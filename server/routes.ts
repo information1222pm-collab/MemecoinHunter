@@ -147,6 +147,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Portfolio routes
+  // Demo default portfolio route for testing
+  app.get("/api/portfolio/default", async (req, res) => {
+    try {
+      // Get or create demo user
+      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
+      if (!demoUser) {
+        demoUser = await storage.createUser({
+          username: "demo_user",
+          email: "demo@memehunter.app",
+          password: "demo123",
+          subscriptionTier: "pro",
+          language: "en"
+        });
+      }
+      
+      // Get or create demo portfolio
+      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+      if (!portfolio) {
+        portfolio = await storage.createPortfolio({
+          userId: demoUser.id,
+          totalValue: "10000.00", // Start with $10,000 virtual balance
+          dailyPnL: "0.00",
+          totalPnL: "0.00",
+          winRate: "0.00"
+        });
+      }
+      
+      const positions = await storage.getPositionsByPortfolio(portfolio.id);
+      res.json({ ...portfolio, positions });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch default portfolio", error });
+    }
+  });
+
   app.get("/api/portfolio/:userId", async (req, res) => {
     try {
       const portfolio = await storage.getPortfolioByUserId(req.params.userId);

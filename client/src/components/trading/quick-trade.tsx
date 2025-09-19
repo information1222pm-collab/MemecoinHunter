@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLanguage } from "@/hooks/use-language";
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -18,6 +18,18 @@ export function QuickTrade() {
   const [tradeType, setTradeType] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("");
   const [orderType, setOrderType] = useState("market");
+
+  // Fetch portfolio data
+  const { data: portfolio } = useQuery({
+    queryKey: ['/api/portfolio/default'],
+    staleTime: 0,
+  });
+
+  // Fetch available tokens
+  const { data: tokens } = useQuery({
+    queryKey: ['/api/tokens'],
+    staleTime: 0,
+  });
 
   const tradeMutation = useMutation({
     mutationFn: async (tradeData: any) => {
@@ -41,7 +53,7 @@ export function QuickTrade() {
   });
 
   const handleTrade = () => {
-    if (!selectedToken || !amount) {
+    if (!selectedToken || !amount || !portfolio || !tokens) {
       toast({
         title: t("trade.error"),
         description: t("trade.fillFields"),
@@ -50,13 +62,28 @@ export function QuickTrade() {
       return;
     }
 
+    // Find the selected token to get current price
+    const selectedTokenData = tokens.find((token: any) => token.id === selectedToken);
+    if (!selectedTokenData) {
+      toast({
+        title: t("trade.error"),
+        description: "Token not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const currentPrice = parseFloat(selectedTokenData.currentPrice || "0");
+    const tradeAmount = parseFloat(amount);
+    const tokenQuantity = tradeAmount / currentPrice;
+
     const tradeData = {
-      portfolioId: "default", // Would come from user context
+      portfolioId: portfolio.id,
       tokenId: selectedToken,
       type: tradeType,
-      amount: amount,
-      price: "0.000012", // Would be fetched from current market price
-      totalValue: (parseFloat(amount) * 0.000012).toString(),
+      amount: tokenQuantity.toString(),
+      price: currentPrice.toString(),
+      totalValue: tradeAmount.toString(),
     };
 
     tradeMutation.mutate(tradeData);
@@ -77,10 +104,11 @@ export function QuickTrade() {
                 <SelectValue placeholder={t("trade.selectToken")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="pepe">PEPE - Pepe Coin</SelectItem>
-                <SelectItem value="doge">DOGE - Dogecoin</SelectItem>
-                <SelectItem value="shib">SHIB - Shiba Inu</SelectItem>
-                <SelectItem value="floki">FLOKI - Floki Inu</SelectItem>
+                {tokens?.map((token: any) => (
+                  <SelectItem key={token.id} value={token.id}>
+                    {token.symbol} - {token.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
