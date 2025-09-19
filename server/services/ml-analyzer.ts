@@ -8,6 +8,26 @@ interface TechnicalIndicators {
   rsi: number;
   volume: number[];
   volatility: number;
+  macd: { macdLine: number[]; signalLine: number[]; histogram: number[] };
+  bollingerBands: { upper: number[]; middle: number[]; lower: number[] };
+  stochastic: { k: number[]; d: number[] };
+  momentum: number[];
+  priceVelocity: number[];
+}
+
+interface MarketSentiment {
+  priceAcceleration: number;
+  volumeWeightedPrice: number;
+  marketRegime: 'bullish' | 'bearish' | 'sideways';
+  trendStrength: number;
+  volatilityRegime: 'low' | 'medium' | 'high';
+}
+
+interface MLFeatures {
+  technicalFeatures: number[];
+  sentimentFeatures: number[];
+  patternFeatures: number[];
+  momentumFeatures: number[];
 }
 
 class MLAnalyzer extends EventEmitter {
@@ -83,6 +103,11 @@ class MLAnalyzer extends EventEmitter {
       rsi: this.calculateRSI(prices, 14),
       volume: volumes,
       volatility: this.calculateVolatility(prices),
+      macd: this.calculateMACD(prices),
+      bollingerBands: this.calculateBollingerBands(prices, 20, 2),
+      stochastic: this.calculateStochastic(prices, 14),
+      momentum: this.calculateMomentum(prices, 10),
+      priceVelocity: this.calculatePriceVelocity(prices),
     };
   }
 
@@ -156,52 +181,27 @@ class MLAnalyzer extends EventEmitter {
   }> {
     const patterns = [];
     const prices = history.map(h => parseFloat(h.price)).reverse();
+    const volumes = history.map(h => parseFloat(h.volume || '0')).reverse();
     
-    // Bull Flag Pattern Detection
-    const bullFlag = this.detectBullFlag(prices, indicators.volume);
-    if (bullFlag.confidence > 70) {
-      patterns.push({
-        type: 'bull_flag',
-        confidence: bullFlag.confidence,
-        timeframe: '1h',
-        metadata: bullFlag.metadata,
-      });
-    }
+    // Calculate market sentiment
+    const sentiment = this.calculateMarketSentiment(prices, volumes, indicators);
     
-    // Double Bottom Pattern Detection
-    const doubleBottom = this.detectDoubleBottom(prices);
-    if (doubleBottom.confidence > 70) {
-      patterns.push({
-        type: 'double_bottom',
-        confidence: doubleBottom.confidence,
-        timeframe: '4h',
-        metadata: doubleBottom.metadata,
-      });
-    }
+    // Extract ML features
+    const features = this.extractMLFeatures(prices, volumes, indicators, sentiment);
     
-    // Volume Spike Detection
-    const volumeSpike = this.detectVolumeSpike(indicators.volume);
-    if (volumeSpike.confidence > 80) {
-      patterns.push({
-        type: 'volume_spike',
-        confidence: volumeSpike.confidence,
-        timeframe: '1h',
-        metadata: volumeSpike.metadata,
-      });
-    }
+    // Advanced pattern detection using ML features
+    const mlPatterns = this.detectMLPatterns(features, prices, indicators);
+    patterns.push(...mlPatterns);
     
-    // RSI Divergence Detection
-    const rsiDivergence = this.detectRSIDivergence(prices, indicators.rsi);
-    if (rsiDivergence.confidence > 75) {
-      patterns.push({
-        type: 'rsi_divergence',
-        confidence: rsiDivergence.confidence,
-        timeframe: '1h',
-        metadata: rsiDivergence.metadata,
-      });
-    }
+    // Enhanced traditional patterns with ML scoring
+    const enhancedPatterns = this.detectEnhancedPatterns(prices, volumes, indicators, sentiment);
+    patterns.push(...enhancedPatterns);
     
-    return patterns;
+    // Momentum-based patterns
+    const momentumPatterns = this.detectMomentumPatterns(indicators, sentiment);
+    patterns.push(...momentumPatterns);
+    
+    return patterns.filter(p => p.confidence > 65); // Higher threshold for better quality
   }
 
   private detectBullFlag(prices: number[], volumes: number[]): { confidence: number; metadata: any } {
@@ -329,6 +329,481 @@ class MLAnalyzer extends EventEmitter {
     return minima;
   }
 
+  // Advanced ML and Technical Analysis Methods
+  
+  private calculateMACD(prices: number[], fastPeriod: number = 12, slowPeriod: number = 26, signalPeriod: number = 9): { macdLine: number[]; signalLine: number[]; histogram: number[] } {
+    const fastEMA = this.calculateEMA(prices, fastPeriod);
+    const slowEMA = this.calculateEMA(prices, slowPeriod);
+    
+    const macdLine = fastEMA.map((fast, i) => fast - (slowEMA[i] || 0));
+    const signalLine = this.calculateEMA(macdLine, signalPeriod);
+    const histogram = macdLine.map((macd, i) => macd - (signalLine[i] || 0));
+    
+    return { macdLine, signalLine, histogram };
+  }
+  
+  private calculateBollingerBands(prices: number[], period: number = 20, stdDev: number = 2): { upper: number[]; middle: number[]; lower: number[] } {
+    const sma = this.calculateSMA(prices, period);
+    const upper: number[] = [];
+    const lower: number[] = [];
+    
+    for (let i = period - 1; i < prices.length; i++) {
+      const slice = prices.slice(i - period + 1, i + 1);
+      const mean = slice.reduce((a, b) => a + b, 0) / slice.length;
+      const variance = slice.reduce((sum, price) => sum + Math.pow(price - mean, 2), 0) / slice.length;
+      const std = Math.sqrt(variance);
+      
+      upper.push(sma[i - period + 1] + (stdDev * std));
+      lower.push(sma[i - period + 1] - (stdDev * std));
+    }
+    
+    return { upper, middle: sma, lower };
+  }
+  
+  private calculateStochastic(prices: number[], period: number = 14): { k: number[]; d: number[] } {
+    const k: number[] = [];
+    
+    for (let i = period - 1; i < prices.length; i++) {
+      const slice = prices.slice(i - period + 1, i + 1);
+      const highest = Math.max(...slice);
+      const lowest = Math.min(...slice);
+      const current = prices[i];
+      
+      if (highest === lowest) {
+        k.push(50); // Avoid division by zero
+      } else {
+        k.push(((current - lowest) / (highest - lowest)) * 100);
+      }
+    }
+    
+    const d = this.calculateSMA(k, 3); // 3-period SMA of %K
+    
+    return { k, d };
+  }
+  
+  private calculateMomentum(prices: number[], period: number = 10): number[] {
+    const momentum: number[] = [];
+    
+    for (let i = period; i < prices.length; i++) {
+      momentum.push(((prices[i] - prices[i - period]) / prices[i - period]) * 100);
+    }
+    
+    return momentum;
+  }
+  
+  private calculatePriceVelocity(prices: number[]): number[] {
+    const velocity: number[] = [];
+    
+    for (let i = 1; i < prices.length; i++) {
+      velocity.push(prices[i] - prices[i - 1]);
+    }
+    
+    return velocity;
+  }
+  
+  private calculateMarketSentiment(prices: number[], volumes: number[], indicators: TechnicalIndicators): MarketSentiment {
+    // Price acceleration (second derivative)
+    const velocity = this.calculatePriceVelocity(prices);
+    const acceleration = this.calculatePriceVelocity(velocity);
+    const priceAcceleration = acceleration.length > 0 ? acceleration[acceleration.length - 1] : 0;
+    
+    // Volume-weighted average price
+    const totalVolume = volumes.reduce((sum, v) => sum + v, 0);
+    const volumeWeightedPrice = totalVolume > 0 ? 
+      prices.reduce((sum, price, i) => sum + (price * volumes[i]), 0) / totalVolume : 0;
+    
+    // Market regime detection
+    const shortMA = indicators.sma.length > 5 ? indicators.sma[indicators.sma.length - 1] : 0;
+    const longMA = indicators.sma.length > 20 ? indicators.sma[indicators.sma.length - 20] : 0;
+    const currentPrice = prices[prices.length - 1];
+    
+    let marketRegime: 'bullish' | 'bearish' | 'sideways' = 'sideways';
+    if (currentPrice > shortMA && shortMA > longMA) {
+      marketRegime = 'bullish';
+    } else if (currentPrice < shortMA && shortMA < longMA) {
+      marketRegime = 'bearish';
+    }
+    
+    // Trend strength using ADX-like calculation
+    const trendStrength = this.calculateTrendStrength(prices);
+    
+    // Volatility regime
+    const volatilityRegime = indicators.volatility > 5 ? 'high' : indicators.volatility > 2 ? 'medium' : 'low';
+    
+    return {
+      priceAcceleration,
+      volumeWeightedPrice,
+      marketRegime,
+      trendStrength,
+      volatilityRegime,
+    };
+  }
+  
+  private calculateTrendStrength(prices: number[]): number {
+    if (prices.length < 14) return 0;
+    
+    const period = 14;
+    let sumDM = 0;
+    let sumTR = 0;
+    
+    for (let i = 1; i < period && i < prices.length; i++) {
+      const high = prices[i];
+      const low = prices[i];
+      const prevClose = prices[i - 1];
+      
+      const trueRange = Math.max(
+        high - low,
+        Math.abs(high - prevClose),
+        Math.abs(low - prevClose)
+      );
+      
+      const directionalMove = Math.abs(prices[i] - prices[i - 1]);
+      
+      sumDM += directionalMove;
+      sumTR += trueRange;
+    }
+    
+    return sumTR > 0 ? (sumDM / sumTR) * 100 : 0;
+  }
+  
+  private extractMLFeatures(prices: number[], volumes: number[], indicators: TechnicalIndicators, sentiment: MarketSentiment): MLFeatures {
+    const technicalFeatures = [
+      indicators.rsi,
+      indicators.volatility,
+      indicators.macd.macdLine[indicators.macd.macdLine.length - 1] || 0,
+      indicators.stochastic.k[indicators.stochastic.k.length - 1] || 0,
+      indicators.momentum[indicators.momentum.length - 1] || 0,
+    ];
+    
+    const sentimentFeatures = [
+      sentiment.priceAcceleration,
+      sentiment.volumeWeightedPrice,
+      sentiment.trendStrength,
+      sentiment.marketRegime === 'bullish' ? 1 : sentiment.marketRegime === 'bearish' ? -1 : 0,
+      sentiment.volatilityRegime === 'high' ? 1 : sentiment.volatilityRegime === 'medium' ? 0.5 : 0,
+    ];
+    
+    const patternFeatures = [
+      this.calculateSupporResistanceStrength(prices),
+      this.calculateBreakoutPotential(prices, volumes),
+      this.calculateVolumeProfile(volumes),
+    ];
+    
+    const momentumFeatures = [
+      this.calculateMomentumDivergence(prices, indicators.rsi),
+      this.calculateVolumeWeightedMomentum(prices, volumes),
+      this.calculatePriceVolumeCorrelation(prices, volumes),
+    ];
+    
+    return {
+      technicalFeatures,
+      sentimentFeatures,
+      patternFeatures,
+      momentumFeatures,
+    };
+  }
+  
+  private calculateSupporResistanceStrength(prices: number[]): number {
+    const currentPrice = prices[prices.length - 1];
+    const recentPrices = prices.slice(-20);
+    
+    let supportCount = 0;
+    let resistanceCount = 0;
+    
+    recentPrices.forEach(price => {
+      if (Math.abs(price - currentPrice) / currentPrice < 0.02) { // Within 2%
+        if (price < currentPrice) supportCount++;
+        else resistanceCount++;
+      }
+    });
+    
+    return (supportCount + resistanceCount) / recentPrices.length;
+  }
+  
+  private calculateBreakoutPotential(prices: number[], volumes: number[]): number {
+    if (prices.length < 10 || volumes.length < 10) return 0;
+    
+    const recentPrices = prices.slice(-10);
+    const recentVolumes = volumes.slice(-10);
+    
+    const priceRange = Math.max(...recentPrices) - Math.min(...recentPrices);
+    const averageVolume = recentVolumes.reduce((sum, v) => sum + v, 0) / recentVolumes.length;
+    const currentVolume = recentVolumes[recentVolumes.length - 1];
+    
+    const priceCompression = 1 - (priceRange / prices[prices.length - 1]);
+    const volumeIncrease = averageVolume > 0 ? currentVolume / averageVolume : 0;
+    
+    return (priceCompression * 0.7) + (Math.min(volumeIncrease, 3) * 0.3);
+  }
+  
+  private calculateVolumeProfile(volumes: number[]): number {
+    if (volumes.length < 10) return 0;
+    
+    const recentVolumes = volumes.slice(-10);
+    const averageVolume = recentVolumes.reduce((sum, v) => sum + v, 0) / recentVolumes.length;
+    const volumeStdDev = Math.sqrt(
+      recentVolumes.reduce((sum, v) => sum + Math.pow(v - averageVolume, 2), 0) / recentVolumes.length
+    );
+    
+    return averageVolume > 0 ? volumeStdDev / averageVolume : 0;
+  }
+  
+  private calculateMomentumDivergence(prices: number[], rsi: number): number {
+    if (prices.length < 10) return 0;
+    
+    const recentPrices = prices.slice(-5);
+    const priceChange = (recentPrices[recentPrices.length - 1] - recentPrices[0]) / recentPrices[0];
+    
+    // Simplified divergence: price goes up but RSI suggests overbought (or vice versa)
+    if (priceChange > 0 && rsi > 70) return 0.8; // Bearish divergence
+    if (priceChange < 0 && rsi < 30) return 0.8; // Bullish divergence
+    
+    return 0;
+  }
+  
+  private calculateVolumeWeightedMomentum(prices: number[], volumes: number[]): number {
+    if (prices.length < 5 || volumes.length < 5) return 0;
+    
+    const recent = Math.min(5, prices.length);
+    let weightedMomentum = 0;
+    let totalVolume = 0;
+    
+    for (let i = prices.length - recent; i < prices.length - 1; i++) {
+      const priceChange = prices[i + 1] - prices[i];
+      const volume = volumes[i];
+      weightedMomentum += priceChange * volume;
+      totalVolume += volume;
+    }
+    
+    return totalVolume > 0 ? weightedMomentum / totalVolume : 0;
+  }
+  
+  private calculatePriceVolumeCorrelation(prices: number[], volumes: number[]): number {
+    if (prices.length < 10 || volumes.length < 10) return 0;
+    
+    const n = Math.min(prices.length, volumes.length, 20);
+    const recentPrices = prices.slice(-n);
+    const recentVolumes = volumes.slice(-n);
+    
+    const avgPrice = recentPrices.reduce((sum, p) => sum + p, 0) / n;
+    const avgVolume = recentVolumes.reduce((sum, v) => sum + v, 0) / n;
+    
+    let covariance = 0;
+    let priceVariance = 0;
+    let volumeVariance = 0;
+    
+    for (let i = 0; i < n; i++) {
+      const priceDiff = recentPrices[i] - avgPrice;
+      const volumeDiff = recentVolumes[i] - avgVolume;
+      
+      covariance += priceDiff * volumeDiff;
+      priceVariance += priceDiff * priceDiff;
+      volumeVariance += volumeDiff * volumeDiff;
+    }
+    
+    const denominator = Math.sqrt(priceVariance * volumeVariance);
+    return denominator > 0 ? covariance / denominator : 0;
+  }
+  
+  private detectMLPatterns(features: MLFeatures, prices: number[], indicators: TechnicalIndicators): Array<{type: string; confidence: number; timeframe: string; metadata: any}> {
+    const patterns = [];
+    
+    // ML-based breakout pattern
+    const breakoutScore = this.calculateMLBreakoutScore(features);
+    if (breakoutScore > 0.7) {
+      patterns.push({
+        type: 'ml_breakout',
+        confidence: Math.min(breakoutScore * 100, 95),
+        timeframe: '1h',
+        metadata: {
+          technicalScore: features.technicalFeatures.reduce((sum, f) => sum + f, 0) / features.technicalFeatures.length,
+          sentimentScore: features.sentimentFeatures.reduce((sum, f) => sum + f, 0) / features.sentimentFeatures.length,
+          momentumScore: features.momentumFeatures.reduce((sum, f) => sum + f, 0) / features.momentumFeatures.length,
+        },
+      });
+    }
+    
+    // ML-based reversal pattern
+    const reversalScore = this.calculateMLReversalScore(features);
+    if (reversalScore > 0.7) {
+      patterns.push({
+        type: 'ml_reversal',
+        confidence: Math.min(reversalScore * 100, 95),
+        timeframe: '2h',
+        metadata: {
+          divergenceStrength: features.momentumFeatures[0],
+          volumePattern: features.patternFeatures[2],
+          trendExhaustion: features.sentimentFeatures[2],
+        },
+      });
+    }
+    
+    // Advanced momentum pattern
+    const momentumScore = this.calculateAdvancedMomentumScore(features, indicators);
+    if (momentumScore > 0.75) {
+      patterns.push({
+        type: 'advanced_momentum',
+        confidence: Math.min(momentumScore * 100, 95),
+        timeframe: '30m',
+        metadata: {
+          momentumStrength: features.momentumFeatures[1],
+          volumeConfirmation: features.momentumFeatures[2],
+          technicalAlignment: features.technicalFeatures[4],
+        },
+      });
+    }
+    
+    return patterns;
+  }
+  
+  private calculateMLBreakoutScore(features: MLFeatures): number {
+    // Weighted scoring based on multiple ML features
+    const technicalWeight = 0.3;
+    const sentimentWeight = 0.25;
+    const patternWeight = 0.25;
+    const momentumWeight = 0.2;
+    
+    const technicalScore = this.normalizeFeatures(features.technicalFeatures);
+    const sentimentScore = this.normalizeFeatures(features.sentimentFeatures);
+    const patternScore = this.normalizeFeatures(features.patternFeatures);
+    const momentumScore = this.normalizeFeatures(features.momentumFeatures);
+    
+    return (technicalScore * technicalWeight) + 
+           (sentimentScore * sentimentWeight) + 
+           (patternScore * patternWeight) + 
+           (momentumScore * momentumWeight);
+  }
+  
+  private calculateMLReversalScore(features: MLFeatures): number {
+    // Focus on divergence and extreme conditions
+    const divergenceWeight = 0.4;
+    const extremeWeight = 0.3;
+    const volumeWeight = 0.3;
+    
+    const divergenceScore = Math.abs(features.momentumFeatures[0]); // Momentum divergence
+    const extremeScore = features.technicalFeatures[0] > 70 || features.technicalFeatures[0] < 30 ? 1 : 0; // RSI extreme
+    const volumeScore = features.patternFeatures[2]; // Volume profile
+    
+    return (divergenceScore * divergenceWeight) + 
+           (extremeScore * extremeWeight) + 
+           (volumeScore * volumeWeight);
+  }
+  
+  private calculateAdvancedMomentumScore(features: MLFeatures, indicators: TechnicalIndicators): number {
+    // Multi-timeframe momentum analysis
+    const macdStrength = Math.abs(indicators.macd.histogram[indicators.macd.histogram.length - 1] || 0);
+    const volumeMomentum = features.momentumFeatures[1];
+    const priceVolumeCorr = Math.abs(features.momentumFeatures[2]);
+    
+    const normalizedMACD = Math.min(macdStrength / 10, 1); // Normalize MACD
+    const normalizedVolume = Math.min(Math.abs(volumeMomentum) / 100, 1);
+    
+    return (normalizedMACD * 0.4) + (normalizedVolume * 0.3) + (priceVolumeCorr * 0.3);
+  }
+  
+  private normalizeFeatures(features: number[]): number {
+    if (features.length === 0) return 0;
+    
+    const sum = features.reduce((sum, f) => sum + Math.abs(f), 0);
+    return Math.min(sum / (features.length * 100), 1); // Normalize to 0-1 range
+  }
+  
+  private detectEnhancedPatterns(prices: number[], volumes: number[], indicators: TechnicalIndicators, sentiment: MarketSentiment): Array<{type: string; confidence: number; timeframe: string; metadata: any}> {
+    const patterns = [];
+    
+    // Enhanced Bull Flag with ML scoring
+    const bullFlag = this.detectBullFlag(prices, volumes);
+    if (bullFlag.confidence > 50) {
+      const mlEnhancement = sentiment.marketRegime === 'bullish' ? 20 : 0;
+      const volumeEnhancement = sentiment.volatilityRegime === 'medium' ? 15 : 0;
+      
+      patterns.push({
+        type: 'enhanced_bull_flag',
+        confidence: Math.min(bullFlag.confidence + mlEnhancement + volumeEnhancement, 95),
+        timeframe: '1h',
+        metadata: {
+          ...bullFlag.metadata,
+          marketRegime: sentiment.marketRegime,
+          trendStrength: sentiment.trendStrength,
+        },
+      });
+    }
+    
+    // Enhanced Volume Analysis
+    const volumeSpike = this.detectVolumeSpike(volumes);
+    if (volumeSpike.confidence > 60) {
+      const priceConfirmation = Math.abs(indicators.momentum[indicators.momentum.length - 1] || 0) > 5 ? 20 : 0;
+      
+      patterns.push({
+        type: 'enhanced_volume_breakout',
+        confidence: Math.min(volumeSpike.confidence + priceConfirmation, 95),
+        timeframe: '30m',
+        metadata: {
+          ...volumeSpike.metadata,
+          priceAcceleration: sentiment.priceAcceleration,
+          momentumConfirmation: indicators.momentum[indicators.momentum.length - 1] || 0,
+        },
+      });
+    }
+    
+    return patterns;
+  }
+  
+  private detectMomentumPatterns(indicators: TechnicalIndicators, sentiment: MarketSentiment): Array<{type: string; confidence: number; timeframe: string; metadata: any}> {
+    const patterns = [];
+    
+    // MACD Golden Cross
+    const macdLine = indicators.macd.macdLine;
+    const signalLine = indicators.macd.signalLine;
+    
+    if (macdLine.length >= 2 && signalLine.length >= 2) {
+      const currentMACD = macdLine[macdLine.length - 1];
+      const currentSignal = signalLine[signalLine.length - 1];
+      const prevMACD = macdLine[macdLine.length - 2];
+      const prevSignal = signalLine[signalLine.length - 2];
+      
+      if (prevMACD <= prevSignal && currentMACD > currentSignal) {
+        const trendConfirmation = sentiment.marketRegime === 'bullish' ? 25 : 0;
+        
+        patterns.push({
+          type: 'macd_golden_cross',
+          confidence: 75 + trendConfirmation,
+          timeframe: '1h',
+          metadata: {
+            macdValue: currentMACD,
+            signalValue: currentSignal,
+            histogram: indicators.macd.histogram[indicators.macd.histogram.length - 1],
+            trendAlignment: sentiment.marketRegime,
+          },
+        });
+      }
+    }
+    
+    // Stochastic momentum
+    const stochK = indicators.stochastic.k;
+    const stochD = indicators.stochastic.d;
+    
+    if (stochK.length > 0 && stochD.length > 0) {
+      const currentK = stochK[stochK.length - 1];
+      const currentD = stochD[stochD.length - 1];
+      
+      if (currentK < 20 && currentD < 20 && currentK > currentD) {
+        patterns.push({
+          type: 'stochastic_oversold_reversal',
+          confidence: 80,
+          timeframe: '1h',
+          metadata: {
+            stochK: currentK,
+            stochD: currentD,
+            oversoldLevel: 20,
+          },
+        });
+      }
+    }
+    
+    return patterns;
+  }
+
   private async savePattern(tokenId: string, pattern: any) {
     try {
       const patternData: InsertPattern = {
@@ -342,7 +817,7 @@ class MLAnalyzer extends EventEmitter {
       const savedPattern = await storage.createPattern(patternData);
       this.emit('patternDetected', savedPattern);
       
-      console.log(`🔍 Pattern detected: ${pattern.type} (${pattern.confidence}% confidence)`);
+      console.log(`🤖 Advanced ML Pattern: ${pattern.type} (${pattern.confidence.toFixed(1)}% confidence)`);
     } catch (error) {
       console.error('Error saving pattern:', error);
     }

@@ -82,7 +82,7 @@ export const patterns = pgTable("patterns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tokenId: varchar("token_id").notNull().references(() => tokens.id),
   patternType: text("pattern_type").notNull(), // 'bull_flag', 'double_bottom', 'volume_spike', etc.
-  confidence: integer("confidence").notNull(), // 0-100
+  confidence: decimal("confidence", { precision: 5, scale: 2 }).notNull(), // 0.00-100.00
   timeframe: text("timeframe").notNull(), // '1h', '4h', '1d', '1w'
   metadata: jsonb("metadata"), // Additional pattern data
   detectedAt: timestamp("detected_at").defaultNow(),
