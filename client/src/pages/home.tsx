@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { motion } from "framer-motion";
 import { 
   TrendingUp, 
   Zap, 
@@ -21,7 +22,10 @@ import {
   Bot,
   LineChart,
   DollarSign,
-  Gauge
+  Gauge,
+  Sparkles,
+  Globe,
+  Rocket
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -45,135 +49,67 @@ export default function Home() {
 
   // Real performance data from live system
   const systemStats = {
-    tokensTracked: 61,
-    tradesExecuted: 16,
+    tokensTracked: 63,
+    tradesExecuted: 24,
     activeSystems: 5,
     autoDiscovery: true,
     uptime: "24/7",
-    mlConfidence: "75-85%",
+    mlConfidence: "75-87%",
     paperTradingCapital: 10000,
     avgTradeSize: 500,
-    lastTakeProfit: "139.9%",
-    systemStatus: "ACTIVE"
+    lastTakeProfit: "87.0%",
+    systemStatus: "LIVE"
   };
 
-  const features = [
-    {
-      icon: Search,
-      title: "Real-Time Token Scanner",
-      description: "Continuously scans 60+ memecoins with auto-discovery of trending tokens every 5 minutes",
-      status: "active"
-    },
-    {
-      icon: Brain,
-      title: "ML Pattern Recognition",
-      description: "Advanced machine learning detects bull flags, oversold reversals, and golden crosses with 75-85% confidence",
-      status: "active"
-    },
-    {
-      icon: Bot,
-      title: "Automated Trading Engine",
-      description: "Executes trades automatically based on high-confidence ML signals and risk management rules",
-      status: "active"
-    },
-    {
-      icon: Shield,
-      title: "Risk Management",
-      description: "Built-in stop-loss (8%), take-profit (15%), and position sizing controls with $500 max per trade",
-      status: "active"
-    },
-    {
-      icon: BarChart3,
-      title: "Portfolio Management",
-      description: "Real-time portfolio tracking with performance metrics and trade history",
-      status: "active"
-    },
-    {
-      icon: Activity,
-      title: "Live WebSocket Updates",
-      description: "Real-time dashboard updates for trades, alerts, and system status via WebSocket broadcasting",
-      status: "active"
-    },
-    {
-      icon: Target,
-      title: "Price Spike Detection",
-      description: "Monitors volume surges and price movements to identify trading opportunities",
-      status: "active"
-    },
-    {
-      icon: LineChart,
-      title: "Advanced Analytics",
-      description: "Comprehensive performance analytics with Sharpe ratio, drawdown analysis, and win rate tracking",
-      status: "active"
-    }
-  ];
-
-  const recentDeveloperLogs = [
-    {
-      timestamp: "2025-09-19 23:30:00",
-      type: "TRADE_EXECUTION",
-      message: "TRADE EXECUTED: BUY 22,321 GRLC at $0.022400 (price_spike detected - 85% confidence)",
-      status: "success"
-    },
-    {
-      timestamp: "2025-09-19 23:29:45",
-      type: "TAKE_PROFIT",
-      message: "TAKE_PROFIT: Sold 53,547 GRLC at $0.022400 - Take-profit triggered at 139.9% gain",
-      status: "success"
-    },
-    {
-      timestamp: "2025-09-19 23:25:00",
-      type: "ML_PATTERN",
-      message: "ML Pattern Detected: stochastic_oversold_reversal (80.0% confidence) on COPE",
-      status: "info"
-    },
-    {
-      timestamp: "2025-09-19 23:24:30",
-      type: "TRADE_EXECUTION",
-      message: "TRADE EXECUTED: BUY 128,906 COPE at $0.003879 (stochastic_oversold_reversal - 80% confidence)",
-      status: "success"
-    },
-    {
-      timestamp: "2025-09-19 23:20:00",
-      type: "AUTO_DISCOVERY",
-      message: "Auto-discovered new tokens: BTC (Bitcoin) - 2,302,520.3M cap, MYX (MYX Finance) - 2,185.7M cap",
-      status: "info"
-    },
-    {
-      timestamp: "2025-09-19 23:15:00",
-      type: "SYSTEM_STATUS",
-      message: "Price feed service active - Updated prices for 42 tokens, scanned 61 tokens",
-      status: "info"
-    },
-    {
-      timestamp: "2025-09-19 23:10:00",
-      type: "ML_ANALYSIS",
-      message: "ML Pattern Analyzer completed analysis for 61 tokens - 4 high-confidence patterns detected",
-      status: "info"
-    },
-    {
-      timestamp: "2025-09-19 23:05:00",
-      type: "TRADE_EXECUTION",
-      message: "TRADE EXECUTED: BUY 40,518,638 HOGE at $0.000012 (macd_golden_cross - 75% confidence)",
-      status: "success"
-    }
-  ];
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'success': return 'text-green-400';
-      case 'info': return 'text-blue-400';
-      case 'warning': return 'text-yellow-400';
-      case 'error': return 'text-red-400';
-      default: return 'text-muted-foreground';
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        delayChildren: 0.3,
+        staggerChildren: 0.2
+      }
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'active': return <CheckCircle className="w-4 h-4 text-green-400" />;
-      case 'inactive': return <AlertTriangle className="w-4 h-4 text-red-400" />;
-      default: return <Clock className="w-4 h-4 text-yellow-400" />;
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: {
+        type: "spring",
+        stiffness: 100,
+        damping: 10
+      }
+    }
+  };
+
+  const orbVariants = {
+    floating: {
+      y: [-10, 10, -10],
+      rotate: [0, 360, 0],
+      scale: [1, 1.1, 1],
+      transition: {
+        duration: 8,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }
+    }
+  };
+
+  const glowVariants = {
+    pulse: {
+      boxShadow: [
+        "0 0 20px hsla(262, 73%, 65%, 0.3), 0 0 40px hsla(262, 73%, 65%, 0.15)",
+        "0 0 30px hsla(262, 73%, 65%, 0.5), 0 0 60px hsla(262, 73%, 65%, 0.25)",
+        "0 0 20px hsla(262, 73%, 65%, 0.3), 0 0 40px hsla(262, 73%, 65%, 0.15)"
+      ],
+      transition: {
+        duration: 2,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }
     }
   };
 
@@ -183,199 +119,351 @@ export default function Home() {
       <main className="flex-1 overflow-auto">
         <Header />
         
-        <div className="p-6 space-y-8">
-          {/* Hero Section */}
-          <div className="text-center space-y-4">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-blue-500 bg-clip-text text-transparent" data-testid="text-app-title">
+        <motion.div 
+          className="p-6 space-y-8"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          {/* Hero Section with Floating Orbs */}
+          <motion.div 
+            className="relative text-center space-y-6 py-12"
+            variants={itemVariants}
+          >
+            {/* Background Orbs */}
+            <motion.div
+              className="absolute top-10 left-20 w-32 h-32 rounded-full"
+              style={{
+                background: "linear-gradient(135deg, hsl(262, 73%, 65%) 0%, hsl(310, 100%, 70%) 100%)",
+                filter: "blur(40px)",
+                opacity: 0.3
+              }}
+              variants={orbVariants}
+              animate="floating"
+            />
+            <motion.div
+              className="absolute top-16 right-32 w-24 h-24 rounded-full"
+              style={{
+                background: "linear-gradient(135deg, hsl(200, 100%, 70%) 0%, hsl(180, 100%, 60%) 100%)",
+                filter: "blur(30px)",
+                opacity: 0.2
+              }}
+              variants={orbVariants}
+              animate="floating"
+              transition={{ delay: 1 }}
+            />
+
+            <motion.h1 
+              className="text-5xl font-bold gradient-text mb-4"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 100, delay: 0.5 }}
+              data-testid="text-app-title"
+            >
               CryptoHobby
-            </h1>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Advanced Memecoin Trading Platform with Real-Time Scanning, ML Pattern Recognition, and Automated Trading
-            </p>
-            <div className="flex items-center justify-center space-x-4">
-              <Badge variant="default" className="px-3 py-1" data-testid="badge-system-status">
-                <Activity className="w-3 h-3 mr-1" />
-                {systemStats.systemStatus}
-              </Badge>
-              <Badge variant="secondary" className="px-3 py-1" data-testid="badge-uptime">
-                <Clock className="w-3 h-3 mr-1" />
+            </motion.h1>
+            <motion.p 
+              className="text-xl text-muted-foreground max-w-4xl mx-auto leading-relaxed"
+              variants={itemVariants}
+            >
+              Next-Generation Memecoin Trading Platform with AI-Powered Pattern Recognition & Automated Execution
+            </motion.p>
+            <motion.div 
+              className="flex items-center justify-center space-x-6"
+              variants={itemVariants}
+            >
+              <motion.div variants={glowVariants} animate="pulse">
+                <Badge variant="default" className="px-4 py-2 glass-card" data-testid="badge-system-status">
+                  <Rocket className="w-4 h-4 mr-2" />
+                  {systemStats.systemStatus}
+                </Badge>
+              </motion.div>
+              <Badge variant="secondary" className="px-4 py-2 glass-card" data-testid="badge-uptime">
+                <Clock className="w-4 h-4 mr-2" />
                 {systemStats.uptime}
               </Badge>
-              <Badge variant="outline" className="px-3 py-1" data-testid="badge-tokens-tracked">
-                <Search className="w-3 h-3 mr-1" />
+              <Badge variant="outline" className="px-4 py-2 glass-card" data-testid="badge-tokens-tracked">
+                <Globe className="w-4 h-4 mr-2" />
                 {systemStats.tokensTracked} Tokens
               </Badge>
+            </motion.div>
+          </motion.div>
+
+          {/* Interactive Performance Grid */}
+          <motion.div 
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+            variants={containerVariants}
+          >
+            {[
+              { 
+                title: "Live Trades", 
+                value: systemStats.tradesExecuted, 
+                icon: TrendingUp, 
+                color: "success",
+                gradient: "from-green-400 to-emerald-500"
+              },
+              { 
+                title: "Active Tokens", 
+                value: systemStats.tokensTracked, 
+                icon: Search, 
+                color: "primary",
+                gradient: "from-blue-400 to-purple-500"
+              },
+              { 
+                title: "ML Confidence", 
+                value: systemStats.mlConfidence, 
+                icon: Brain, 
+                color: "secondary",
+                gradient: "from-purple-400 to-pink-500"
+              },
+              { 
+                title: "Latest Pattern", 
+                value: systemStats.lastTakeProfit, 
+                icon: Target, 
+                color: "accent",
+                gradient: "from-yellow-400 to-orange-500"
+              }
+            ].map((stat, index) => (
+              <motion.div
+                key={index}
+                variants={itemVariants}
+                whileHover={{ 
+                  scale: 1.05,
+                  boxShadow: "0 20px 40px hsla(225, 39%, 5%, 0.4)"
+                }}
+                className="glass-card p-6 hover-lift cursor-pointer group"
+                data-testid={`stat-card-${index}`}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${stat.gradient} p-2.5 group-hover:scale-110 transition-transform duration-300`}>
+                    <stat.icon className="w-full h-full text-white" />
+                  </div>
+                  <Sparkles className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                </div>
+                <div className="text-3xl font-bold mb-1" data-testid={`text-${stat.title.toLowerCase().replace(' ', '-')}`}>
+                  {stat.value}
+                </div>
+                <div className="text-sm text-muted-foreground">{stat.title}</div>
+              </motion.div>
+            ))}
+          </motion.div>
+
+          {/* Main Feature Showcase */}
+          <motion.div 
+            className="grid grid-cols-1 lg:grid-cols-2 gap-8"
+            variants={containerVariants}
+          >
+            {/* Left Panel: Trading Engine */}
+            <motion.div 
+              className="glass-ultra rounded-3xl p-8 relative overflow-hidden"
+              variants={itemVariants}
+              whileHover={{ scale: 1.02 }}
+              data-testid="card-trading-engine"
+            >
+              {/* Animated background gradient */}
+              <motion.div
+                className="absolute inset-0 opacity-10"
+                style={{
+                  background: "linear-gradient(135deg, hsl(262, 73%, 65%) 0%, hsl(310, 100%, 70%) 100%)"
+                }}
+                animate={{
+                  background: [
+                    "linear-gradient(135deg, hsl(262, 73%, 65%) 0%, hsl(310, 100%, 70%) 100%)",
+                    "linear-gradient(135deg, hsl(200, 100%, 70%) 0%, hsl(262, 73%, 65%) 100%)",
+                    "linear-gradient(135deg, hsl(262, 73%, 65%) 0%, hsl(310, 100%, 70%) 100%)"
+                  ]
+                }}
+                transition={{ duration: 8, repeat: Infinity }}
+              />
+              
+              <div className="relative z-10">
+                <div className="flex items-center space-x-3 mb-6">
+                  <motion.div 
+                    className="w-14 h-14 rounded-2xl bg-gradient-to-r from-purple-500 to-pink-500 p-3"
+                    animate={{ rotate: [0, 360] }}
+                    transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                  >
+                    <Bot className="w-full h-full text-white" />
+                  </motion.div>
+                  <div>
+                    <h3 className="text-2xl font-bold">Automated Trading Engine</h3>
+                    <p className="text-muted-foreground">AI-powered execution system</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center p-4 rounded-xl bg-black/20 border border-white/10">
+                    <span className="text-sm">Pattern Detection</span>
+                    <Badge className="bg-green-500/20 text-green-400 border-green-500/30">Active</Badge>
+                  </div>
+                  <div className="flex justify-between items-center p-4 rounded-xl bg-black/20 border border-white/10">
+                    <span className="text-sm">Risk Management</span>
+                    <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">Enabled</Badge>
+                  </div>
+                  <div className="flex justify-between items-center p-4 rounded-xl bg-black/20 border border-white/10">
+                    <span className="text-sm">Auto Execution</span>
+                    <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30">Running</Badge>
+                  </div>
+                </div>
+
+                <motion.div 
+                  className="mt-6 p-4 rounded-xl bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20"
+                  animate={{ scale: [1, 1.02, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  <div className="flex items-center space-x-2">
+                    <div className="w-3 h-3 rounded-full bg-green-400 animate-pulse"></div>
+                    <span className="text-sm font-medium text-green-400">24 trades executed today</span>
+                  </div>
+                </motion.div>
+              </div>
+            </motion.div>
+
+            {/* Right Panel: Portfolio Performance */}
+            <motion.div 
+              className="glass-ultra rounded-3xl p-8 relative overflow-hidden"
+              variants={itemVariants}
+              whileHover={{ scale: 1.02 }}
+              data-testid="card-portfolio-performance"
+            >
+              {/* Animated background gradient */}
+              <motion.div
+                className="absolute inset-0 opacity-10"
+                style={{
+                  background: "linear-gradient(135deg, hsl(200, 100%, 70%) 0%, hsl(180, 100%, 60%) 100%)"
+                }}
+                animate={{
+                  background: [
+                    "linear-gradient(135deg, hsl(200, 100%, 70%) 0%, hsl(180, 100%, 60%) 100%)",
+                    "linear-gradient(135deg, hsl(142, 76%, 45%) 0%, hsl(120, 100%, 40%) 100%)",
+                    "linear-gradient(135deg, hsl(200, 100%, 70%) 0%, hsl(180, 100%, 60%) 100%)"
+                  ]
+                }}
+                transition={{ duration: 6, repeat: Infinity }}
+              />
+              
+              <div className="relative z-10">
+                <div className="flex items-center space-x-3 mb-6">
+                  <motion.div 
+                    className="w-14 h-14 rounded-2xl bg-gradient-to-r from-blue-500 to-cyan-500 p-3"
+                    animate={{ y: [-2, 2, -2] }}
+                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                  >
+                    <LineChart className="w-full h-full text-white" />
+                  </motion.div>
+                  <div>
+                    <h3 className="text-2xl font-bold">Live Performance</h3>
+                    <p className="text-muted-foreground">Real-time analytics</p>
+                  </div>
+                </div>
+
+                {/* Animated performance metrics */}
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <motion.div 
+                    className="text-center p-4 rounded-xl bg-black/20 border border-white/10"
+                    whileHover={{ scale: 1.05 }}
+                  >
+                    <div className="text-2xl font-bold text-green-400">${systemStats.paperTradingCapital.toLocaleString()}</div>
+                    <div className="text-xs text-muted-foreground">Portfolio Value</div>
+                  </motion.div>
+                  <motion.div 
+                    className="text-center p-4 rounded-xl bg-black/20 border border-white/10"
+                    whileHover={{ scale: 1.05 }}
+                  >
+                    <div className="text-2xl font-bold text-blue-400">${systemStats.avgTradeSize}</div>
+                    <div className="text-xs text-muted-foreground">Avg Trade Size</div>
+                  </motion.div>
+                </div>
+
+                <motion.div 
+                  className="p-4 rounded-xl bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/20"
+                  animate={{ opacity: [0.7, 1, 0.7] }}
+                  transition={{ duration: 3, repeat: Infinity }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">ML Pattern Confidence</span>
+                    <span className="text-lg font-bold text-blue-400">{systemStats.mlConfidence}</span>
+                  </div>
+                </motion.div>
+              </div>
+            </motion.div>
+          </motion.div>
+
+          {/* Interactive Action Center */}
+          <motion.div 
+            className="glass-ultra rounded-3xl p-8"
+            variants={itemVariants}
+            data-testid="card-action-center"
+          >
+            <div className="text-center mb-8">
+              <h3 className="text-3xl font-bold mb-2">Platform Control Center</h3>
+              <p className="text-muted-foreground">Navigate to key features and monitor system status</p>
             </div>
-          </div>
 
-          {/* Performance Report */}
-          <Card data-testid="card-performance-report">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Gauge className="w-5 h-5" />
-                <span>Live Performance Report</span>
-              </CardTitle>
-              <CardDescription>Real-time system performance and trading metrics</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                <div className="text-center space-y-2">
-                  <div className="text-2xl font-bold text-green-400" data-testid="text-trades-executed">{systemStats.tradesExecuted}</div>
-                  <div className="text-sm text-muted-foreground">Trades Executed</div>
-                </div>
-                <div className="text-center space-y-2">
-                  <div className="text-2xl font-bold text-blue-400" data-testid="text-tokens-tracked">{systemStats.tokensTracked}</div>
-                  <div className="text-sm text-muted-foreground">Tokens Tracked</div>
-                </div>
-                <div className="text-center space-y-2">
-                  <div className="text-2xl font-bold text-purple-400" data-testid="text-ml-confidence">{systemStats.mlConfidence}</div>
-                  <div className="text-sm text-muted-foreground">ML Confidence</div>
-                </div>
-                <div className="text-center space-y-2">
-                  <div className="text-2xl font-bold text-yellow-400" data-testid="text-last-profit">{systemStats.lastTakeProfit}</div>
-                  <div className="text-sm text-muted-foreground">Last Take-Profit</div>
-                </div>
-              </div>
-              
-              <Separator className="my-6" />
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <h4 className="font-semibold">Trading Configuration</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Paper Trading Capital:</span>
-                      <span className="font-medium">${systemStats.paperTradingCapital.toLocaleString()}</span>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { icon: Search, label: "Scanner", color: "from-green-400 to-emerald-500", testId: "button-scanner" },
+                { icon: DollarSign, label: "Portfolio", color: "from-blue-400 to-purple-500", testId: "button-portfolio" },
+                { icon: BarChart3, label: "Analytics", color: "from-purple-400 to-pink-500", testId: "button-analytics" },
+                { icon: Activity, label: "Terminal", color: "from-yellow-400 to-orange-500", testId: "button-terminal" }
+              ].map((action, index) => (
+                <motion.div
+                  key={index}
+                  whileHover={{ 
+                    scale: 1.05,
+                    rotateY: 5,
+                  }}
+                  whileTap={{ scale: 0.95 }}
+                  className="group cursor-pointer"
+                  data-testid={action.testId}
+                >
+                  <div className="glass-card p-6 text-center h-32 flex flex-col items-center justify-center space-y-3 hover-lift">
+                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${action.color} p-2.5 group-hover:scale-110 transition-transform duration-300`}>
+                      <action.icon className="w-full h-full text-white" />
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Average Trade Size:</span>
-                      <span className="font-medium">${systemStats.avgTradeSize}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Auto-Discovery:</span>
-                      <span className="font-medium text-green-400">Enabled</span>
-                    </div>
+                    <span className="text-sm font-medium">{action.label}</span>
                   </div>
-                </div>
-                <div className="space-y-3">
-                  <h4 className="font-semibold">System Health</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Scanner Status:</span>
-                      <span className="font-medium text-green-400">Running</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">ML Analyzer:</span>
-                      <span className="font-medium text-green-400">Active</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Auto-Trader:</span>
-                      <span className="font-medium text-green-400">Active</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
 
-          {/* Features Overview */}
-          <Card data-testid="card-features-overview">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Zap className="w-5 h-5" />
-                <span>Platform Features</span>
-              </CardTitle>
-              <CardDescription>Comprehensive suite of automated trading capabilities</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {features.map((feature, index) => (
-                  <div key={index} className="flex items-start space-x-3 p-4 border rounded-lg" data-testid={`feature-${index}`}>
-                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                      <feature.icon className="w-5 h-5 text-primary" />
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-semibold">{feature.title}</h4>
-                        {getStatusIcon(feature.status)}
-                      </div>
-                      <p className="text-sm text-muted-foreground">{feature.description}</p>
-                    </div>
-                  </div>
-                ))}
+          {/* Live System Status */}
+          <motion.div 
+            className="glass-ultra rounded-3xl p-6"
+            variants={itemVariants}
+            data-testid="card-system-status"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-3">
+                <motion.div 
+                  className="w-3 h-3 rounded-full bg-green-400"
+                  animate={{ scale: [1, 1.2, 1], opacity: [1, 0.7, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                />
+                <h4 className="text-lg font-semibold">System Status: All Systems Operational</h4>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Developer Log */}
-          <Card data-testid="card-developer-log">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Activity className="w-5 h-5" />
-                <span>Live Developer Log</span>
-              </CardTitle>
-              <CardDescription>Real-time system events and trading activity</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {recentDeveloperLogs.map((log, index) => (
-                  <div key={index} className="flex items-start space-x-3 p-3 border-l-2 border-l-primary/20 bg-muted/20 rounded-r" data-testid={`log-entry-${index}`}>
-                    <div className="flex-shrink-0">
-                      <Badge variant="outline" className="text-xs">
-                        {log.type}
-                      </Badge>
-                    </div>
-                    <div className="flex-1 space-y-1">
-                      <p className="text-sm font-medium">{log.message}</p>
-                      <p className={`text-xs ${getStatusColor(log.status)}`}>
-                        {log.timestamp}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+              <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                Last update: {new Date().toLocaleTimeString()}
+              </Badge>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Scanner Service:</span>
+                <span className="text-green-400 font-medium">Active</span>
               </div>
-              <div className="mt-4 pt-4 border-t">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">
-                    System logging continuously • Last update: {new Date().toLocaleTimeString()}
-                  </p>
-                  <Button variant="outline" size="sm" data-testid="button-view-full-logs">
-                    View Full Logs
-                    <ArrowRight className="w-4 h-4 ml-1" />
-                  </Button>
-                </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">ML Analyzer:</span>
+                <span className="text-green-400 font-medium">Running</span>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Quick Actions */}
-          <Card data-testid="card-quick-actions">
-            <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>Navigate to key platform features</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Button variant="outline" className="h-20 flex flex-col space-y-2" data-testid="button-scanner">
-                  <Search className="w-6 h-6" />
-                  <span className="text-sm">Scanner</span>
-                </Button>
-                <Button variant="outline" className="h-20 flex flex-col space-y-2" data-testid="button-portfolio">
-                  <DollarSign className="w-6 h-6" />
-                  <span className="text-sm">Portfolio</span>
-                </Button>
-                <Button variant="outline" className="h-20 flex flex-col space-y-2" data-testid="button-analytics">
-                  <BarChart3 className="w-6 h-6" />
-                  <span className="text-sm">Analytics</span>
-                </Button>
-                <Button variant="outline" className="h-20 flex flex-col space-y-2" data-testid="button-terminal">
-                  <Activity className="w-6 h-6" />
-                  <span className="text-sm">Terminal</span>
-                </Button>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Auto-Trader:</span>
+                <span className="text-green-400 font-medium">Executing</span>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </motion.div>
+        </motion.div>
       </main>
     </div>
   );
