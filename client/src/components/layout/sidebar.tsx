@@ -12,10 +12,12 @@ import {
   CreditCard,
   Settings,
   Users,
+  Home,
 } from "lucide-react";
 
 const navigationItems = [
-  { href: "/", icon: BarChart3, labelKey: "navigation.dashboard" },
+  { href: "/", icon: Home, labelKey: "navigation.home" },
+  { href: "/dashboard", icon: BarChart3, labelKey: "navigation.dashboard" },
   { href: "/scanner", icon: Zap, labelKey: "navigation.scanner", hasIndicator: true },
   { href: "/portfolio", icon: Briefcase, labelKey: "navigation.portfolio" },
   { href: "/analytics", icon: TrendingUp, labelKey: "navigation.analytics" },

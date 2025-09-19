@@ -1,6 +1,7 @@
 export const translations = {
   en: {
     navigation: {
+      home: "Home",
       dashboard: "Dashboard",
       scanner: "Live Scanner",
       portfolio: "Portfolio",
@@ -117,6 +118,7 @@ export const translations = {
   },
   es: {
     navigation: {
+      home: "Inicio",
       dashboard: "Panel de Control",
       scanner: "Escáner en Vivo",
       portfolio: "Cartera",
@@ -233,6 +235,7 @@ export const translations = {
   },
   fr: {
     navigation: {
+      home: "Accueil",
       dashboard: "Tableau de Bord",
       scanner: "Scanner en Direct",
       portfolio: "Portefeuille",
@@ -349,6 +352,7 @@ export const translations = {
   },
   de: {
     navigation: {
+      home: "Startseite",
       dashboard: "Dashboard",
       scanner: "Live Scanner",
       portfolio: "Portfolio",
@@ -465,6 +469,7 @@ export const translations = {
   },
   ja: {
     navigation: {
+      home: "ホーム",
       dashboard: "ダッシュボード",
       scanner: "ライブスキャナー",
       portfolio: "ポートフォリオ",
@@ -581,6 +586,7 @@ export const translations = {
   },
   ko: {
     navigation: {
+      home: "홈",
       dashboard: "대시보드",
       scanner: "라이브 스캐너",
       portfolio: "포트폴리오",
