@@ -6,6 +6,7 @@ import { scanner } from "./services/scanner";
 import { mlAnalyzer } from "./services/ml-analyzer";
 import { priceFeed } from "./services/price-feed";
 import { riskManager } from "./services/risk-manager";
+import { autoTrader } from "./services/auto-trader";
 import { insertUserSchema, insertTradeSchema, insertTokenSchema } from "@shared/schema";
 import { z } from "zod";
 
@@ -59,6 +60,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   priceFeed.start();
   mlAnalyzer.start();
   riskManager.start();
+  autoTrader.start();
 
   // Set up real-time broadcasts
   scanner.on('tokenScanned', (token) => {
@@ -71,6 +73,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   priceFeed.on('priceUpdate', (update) => {
     broadcast({ type: 'price_update', data: update });
+  });
+
+  // Auto-trader real-time events
+  autoTrader.on('tradeExecuted', (tradeData) => {
+    broadcast({ type: 'trade_executed', data: tradeData });
+  });
+
+  autoTrader.on('statsUpdate', (statsData) => {
+    broadcast({ type: 'trading_stats', data: statsData });
   });
 
   mlAnalyzer.on('patternDetected', (pattern) => {
