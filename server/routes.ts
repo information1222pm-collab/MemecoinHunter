@@ -77,6 +77,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     broadcast({ type: 'pattern_detected', data: pattern });
   });
 
+  // Risk management events
+  riskManager.on('stopLossTriggered', (data) => {
+    broadcast({ type: 'stop_loss_triggered', data });
+  });
+
+  riskManager.on('riskLimitExceeded', (data) => {
+    broadcast({ type: 'risk_limit_exceeded', data });
+  });
+
   // API Routes
 
   // Authentication routes

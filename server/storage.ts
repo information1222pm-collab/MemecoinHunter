@@ -210,17 +210,19 @@ export class DatabaseStorage implements IStorage {
 
   // Price history operations
   async getPriceHistory(tokenId: string, from?: Date, to?: Date): Promise<PriceHistory[]> {
-    let query = db.select().from(priceHistory).where(eq(priceHistory.tokenId, tokenId));
-    
     if (from && to) {
-      query = query.where(and(
-        eq(priceHistory.tokenId, tokenId),
-        gte(priceHistory.timestamp, from),
-        lte(priceHistory.timestamp, to)
-      ));
+      return await db.select().from(priceHistory)
+        .where(and(
+          eq(priceHistory.tokenId, tokenId),
+          gte(priceHistory.timestamp, from),
+          lte(priceHistory.timestamp, to)
+        ))
+        .orderBy(desc(priceHistory.timestamp));
     }
     
-    return await query.orderBy(desc(priceHistory.timestamp));
+    return await db.select().from(priceHistory)
+      .where(eq(priceHistory.tokenId, tokenId))
+      .orderBy(desc(priceHistory.timestamp));
   }
 
   async createPriceHistory(insertHistory: InsertPriceHistory): Promise<PriceHistory> {

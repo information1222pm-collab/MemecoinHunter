@@ -359,12 +359,27 @@ class RiskManager extends EventEmitter {
           unrealizedPnL: '0',
         });
 
+        // Update portfolio totals after stop-loss
+        const portfolio = await storage.getPortfolio(position.portfolioId);
+        if (portfolio) {
+          const sellValue = amount * currentPrice;
+          const pnl = sellValue - (amount * avgBuyPrice);
+          const currentTotal = parseFloat(portfolio.totalValue || '0');
+          const currentDailyPnL = parseFloat(portfolio.dailyPnL || '0');
+          
+          await storage.updatePortfolio(position.portfolioId, {
+            totalValue: (currentTotal + pnl).toString(),
+            dailyPnL: (currentDailyPnL + pnl).toString()
+          });
+        }
+
         this.emit('stopLossTriggered', {
           positionId,
           tokenSymbol: token.symbol,
           stopLossPrice,
           currentPrice,
           loss: (avgBuyPrice - currentPrice) * amount,
+          portfolioId: position.portfolioId
         });
 
         console.log(`🛡️ Stop-loss triggered for ${token.symbol}: ${currentPrice} (${stopLossPrice} target)`);
