@@ -10,36 +10,52 @@ interface PriceUpdate {
   change24h: number;
 }
 
+interface CoinGeckoToken {
+  id: string;
+  symbol: string;
+  name: string;
+  current_price: number;
+  market_cap: number;
+  total_volume: number;
+  price_change_percentage_24h: number;
+  contract_address?: string;
+}
+
 class PriceFeedService extends EventEmitter {
   private isRunning = false;
   private updateInterval?: NodeJS.Timeout;
-  private mockTokens = [
-    { symbol: 'PEPE', name: 'Pepe Coin', basePrice: 0.000012 },
-    { symbol: 'DOGE', name: 'Dogecoin', basePrice: 0.082 },
-    { symbol: 'SHIB', name: 'Shiba Inu', basePrice: 0.000009 },
-    { symbol: 'FLOKI', name: 'Floki Inu', basePrice: 0.000034 },
-    { symbol: 'BONK', name: 'Bonk', basePrice: 0.000015 },
-    { symbol: 'WIF', name: 'Dogwifhat', basePrice: 2.45 },
-    { symbol: 'MEME', name: 'Memecoin', basePrice: 0.012 },
-    { symbol: 'WOJAK', name: 'Wojak', basePrice: 0.00087 },
+  private readonly API_BASE = 'https://api.coingecko.com/api/v3';
+  private readonly RATE_LIMIT_DELAY = 1000; // 1 second between requests
+  private lastRequestTime = 0;
+  
+  // Popular memecoins to track
+  private readonly TRACKED_COINS = [
+    'pepe',
+    'dogecoin', 
+    'shiba-inu',
+    'floki',
+    'bonk',
+    'dogwifcoin',
+    'memecoin',
+    'wojak-coin'
   ];
 
   start() {
     if (this.isRunning) return;
     
     this.isRunning = true;
-    console.log('📡 Price feed service started');
+    console.log('📡 Price feed service started (CoinGecko API)');
     
-    // Initialize mock tokens
-    this.initializeMockTokens();
+    // Initialize tokens from CoinGecko API
+    this.initializeTokensFromAPI();
     
-    // Update prices every 15 seconds
+    // Update prices every 30 seconds (respect API limits)
     this.updateInterval = setInterval(() => {
       this.updatePrices();
-    }, 15000);
+    }, 30000);
     
     // Initial price update
-    this.updatePrices();
+    setTimeout(() => this.updatePrices(), 2000);
   }
 
   stop() {
@@ -52,114 +68,163 @@ class PriceFeedService extends EventEmitter {
     console.log('🛑 Price feed service stopped');
   }
 
-  private async initializeMockTokens() {
+  private async initializeTokensFromAPI() {
     try {
-      for (const mockToken of this.mockTokens) {
-        const existing = await storage.getTokenBySymbol(mockToken.symbol);
+      console.log('🔄 Fetching token data from CoinGecko API...');
+      const coinData = await this.fetchCoinsData();
+      
+      for (const coin of coinData) {
+        const existing = await storage.getTokenBySymbol(coin.symbol.toUpperCase());
         
         if (!existing) {
           const tokenData: InsertToken = {
-            symbol: mockToken.symbol,
-            name: mockToken.name,
-            currentPrice: mockToken.basePrice.toString(),
-            marketCap: this.calculateMarketCap(mockToken.basePrice).toString(),
-            volume24h: this.generateRandomVolume().toString(),
-            priceChange24h: this.generateRandomChange().toString(),
-            contractAddress: `0x${this.generateRandomAddress()}`,
+            symbol: coin.symbol.toUpperCase(),
+            name: coin.name,
+            currentPrice: coin.current_price.toString(),
+            marketCap: coin.market_cap.toString(),
+            volume24h: coin.total_volume.toString(),
+            priceChange24h: coin.price_change_percentage_24h.toString(),
+            contractAddress: coin.contract_address || `coingecko:${coin.id}`,
           };
           
           await storage.createToken(tokenData);
-          console.log(`📊 Initialized token: ${mockToken.symbol}`);
+          console.log(`📊 Initialized token: ${coin.symbol.toUpperCase()} (${coin.name})`);
         }
       }
     } catch (error) {
-      console.error('Error initializing mock tokens:', error);
+      console.error('Error initializing tokens from API:', error);
+      // Fallback to ensure some tokens exist
+      await this.createFallbackTokens();
     }
   }
 
   private async updatePrices() {
     try {
+      console.log('🔄 Updating prices from CoinGecko API...');
+      const coinData = await this.fetchCoinsData();
       const tokens = await storage.getActiveTokens();
       
-      for (const token of tokens) {
-        const mockToken = this.mockTokens.find(mt => mt.symbol === token.symbol);
-        if (!mockToken) continue;
+      for (const coin of coinData) {
+        const token = tokens.find(t => t.symbol.toLowerCase() === coin.symbol.toLowerCase());
+        if (!token) continue;
         
-        const priceUpdate = this.generatePriceUpdate(token, mockToken);
+        const priceUpdate: PriceUpdate = {
+          tokenId: token.id,
+          symbol: token.symbol,
+          price: coin.current_price,
+          volume: coin.total_volume,
+          change24h: coin.price_change_percentage_24h,
+        };
         
         // Update token price
         await storage.updateToken(token.id, {
-          currentPrice: priceUpdate.price.toString(),
-          volume24h: priceUpdate.volume.toString(),
-          priceChange24h: priceUpdate.change24h.toString(),
-          marketCap: this.calculateMarketCap(priceUpdate.price).toString(),
+          currentPrice: coin.current_price.toString(),
+          volume24h: coin.total_volume.toString(),
+          priceChange24h: coin.price_change_percentage_24h.toString(),
+          marketCap: coin.market_cap.toString(),
         });
         
         // Save price history
         await storage.createPriceHistory({
           tokenId: token.id,
-          price: priceUpdate.price.toString(),
-          volume: priceUpdate.volume.toString(),
+          price: coin.current_price.toString(),
+          volume: coin.total_volume.toString(),
         });
         
         this.emit('priceUpdate', priceUpdate);
       }
       
+      console.log(`💰 Updated prices for ${coinData.length} tokens`);
     } catch (error) {
       console.error('Error updating prices:', error);
     }
   }
 
-  private generatePriceUpdate(token: any, mockToken: any): PriceUpdate {
-    const currentPrice = parseFloat(token.currentPrice || mockToken.basePrice.toString());
+  private async fetchCoinsData(): Promise<CoinGeckoToken[]> {
+    await this.respectRateLimit();
     
-    // Generate realistic price movement (-5% to +5% typically, with occasional spikes)
-    const randomFactor = Math.random();
-    let changePercent;
+    const url = `${this.API_BASE}/coins/markets?vs_currency=usd&ids=${this.TRACKED_COINS.join(',')}&order=market_cap_desc&per_page=20&page=1&sparkline=false&price_change_percentage=24h`;
     
-    if (randomFactor < 0.1) {
-      // 10% chance of significant spike/drop
-      changePercent = (Math.random() - 0.5) * 40; // -20% to +20%
-    } else {
-      // Normal volatility
-      changePercent = (Math.random() - 0.5) * 10; // -5% to +5%
+    const response = await fetch(url, {
+      headers: {
+        'Accept': 'application/json',
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`CoinGecko API error: ${response.status} ${response.statusText}`);
     }
     
-    const newPrice = currentPrice * (1 + changePercent / 100);
-    const volume = this.generateRandomVolume();
+    const data = await response.json();
+    return data.map((coin: any) => ({
+      id: coin.id,
+      symbol: coin.symbol,
+      name: coin.name,
+      current_price: coin.current_price || 0,
+      market_cap: coin.market_cap || 0,
+      total_volume: coin.total_volume || 0,
+      price_change_percentage_24h: coin.price_change_percentage_24h || 0,
+      contract_address: coin.contract_address,
+    }));
+  }
+
+  private async respectRateLimit(): Promise<void> {
+    const now = Date.now();
+    const timeSinceLastRequest = now - this.lastRequestTime;
     
-    return {
-      tokenId: token.id,
-      symbol: token.symbol,
-      price: Math.max(newPrice, 0.000001), // Ensure positive price
-      volume,
-      change24h: changePercent,
-    };
-  }
-
-  private generateRandomVolume(): number {
-    // Generate volume between $10K and $10M
-    return Math.random() * 9990000 + 10000;
-  }
-
-  private generateRandomChange(): number {
-    // Generate 24h change between -50% and +200%
-    return (Math.random() - 0.2) * 250;
-  }
-
-  private calculateMarketCap(price: number): number {
-    // Mock market cap calculation
-    const supply = Math.random() * 1000000000000 + 1000000000; // 1B to 1T tokens
-    return price * supply;
-  }
-
-  private generateRandomAddress(): string {
-    const chars = '0123456789abcdef';
-    let result = '';
-    for (let i = 0; i < 40; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    if (timeSinceLastRequest < this.RATE_LIMIT_DELAY) {
+      await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY - timeSinceLastRequest));
     }
-    return result;
+    
+    this.lastRequestTime = Date.now();
+  }
+
+  private async createFallbackTokens(): Promise<void> {
+    console.log('⚠️ Creating fallback tokens due to API failure');
+    const fallbackTokens = [
+      { symbol: 'DOGE', name: 'Dogecoin' },
+      { symbol: 'SHIB', name: 'Shiba Inu' },
+      { symbol: 'PEPE', name: 'Pepe' },
+    ];
+    
+    for (const token of fallbackTokens) {
+      const existing = await storage.getTokenBySymbol(token.symbol);
+      if (!existing) {
+        await storage.createToken({
+          symbol: token.symbol,
+          name: token.name,
+          currentPrice: '0.01',
+          marketCap: '1000000',
+          volume24h: '100000',
+          priceChange24h: '0',
+          contractAddress: `fallback:${token.symbol.toLowerCase()}`,
+        });
+      }
+    }
+  }
+
+  async fetchHistoricalData(coinId: string, days: number = 7): Promise<Array<{timestamp: number, price: number, volume: number}>> {
+    await this.respectRateLimit();
+    
+    const url = `${this.API_BASE}/coins/${coinId}/market_chart?vs_currency=usd&days=${days}&interval=hourly`;
+    
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`CoinGecko API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      return data.prices.map((pricePoint: [number, number], index: number) => ({
+        timestamp: pricePoint[0],
+        price: pricePoint[1],
+        volume: data.total_volumes[index]?.[1] || 0,
+      }));
+    } catch (error) {
+      console.error(`Error fetching historical data for ${coinId}:`, error);
+      return [];
+    }
   }
 }
 
