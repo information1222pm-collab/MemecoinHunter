@@ -298,6 +298,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/scanner/start", async (req, res) => {
+    try {
+      scanner.start();
+      const status = scanner.getStatus();
+      res.json({ message: "Scanner started", status });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to start scanner", error });
+    }
+  });
+
+  app.post("/api/scanner/stop", async (req, res) => {
+    try {
+      scanner.stop();
+      const status = scanner.getStatus();
+      res.json({ message: "Scanner stopped", status });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to stop scanner", error });
+    }
+  });
+
   app.get("/api/alerts", async (req, res) => {
     try {
       const alerts = await storage.getUnreadAlerts();
@@ -364,16 +384,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId, plan } = req.body;
       
-      const subscription = await storage.createSubscription({
-        userId,
-        plan,
-        currentPeriodStart: new Date(),
-        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-      });
+      // Check if subscription already exists
+      let subscription;
+      try {
+        subscription = await storage.getSubscriptionByUserId(userId);
+      } catch (error) {
+        // No existing subscription found, create new one
+      }
+      
+      if (subscription) {
+        // Update existing subscription plan
+        subscription = await storage.updateSubscription(subscription.id, {
+          plan,
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        });
+      } else {
+        // Create new subscription
+        subscription = await storage.createSubscription({
+          userId,
+          plan,
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        });
+      }
       
       res.json(subscription);
     } catch (error) {
-      res.status(400).json({ message: "Failed to create subscription", error });
+      res.status(400).json({ message: "Failed to update subscription", error });
     }
   });
 

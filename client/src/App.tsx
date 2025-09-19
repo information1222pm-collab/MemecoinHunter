@@ -11,6 +11,7 @@ import Analytics from "@/pages/analytics";
 import Activity from "@/pages/activity";
 import Terminal from "@/pages/terminal";
 import Subscription from "@/pages/subscription";
+import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -23,6 +24,7 @@ function Router() {
       <Route path="/activity" component={Activity} />
       <Route path="/terminal" component={Terminal} />
       <Route path="/subscription" component={Subscription} />
+      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );

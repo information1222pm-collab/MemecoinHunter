@@ -4,14 +4,18 @@ import { TokenScanner } from "@/components/trading/token-scanner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "@/hooks/use-language";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { Settings, Play, Pause, RefreshCw } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Scanner() {
   const { t } = useLanguage();
   const { isConnected, lastMessage } = useWebSocket();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   const { data: scannerStatus } = useQuery({
     queryKey: ['/api/scanner/status'],
@@ -22,6 +26,43 @@ export default function Scanner() {
     queryKey: ['/api/alerts'],
     refetchInterval: 30000,
   });
+
+  // Scanner control mutations
+  const startScannerMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/scanner/start"),
+    onSuccess: () => {
+      toast({ title: "Scanner Started", description: "Token scanner is now running" });
+      queryClient.invalidateQueries({ queryKey: ['/api/scanner/status'] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to start scanner", variant: "destructive" });
+    }
+  });
+
+  const stopScannerMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/scanner/stop"),
+    onSuccess: () => {
+      toast({ title: "Scanner Paused", description: "Token scanner has been paused" });
+      queryClient.invalidateQueries({ queryKey: ['/api/scanner/status'] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to pause scanner", variant: "destructive" });
+    }
+  });
+
+  const handleStartScanner = () => {
+    startScannerMutation.mutate();
+  };
+
+  const handlePauseScanner = () => {
+    stopScannerMutation.mutate();
+  };
+
+  const handleRefreshScanner = () => {
+    queryClient.invalidateQueries({ queryKey: ['/api/scanner/status'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/tokens'] });
+    toast({ title: "Refreshed", description: "Scanner data refreshed" });
+  };
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -43,8 +84,8 @@ export default function Scanner() {
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Status:</span>
-                    <Badge variant={isConnected ? "default" : "destructive"} data-testid="badge-scanner-status">
-                      {isConnected ? "Running" : "Stopped"}
+                    <Badge variant={scannerStatus?.isRunning ? "default" : "destructive"} data-testid="badge-scanner-status">
+                      {scannerStatus?.isRunning ? "Running" : "Stopped"}
                     </Badge>
                   </div>
                   <div className="flex justify-between">
@@ -62,15 +103,33 @@ export default function Scanner() {
                 </div>
                 
                 <div className="flex space-x-2 mt-4">
-                  <Button size="sm" className="flex-1" data-testid="button-start-scanner">
+                  <Button 
+                    size="sm" 
+                    className="flex-1" 
+                    data-testid="button-start-scanner"
+                    onClick={handleStartScanner}
+                    disabled={startScannerMutation.isPending || scannerStatus?.isRunning}
+                  >
                     <Play className="w-4 h-4 mr-2" />
-                    Start
+                    {startScannerMutation.isPending ? "Starting..." : "Start"}
                   </Button>
-                  <Button size="sm" variant="secondary" className="flex-1" data-testid="button-pause-scanner">
+                  <Button 
+                    size="sm" 
+                    variant="secondary" 
+                    className="flex-1" 
+                    data-testid="button-pause-scanner"
+                    onClick={handlePauseScanner}
+                    disabled={stopScannerMutation.isPending || !scannerStatus?.isRunning}
+                  >
                     <Pause className="w-4 h-4 mr-2" />
-                    Pause
+                    {stopScannerMutation.isPending ? "Pausing..." : "Pause"}
                   </Button>
-                  <Button size="sm" variant="outline" data-testid="button-refresh-scanner">
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    data-testid="button-refresh-scanner"
+                    onClick={handleRefreshScanner}
+                  >
                     <RefreshCw className="w-4 h-4" />
                   </Button>
                 </div>

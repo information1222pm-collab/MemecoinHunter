@@ -1,12 +1,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useQuery } from "@tanstack/react-query";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { useLanguage } from "@/hooks/use-language";
 import { Filter, Play, ChevronUp, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useMemo } from "react";
+import { QuickTradeModal } from "./quick-trade-modal";
 
 interface Token {
   id: string;
@@ -38,6 +40,15 @@ export function TokenScanner() {
     direction: 'asc' | 'desc';
   }>({ column: null, direction: 'asc' });
   const [showFilters, setShowFilters] = useState(false);
+  
+  // Trade modal state
+  const [tradeModalOpen, setTradeModalOpen] = useState(false);
+  const [selectedToken, setSelectedToken] = useState<Token | null>(null);
+
+  const openTradeModal = (token: Token) => {
+    setSelectedToken(token);
+    setTradeModalOpen(true);
+  };
 
   // Helper functions (must be defined before useMemo)
   const getSignal = (change: string) => {
@@ -335,7 +346,11 @@ export function TokenScanner() {
                       </Badge>
                     </td>
                     <td className="p-4">
-                      <Button size="sm" data-testid={`button-trade-${token.symbol}`}>
+                      <Button 
+                        size="sm" 
+                        data-testid={`button-trade-${token.symbol}`}
+                        onClick={() => openTradeModal(token)}
+                      >
                         {t("scanner.trade")}
                       </Button>
                     </td>
@@ -346,6 +361,21 @@ export function TokenScanner() {
           </table>
         </div>
       </CardContent>
+      
+      {/* Trade Modal */}
+      <Dialog open={tradeModalOpen} onOpenChange={setTradeModalOpen}>
+        <DialogContent className="max-w-md" data-testid="modal-trade">
+          <DialogHeader>
+            <DialogTitle>
+              Trade {selectedToken?.symbol}
+            </DialogTitle>
+          </DialogHeader>
+          <QuickTradeModal 
+            selectedToken={selectedToken} 
+            onClose={() => setTradeModalOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
