@@ -28,16 +28,89 @@ class PriceFeedService extends EventEmitter {
   private readonly RATE_LIMIT_DELAY = 1000; // 1 second between requests
   private lastRequestTime = 0;
   
-  // Popular memecoins to track
+  // Comprehensive list of memecoins and trending tokens to track
   private readonly TRACKED_COINS = [
+    // Top Tier Memecoins
+    'dogecoin',
+    'shiba-inu', 
     'pepe',
-    'dogecoin', 
-    'shiba-inu',
     'floki',
     'bonk',
     'dogwifcoin',
     'memecoin',
-    'wojak-coin'
+    'wojak-coin',
+    
+    // Popular Memecoins
+    'baby-doge-coin',
+    'safemoon-v2',
+    'dogelon-mars',
+    'akita-inu',
+    'catecoin',
+    'hoge-finance',
+    'kishu-inu',
+    'mona-coin',
+    'banano',
+    'garlicoin',
+    
+    // Trending & New Memecoins  
+    'myro',
+    'cat-in-a-dogs-world',
+    'mog-coin',
+    'book-of-meme',
+    'peng',
+    'bonk1',
+    'slerf',
+    'jeo-boden',
+    'ponke',
+    'mew',
+    
+    // Animal-themed Tokens
+    'shibarium',
+    'corgi-inu',
+    'pitbull',
+    'husky-token',
+    'bear-inu',
+    'wolf-safe-poor-people',
+    'tiger-king-coin',
+    'panda-coin',
+    'rabbit-coin',
+    'fox-token',
+    
+    // Community & Cult Tokens
+    'degen-base',
+    'based-token',
+    'cult-dao',
+    'shibaswap',
+    'saitama-inu',
+    'elongate',
+    'rocket-bunny',
+    'moonshot',
+    'diamond-hands',
+    'stonks',
+    
+    // Recent Trends & Solana Ecosystem
+    'jito',
+    'jupiter-exchange-token',
+    'raydium',
+    'serum',
+    'cope',
+    'maps',
+    'samo-coin',
+    'ninja-protocol',
+    'star-atlas',
+    'solape-token',
+    
+    // Polygon & BSC Memecoins
+    'polygon-ecosystem-token',
+    'matic-network',
+    'pancakeswap-token',
+    'biswap',
+    'baby-cake',
+    'safemars',
+    'elongate',
+    'pig-finance',
+    'refinable',
+    'mooncake'
   ];
 
   start() {
