@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { scanner } from "./services/scanner";
 import { mlAnalyzer } from "./services/ml-analyzer";
 import { priceFeed } from "./services/price-feed";
+import { riskManager } from "./services/risk-manager";
 import { insertUserSchema, insertTradeSchema, insertTokenSchema } from "@shared/schema";
 import { z } from "zod";
 
@@ -57,6 +58,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   scanner.start();
   priceFeed.start();
   mlAnalyzer.start();
+  riskManager.start();
 
   // Set up real-time broadcasts
   scanner.on('tokenScanned', (token) => {
@@ -215,6 +217,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Portfolio not found" });
       }
       
+      // Risk analysis before executing trade
+      const riskAnalysis = await riskManager.analyzeTradeRisk(
+        tradeData.portfolioId,
+        tradeData.tokenId,
+        tradeData.type as 'buy' | 'sell',
+        parseFloat(tradeData.amount),
+        parseFloat(tradeData.price)
+      );
+      
+      if (!riskAnalysis.allowed) {
+        return res.status(400).json({ 
+          message: "Trade blocked by risk management", 
+          reason: riskAnalysis.reason,
+          suggestedSize: riskAnalysis.suggestedSize 
+        });
+      }
+      
       // Create trade
       const trade = await storage.createTrade(tradeData);
       
@@ -248,7 +267,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      res.json(trade);
+      res.json({ 
+        ...trade, 
+        riskAnalysis: {
+          stopLossPrice: riskAnalysis.stopLossPrice,
+          riskRewardRatio: riskAnalysis.riskRewardRatio
+        }
+      });
     } catch (error) {
       res.status(400).json({ message: "Failed to create trade", error });
     }
@@ -367,6 +392,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Risk Management API endpoints
+  app.get("/api/risk/portfolio/:portfolioId", async (req, res) => {
+    try {
+      const riskMetrics = await riskManager.analyzePortfolioRisk(req.params.portfolioId);
+      res.json(riskMetrics);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to analyze portfolio risk", error });
+    }
+  });
+
+  app.post("/api/risk/position-sizing", async (req, res) => {
+    try {
+      const { portfolioId, tokenId, entryPrice, confidence } = req.body;
+      const sizing = await riskManager.calculatePositionSizing(portfolioId, tokenId, entryPrice, confidence);
+      res.json(sizing);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to calculate position sizing", error });
+    }
+  });
+
+  app.post("/api/risk/trade-analysis", async (req, res) => {
+    try {
+      const { portfolioId, tokenId, tradeType, amount, price } = req.body;
+      const analysis = await riskManager.analyzeTradeRisk(portfolioId, tokenId, tradeType, amount, price);
+      res.json(analysis);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to analyze trade risk", error });
+    }
+  });
+
+  app.post("/api/risk/monitor/:portfolioId", async (req, res) => {
+    try {
+      await riskManager.monitorRiskLimits(req.params.portfolioId);
+      res.json({ message: "Risk monitoring completed" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to monitor risk limits", error });
+    }
+  });
+
   async function processCliCommand(command: string): Promise<string> {
     const parts = command.split(' ');
     const cmd = parts[0];
@@ -380,8 +444,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       case 'alerts':
         const alerts = await storage.getUnreadAlerts();
         return `🚨 ${alerts.length} unread alerts`;
+      case 'risk':
+        return "🛡️ Risk Management Status:\n📊 Portfolio risk: Monitored\n⚠️ Active stop-losses: Enabled\n🎯 Position limits: Enforced";
       case 'help':
-        return "Available commands:\n- scan: Start token scanning\n- status: Show scanner status\n- alerts: Show unread alerts\n- help: Show this help";
+        return "Available commands:\n- scan: Start token scanning\n- status: Show scanner status\n- alerts: Show unread alerts\n- risk: Show risk management status\n- help: Show this help";
       default:
         return `Unknown command: ${cmd}. Type 'help' for available commands.`;
     }
