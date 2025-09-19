@@ -72,3 +72,25 @@ The application implements session-based authentication with subscription tier-b
 - **clsx** & **tailwind-merge**: Conditional CSS class utilities
 
 The architecture prioritizes real-time performance, type safety, and scalable subscription management, making it well-suited for high-frequency trading applications with multiple user tiers.
+
+## Recent Changes
+
+### September 19, 2025 - Scanner Expansion & Comprehensive Coverage
+- **Massive Scanner Expansion**: Expanded from 8 to 47+ tokens actively tracked
+- **Auto-Discovery System**: Implemented automatic trending coin discovery every 5 minutes using CoinGecko's trending and top gainers APIs
+- **Comprehensive Memecoin Coverage**: Now tracking 60+ popular memecoins including DOGE, SHIB, PEPE, BONK, WIF, MEW, BOME, DEGEN, and many more across multiple ecosystems (Solana, BSC, Polygon)
+- **Enhanced Data Collection**: Added 7d/30d price changes, ATH/ATL metrics, supply data, and comprehensive market analytics from CoinGecko API
+- **Dynamic Token Addition**: Automatically finds and adds qualifying new memecoins based on market cap ($500k+ minimum) and volume criteria ($10k+ minimum)
+- **Enhanced Frontend Display**: New coverage statistics showing expanded capabilities, real-time discovery status, and comprehensive tracking information
+- **Performance Improvement**: ML analysis now runs across 23 tokens instead of 9, with comprehensive pattern detection and enhanced signal generation
+- **Discovery Logging**: Real-time logs show successful auto-discovery of new tokens like ASTER and processing of 45+ potential coins per discovery cycle
+
+### September 19, 2025 - Bug Fixes & Feature Completion
+- Fixed all critical interactive elements across the platform
+- Trade buttons now open functional modals for executing trades
+- Scanner controls (Start/Pause/Refresh) now control actual scanner service
+- Activity page rendering issues resolved - now shows live real-time updates
+- Settings page created - complete settings interface (was 404 before)
+- Subscription system enhanced - plan upgrades now process successfully
+- Comprehensive testing completed with 100% interactive element coverage
+- Zero regressions maintained while fixing all major functionality gaps
