@@ -220,6 +220,32 @@ class RiskManager extends EventEmitter {
       const tradeValue = amount * price;
       const riskLimits = this.defaultRiskLimits;
 
+      // Strict sell validation
+      if (tradeType === 'sell') {
+        if (!existingPosition) {
+          return {
+            allowed: false,
+            reason: 'Cannot sell - no existing position found for this token'
+          };
+        }
+        
+        const currentAmount = parseFloat(existingPosition.amount);
+        if (amount > currentAmount) {
+          return {
+            allowed: false,
+            reason: `Cannot sell ${amount} tokens - only ${currentAmount} available`,
+            suggestedSize: currentAmount
+          };
+        }
+        
+        if (currentAmount <= 0) {
+          return {
+            allowed: false,
+            reason: 'Cannot sell - position has zero or negative amount'
+          };
+        }
+      }
+
       // Check maximum position size
       if (tradeType === 'buy') {
         const currentPositionValue = existingPosition 
@@ -253,12 +279,15 @@ class RiskManager extends EventEmitter {
         };
       }
 
-      // Check maximum open positions
-      if (tradeType === 'buy' && !existingPosition && positions.length >= riskLimits.maxOpenPositions) {
-        return {
-          allowed: false,
-          reason: `Maximum ${riskLimits.maxOpenPositions} open positions reached`,
-        };
+      // Check maximum open positions (only count positions with amount > 0)
+      if (tradeType === 'buy' && !existingPosition) {
+        const activePositions = positions.filter(p => parseFloat(p.amount) > 0);
+        if (activePositions.length >= riskLimits.maxOpenPositions) {
+          return {
+            allowed: false,
+            reason: `Maximum ${riskLimits.maxOpenPositions} open positions reached`,
+          };
+        }
       }
 
       // Calculate stop-loss price
