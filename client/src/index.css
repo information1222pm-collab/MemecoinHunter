@@ -111,18 +111,20 @@
     min-height: 100vh;
   }
 
-  /* Glass morphism utilities */
+  /* Glass morphism utilities - optimized for performance */
   .glass {
     background: var(--glass-bg);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border: 1px solid var(--glass-border);
     box-shadow: var(--glass-shadow);
+    will-change: transform;
   }
 
   .glass-card {
     @apply glass rounded-2xl;
-    background: hsla(225, 39%, 12%, 0.6);
+    background: hsla(225, 39%, 12%, 0.8);
+    will-change: transform;
   }
 
   /* Modern gradient utilities */
@@ -162,9 +164,21 @@
       0 0 40px hsla(0, 84%, 65%, 0.15);
   }
 
-  /* Smooth animations */
-  * {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Optimized transitions - only on interactive elements */
+  button, a, [role="button"], input, select, textarea {
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+                opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   /* Floating orb animation */
@@ -285,15 +299,16 @@
     border-color: hsl(var(--price-down) / 0.3);
   }
 
-  /* Glassmorphism card variations */
+  /* Glassmorphism card variations - performance optimized */
   .glass-ultra {
-    background: hsla(225, 39%, 15%, 0.3);
-    backdrop-filter: blur(40px);
-    -webkit-backdrop-filter: blur(40px);
+    background: hsla(225, 39%, 15%, 0.5);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border: 1px solid hsla(210, 40%, 98%, 0.05);
     box-shadow: 
-      0 8px 32px hsla(225, 39%, 5%, 0.4),
+      0 4px 24px hsla(225, 39%, 5%, 0.4),
       inset 0 1px 0 hsla(210, 40%, 98%, 0.1);
+    will-change: transform;
   }
 
   /* Modern gradient text */
