@@ -29,6 +29,7 @@ export interface IStorage {
   // Portfolio operations
   getPortfolio(id: string): Promise<Portfolio | undefined>;
   getPortfolioByUserId(userId: string): Promise<Portfolio | undefined>;
+  getAllPortfolios(): Promise<Portfolio[]>;
   createPortfolio(portfolio: InsertPortfolio): Promise<Portfolio>;
   updatePortfolio(id: string, updates: Partial<InsertPortfolio>): Promise<Portfolio>;
 
@@ -131,6 +132,10 @@ export class DatabaseStorage implements IStorage {
   async getPortfolioByUserId(userId: string): Promise<Portfolio | undefined> {
     const [portfolio] = await db.select().from(portfolios).where(eq(portfolios.userId, userId));
     return portfolio || undefined;
+  }
+
+  async getAllPortfolios(): Promise<Portfolio[]> {
+    return await db.select().from(portfolios);
   }
 
   async createPortfolio(insertPortfolio: InsertPortfolio): Promise<Portfolio> {

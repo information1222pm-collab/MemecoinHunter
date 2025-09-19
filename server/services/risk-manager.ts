@@ -77,16 +77,18 @@ class RiskManager extends EventEmitter {
 
   private async monitorAllPortfolios() {
     try {
-      // Get all active portfolios (simplified - using default portfolio for now)
-      const portfolios = [await storage.getPortfolioByUserId('default')];
+      // Get all active portfolios for comprehensive monitoring
+      const portfolios = await storage.getAllPortfolios();
       
       for (const portfolio of portfolios) {
-        if (portfolio) {
+        try {
           await this.monitorRiskLimits(portfolio.id);
+        } catch (error) {
+          console.error(`❌ Error monitoring portfolio ${portfolio.id}:`, error);
         }
       }
     } catch (error) {
-      console.error('Error monitoring portfolios:', error);
+      console.error('❌ Error monitoring portfolios:', error);
     }
   }
 
