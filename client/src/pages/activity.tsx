@@ -9,7 +9,7 @@ import { useLanguage } from "@/hooks/use-language";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { useState, useEffect } from "react";
 import { 
-  Activity, 
+  Activity as ActivityIcon, 
   Search, 
   TrendingUp, 
   AlertCircle, 
@@ -63,7 +63,7 @@ export default function Activity() {
     const events: ActivityEvent[] = [];
 
     // Add alerts as activity events
-    if (alerts) {
+    if (alerts && Array.isArray(alerts)) {
       alerts.forEach((alert: any) => {
         events.push({
           id: alert.id,
@@ -78,7 +78,7 @@ export default function Activity() {
     }
 
     // Add ML patterns as activity events
-    if (patterns) {
+    if (patterns && Array.isArray(patterns)) {
       patterns.forEach((pattern: any) => {
         events.push({
           id: pattern.id,
@@ -101,44 +101,45 @@ export default function Activity() {
   // Handle real-time WebSocket updates
   useEffect(() => {
     if (lastMessage) {
-      try {
-        const data = JSON.parse(lastMessage);
-        const newEvent: ActivityEvent = {
-          id: `ws-${Date.now()}`,
-          timestamp: new Date(),
-          type: 'system',
-          severity: 'info',
-          message: 'Real-time update received',
-          details: data.type,
-        };
+      const newEvent: ActivityEvent = {
+        id: `ws-${Date.now()}`,
+        timestamp: new Date(),
+        type: 'system',
+        severity: 'info',
+        message: 'Real-time update received',
+        details: lastMessage.type,
+      };
 
-        switch (data.type) {
-          case 'new_alert':
-            newEvent.type = 'alert';
-            newEvent.severity = 'warning';
-            newEvent.message = data.data.message;
-            newEvent.symbol = data.data.symbol;
-            break;
-          case 'pattern_detected':
-            newEvent.type = 'pattern';
-            newEvent.severity = 'success';
-            newEvent.message = `New pattern: ${data.data.patternType}`;
-            newEvent.symbol = data.data.symbol;
-            newEvent.value = `${data.data.confidence}%`;
-            break;
-          case 'price_update':
-            newEvent.type = 'price';
-            newEvent.severity = 'info';
-            newEvent.message = `Price updated: ${data.data.symbol}`;
-            newEvent.symbol = data.data.symbol;
-            newEvent.value = `$${data.data.price}`;
-            break;
-        }
-
-        setActivityEvents(prev => [newEvent, ...prev.slice(0, 199)]); // Keep only 200 most recent
-      } catch (error) {
-        // Ignore invalid JSON
+      switch (lastMessage.type) {
+        case 'new_alert':
+          newEvent.type = 'alert';
+          newEvent.severity = 'warning';
+          newEvent.message = lastMessage.data?.message || 'New alert triggered';
+          newEvent.symbol = lastMessage.data?.symbol;
+          break;
+        case 'pattern_detected':
+          newEvent.type = 'pattern';
+          newEvent.severity = 'success';
+          newEvent.message = `New pattern: ${lastMessage.data?.patternType || 'Unknown'}`;
+          newEvent.symbol = lastMessage.data?.symbol;
+          newEvent.value = lastMessage.data?.confidence ? `${lastMessage.data.confidence}%` : undefined;
+          break;
+        case 'price_update':
+          newEvent.type = 'price';
+          newEvent.severity = 'info';
+          newEvent.message = `Price updated: ${lastMessage.data?.symbol || 'Unknown'}`;
+          newEvent.symbol = lastMessage.data?.symbol;
+          newEvent.value = lastMessage.data?.price ? `$${lastMessage.data.price}` : undefined;
+          break;
+        case 'token_update':
+          newEvent.type = 'scanner';
+          newEvent.severity = 'info';
+          newEvent.message = `Token scanned: ${lastMessage.data?.symbol || 'Unknown'}`;
+          newEvent.symbol = lastMessage.data?.symbol;
+          break;
       }
+
+      setActivityEvents(prev => [newEvent, ...prev.slice(0, 199)]); // Keep only 200 most recent
     }
   }, [lastMessage]);
 
@@ -151,7 +152,7 @@ export default function Activity() {
       case 'risk': return <AlertTriangle className="w-4 h-4" />;
       case 'trade': return <TrendingUp className="w-4 h-4" />;
       case 'system': return <Zap className="w-4 h-4" />;
-      default: return <Activity className="w-4 h-4" />;
+      default: return <ActivityIcon className="w-4 h-4" />;
     }
   };
 
@@ -202,7 +203,7 @@ export default function Activity() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold flex items-center space-x-3" data-testid="text-page-title">
-                <Activity className="w-8 h-8" />
+                <ActivityIcon className="w-8 h-8" />
                 <span>System Activity</span>
               </h1>
               <p className="text-muted-foreground mt-1">Real-time monitoring of all system operations</p>
@@ -294,7 +295,7 @@ export default function Activity() {
                   <div className="p-6 space-y-3">
                     {filteredEvents.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">
-                        <Activity className="w-8 h-8 mx-auto mb-3 opacity-50" />
+                        <ActivityIcon className="w-8 h-8 mx-auto mb-3 opacity-50" />
                         <p>No activity events found</p>
                         <p className="text-sm">Events will appear here as they happen</p>
                       </div>

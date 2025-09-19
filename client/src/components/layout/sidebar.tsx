@@ -7,6 +7,7 @@ import {
   Briefcase,
   TrendingUp,
   Terminal,
+  Activity,
   Star,
   CreditCard,
   Settings,
@@ -18,6 +19,7 @@ const navigationItems = [
   { href: "/scanner", icon: Zap, labelKey: "navigation.scanner", hasIndicator: true },
   { href: "/portfolio", icon: Briefcase, labelKey: "navigation.portfolio" },
   { href: "/analytics", icon: TrendingUp, labelKey: "navigation.analytics" },
+  { href: "/activity", icon: Activity, labelKey: "navigation.activity", hasIndicator: true },
   { href: "/terminal", icon: Terminal, labelKey: "navigation.terminal" },
 ];
 

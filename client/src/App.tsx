@@ -8,6 +8,7 @@ import Dashboard from "@/pages/dashboard";
 import Scanner from "@/pages/scanner";
 import Portfolio from "@/pages/portfolio";
 import Analytics from "@/pages/analytics";
+import Activity from "@/pages/activity";
 import Terminal from "@/pages/terminal";
 import Subscription from "@/pages/subscription";
 import NotFound from "@/pages/not-found";
@@ -19,6 +20,7 @@ function Router() {
       <Route path="/scanner" component={Scanner} />
       <Route path="/portfolio" component={Portfolio} />
       <Route path="/analytics" component={Analytics} />
+      <Route path="/activity" component={Activity} />
       <Route path="/terminal" component={Terminal} />
       <Route path="/subscription" component={Subscription} />
       <Route component={NotFound} />
