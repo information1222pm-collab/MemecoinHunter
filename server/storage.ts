@@ -1,11 +1,12 @@
 import { 
   users, tokens, portfolios, trades, positions, scanAlerts, 
-  priceHistory, patterns, subscriptions,
+  priceHistory, patterns, subscriptions, patternPerformance, mlLearningParams,
   type User, type InsertUser, type Token, type InsertToken,
   type Portfolio, type InsertPortfolio, type Trade, type InsertTrade,
   type Position, type InsertPosition, type ScanAlert, type InsertScanAlert,
   type PriceHistory, type InsertPriceHistory, type Pattern, type InsertPattern,
-  type Subscription, type InsertSubscription
+  type Subscription, type InsertSubscription, type PatternPerformance, type InsertPatternPerformance,
+  type MLLearningParams, type InsertMLLearningParams
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte } from "drizzle-orm";
@@ -37,6 +38,7 @@ export interface IStorage {
   getTrade(id: string): Promise<Trade | undefined>;
   getTradesByPortfolio(portfolioId: string): Promise<Trade[]>;
   createTrade(trade: InsertTrade): Promise<Trade>;
+  updateTrade(id: string, updates: Partial<InsertTrade>): Promise<Trade>;
   getRecentTrades(limit?: number): Promise<Trade[]>;
 
   // Position operations
@@ -59,6 +61,21 @@ export interface IStorage {
   getPatternsByToken(tokenId: string): Promise<Pattern[]>;
   createPattern(pattern: InsertPattern): Promise<Pattern>;
   getRecentPatterns(limit?: number): Promise<Pattern[]>;
+  getAllPatterns(): Promise<Pattern[]>;
+  updatePatternConfidenceMultiplier(patternType: string, timeframe: string, multiplier: number): Promise<void>;
+
+  // Trade operations extensions
+  getTradesByPatternType(patternType: string, timeframe: string): Promise<Trade[]>;
+
+  // Pattern Performance operations
+  getPatternPerformance(patternType: string, timeframe: string): Promise<PatternPerformance | undefined>;
+  getAllPatternPerformance(): Promise<PatternPerformance[]>;
+  upsertPatternPerformance(performance: InsertPatternPerformance): Promise<PatternPerformance>;
+
+  // ML Learning Parameters operations
+  getMLLearningParam(key: string): Promise<MLLearningParams | undefined>;
+  createMLLearningParam(param: InsertMLLearningParams): Promise<MLLearningParams>;
+  updateMLLearningParam(key: string, value: string): Promise<MLLearningParams>;
 
   // Subscription operations
   getSubscription(id: string): Promise<Subscription | undefined>;
@@ -163,6 +180,14 @@ export class DatabaseStorage implements IStorage {
     return trade;
   }
 
+  async updateTrade(id: string, updates: Partial<InsertTrade>): Promise<Trade> {
+    const [updated] = await db.update(trades)
+      .set({ ...updates })
+      .where(eq(trades.id, id))
+      .returning();
+    return updated;
+  }
+
   async getRecentTrades(limit: number = 10): Promise<Trade[]> {
     return await db.select().from(trades).orderBy(desc(trades.createdAt)).limit(limit);
   }
@@ -242,6 +267,90 @@ export class DatabaseStorage implements IStorage {
 
   async getRecentPatterns(limit: number = 10): Promise<Pattern[]> {
     return await db.select().from(patterns).orderBy(desc(patterns.detectedAt)).limit(limit);
+  }
+
+  async getAllPatterns(): Promise<Pattern[]> {
+    return await db.select().from(patterns).orderBy(desc(patterns.detectedAt));
+  }
+
+  async updatePatternConfidenceMultiplier(patternType: string, timeframe: string, multiplier: number): Promise<void> {
+    await db.update(patterns)
+      .set({ adjustedConfidence: (multiplier * 100).toString() })
+      .where(and(
+        eq(patterns.patternType, patternType),
+        eq(patterns.timeframe, timeframe)
+      ));
+  }
+
+  // Trade operations extensions
+  async getTradesByPatternType(patternType: string, timeframe: string): Promise<Trade[]> {
+    const patternIds = await db.select({ id: patterns.id })
+      .from(patterns)
+      .where(and(
+        eq(patterns.patternType, patternType),
+        eq(patterns.timeframe, timeframe)
+      ));
+    
+    if (patternIds.length === 0) return [];
+    
+    const tradeResults: Trade[] = [];
+    for (const pattern of patternIds) {
+      const patternTrades = await db.select().from(trades).where(eq(trades.patternId, pattern.id));
+      tradeResults.push(...patternTrades);
+    }
+    
+    return tradeResults;
+  }
+
+  // Pattern Performance operations
+  async getPatternPerformance(patternType: string, timeframe: string): Promise<PatternPerformance | undefined> {
+    const [performance] = await db.select().from(patternPerformance)
+      .where(and(
+        eq(patternPerformance.patternType, patternType),
+        eq(patternPerformance.timeframe, timeframe)
+      ));
+    return performance || undefined;
+  }
+
+  async getAllPatternPerformance(): Promise<PatternPerformance[]> {
+    return await db.select().from(patternPerformance).orderBy(desc(patternPerformance.lastUpdated));
+  }
+
+  async upsertPatternPerformance(performance: InsertPatternPerformance): Promise<PatternPerformance> {
+    const existing = await this.getPatternPerformance(performance.patternType, performance.timeframe);
+    
+    if (existing) {
+      const [updated] = await db.update(patternPerformance)
+        .set({ ...performance, lastUpdated: new Date() })
+        .where(and(
+          eq(patternPerformance.patternType, performance.patternType),
+          eq(patternPerformance.timeframe, performance.timeframe)
+        ))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(patternPerformance).values(performance).returning();
+      return created;
+    }
+  }
+
+  // ML Learning Parameters operations
+  async getMLLearningParam(key: string): Promise<MLLearningParams | undefined> {
+    const [param] = await db.select().from(mlLearningParams).where(eq(mlLearningParams.paramKey, key));
+    return param || undefined;
+  }
+
+  async createMLLearningParam(param: InsertMLLearningParams): Promise<MLLearningParams> {
+    const [created] = await db.insert(mlLearningParams).values(param).returning();
+    return created;
+  }
+
+  async updateMLLearningParam(key: string, value: string): Promise<MLLearningParams> {
+    const [updated] = await db.update(mlLearningParams)
+      .set({ paramValue: value, lastUpdated: new Date() })
+      .where(eq(mlLearningParams.paramKey, key))
+      .returning();
+    return updated;
   }
 
   // Subscription operations

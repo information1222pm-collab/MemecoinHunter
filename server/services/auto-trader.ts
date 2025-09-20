@@ -3,6 +3,7 @@ import { storage } from '../storage';
 import { riskManager } from './risk-manager';
 import { scanner } from './scanner';
 import { mlAnalyzer } from './ml-analyzer';
+import { patternPerformanceAnalyzer } from './pattern-performance-analyzer';
 import type { Token, Pattern, InsertTrade } from '@shared/schema';
 
 interface TradingSignal {
@@ -12,6 +13,7 @@ interface TradingSignal {
   source: string;
   price: number;
   reason: string;
+  patternId?: string; // Link to originating pattern
 }
 
 class AutoTrader extends EventEmitter {
@@ -19,8 +21,8 @@ class AutoTrader extends EventEmitter {
   private defaultPortfolioId: string | null = null;
   private monitoringInterval?: NodeJS.Timeout;
   
-  private readonly strategy = {
-    minConfidence: 75, // Minimum 75% confidence to trade
+  private strategy = {
+    minConfidence: 75, // Dynamic minimum confidence
     maxPositionSize: 1000, // $1000 max per position
     stopLossPercentage: 8, // 8% stop loss
     takeProfitPercentage: 15, // 15% take profit
@@ -37,9 +39,12 @@ class AutoTrader extends EventEmitter {
     if (this.isActive) return;
     
     this.isActive = true;
-    console.log('🤖 Auto-Trader started - Paper trading mode');
+    console.log('🤖 Auto-Trader started - Paper trading mode with ML learning');
     
     await this.initializePortfolio();
+    
+    // Start pattern performance analyzer
+    await patternPerformanceAnalyzer.start();
     
     // Listen to ML pattern events
     mlAnalyzer.on('patternDetected', (pattern) => {
@@ -49,6 +54,12 @@ class AutoTrader extends EventEmitter {
     // Listen to scanner alerts
     scanner.on('alertTriggered', (alert) => {
       this.handleScannerAlert(alert);
+    });
+    
+    // Listen to threshold updates from pattern analyzer
+    patternPerformanceAnalyzer.on('thresholdUpdated', (data) => {
+      this.strategy.minConfidence = data.minConfidence;
+      console.log(`🎯 Dynamic threshold updated: ${data.minConfidence}% (Win rate: ${(data.recentWinRate * 100).toFixed(1)}%)`);
     });
     
     // Monitor positions every 30 seconds
@@ -96,15 +107,34 @@ class AutoTrader extends EventEmitter {
     if (!this.isActive || !this.defaultPortfolioId) return;
     
     try {
-      const confidence = parseFloat(pattern.confidence.toString());
-      if (confidence < this.strategy.minConfidence) return;
+      const baseConfidence = parseFloat(pattern.confidence.toString());
+      
+      // Get pattern performance for confidence adjustment
+      const performance = await patternPerformanceAnalyzer.getPatternPerformance(
+        pattern.patternType, 
+        pattern.timeframe
+      );
+      
+      // Apply confidence multiplier based on historical performance
+      const adjustedConfidence = performance 
+        ? baseConfidence * performance.confidenceMultiplier
+        : baseConfidence;
+      
+      // Get current dynamic minimum confidence
+      const currentMinConfidence = await patternPerformanceAnalyzer.getCurrentMinConfidence();
+      
+      if (adjustedConfidence < currentMinConfidence) {
+        console.log(`🔍 Pattern ${pattern.patternType} skipped: ${adjustedConfidence.toFixed(1)}% < ${currentMinConfidence}% threshold`);
+        return;
+      }
       
       const token = await storage.getToken(pattern.tokenId);
       if (!token) return;
       
-      const signal = this.evaluatePattern(pattern, token, confidence);
+      const signal = this.evaluatePattern(pattern, token, adjustedConfidence);
       if (signal) {
-        await this.executeTradeSignal(signal);
+        signal.patternId = pattern.id; // Link signal to pattern
+        await this.executeTradeSignal(signal, pattern.id);
       }
     } catch (error) {
       console.error('Error handling ML pattern:', error);
@@ -178,7 +208,7 @@ class AutoTrader extends EventEmitter {
     return null;
   }
 
-  private async executeTradeSignal(signal: TradingSignal) {
+  private async executeTradeSignal(signal: TradingSignal, patternId?: string) {
     if (!this.defaultPortfolioId) return;
     
     try {
@@ -197,10 +227,11 @@ class AutoTrader extends EventEmitter {
       const tradeAmount = (tradeValue / signal.price).toString();
       const totalValue = (parseFloat(tradeAmount) * signal.price).toString();
       
-      // Create trade record
+      // Create trade record with pattern linkage
       const tradeData: InsertTrade = {
         portfolioId: this.defaultPortfolioId,
         tokenId: signal.tokenId,
+        patternId: patternId || null, // Link to originating pattern
         type: signal.type,
         amount: tradeAmount,
         price: signal.price.toString(),
@@ -228,6 +259,9 @@ class AutoTrader extends EventEmitter {
       console.log(`🚀 TRADE EXECUTED: BUY ${parseFloat(tradeAmount).toFixed(6)} ${token?.symbol} at $${signal.price.toFixed(6)}`);
       console.log(`   💡 ${signal.reason}`);
       console.log(`   💰 Value: $${tradeValue}`);
+      if (patternId) {
+        console.log(`   🧠 Pattern ID: ${patternId}`);
+      }
       
       // Emit trading event for real-time dashboard updates
       this.emit('tradeExecuted', {
@@ -316,30 +350,71 @@ class AutoTrader extends EventEmitter {
     try {
       const currentPrice = parseFloat(token.currentPrice || '0');
       const amount = parseFloat(position.amount);
+      const avgBuyPrice = parseFloat(position.avgBuyPrice);
+      
+      // Calculate realized P&L
+      const totalSellValue = amount * currentPrice;
+      const totalBuyValue = amount * avgBuyPrice;
+      const realizedPnL = totalSellValue - totalBuyValue;
       const totalValue = (amount * currentPrice).toString();
+      
+      // Find the original buy trade to get pattern linkage
+      const buyTrades = await storage.getTradesByPortfolio(this.defaultPortfolioId);
+      const originalBuyTrade = buyTrades.find(t => 
+        t.tokenId === position.tokenId && 
+        t.type === 'buy' && 
+        parseFloat(t.price) === avgBuyPrice
+      );
       
       const tradeData: InsertTrade = {
         portfolioId: this.defaultPortfolioId,
         tokenId: position.tokenId,
+        patternId: originalBuyTrade?.patternId || null, // Link to same pattern as buy trade
         type: 'sell',
         amount: position.amount,
         price: currentPrice.toString(),
+        exitPrice: currentPrice.toString(),
+        realizedPnL: realizedPnL.toString(),
         totalValue,
+        closedAt: new Date(),
       };
       
       const trade = await storage.createTrade(tradeData);
+      
+      // Update the original buy trade with exit information
+      if (originalBuyTrade) {
+        await storage.updateTrade(originalBuyTrade.id, {
+          exitPrice: currentPrice.toString(),
+          realizedPnL: realizedPnL.toString(),
+          closedAt: new Date(),
+        });
+      }
+      
       await storage.updatePosition(position.id, { amount: "0" });
+      
+      // Update success stats
+      if (realizedPnL > 0) {
+        this.tradingStats.successfulTrades++;
+      }
       
       this.tradingStats.totalTrades++;
       this.tradingStats.todayTrades++;
       
+      const pnlSymbol = realizedPnL >= 0 ? '💚' : '❌';
+      const pnlText = realizedPnL >= 0 ? `+$${realizedPnL.toFixed(2)}` : `-$${Math.abs(realizedPnL).toFixed(2)}`;
+      
       console.log(`🎯 ${trigger.toUpperCase()}: Sold ${position.amount} ${token.symbol} at $${currentPrice.toFixed(6)}`);
       console.log(`   📝 ${reason}`);
+      console.log(`   ${pnlSymbol} P&L: ${pnlText}`);
+      if (originalBuyTrade?.patternId) {
+        console.log(`   🧠 Pattern: ${originalBuyTrade.patternId}`);
+      }
       
       this.emit('tradeExecuted', {
         trade,
         signal: { type: 'sell', source: trigger, reason },
         token,
+        realizedPnL,
         timestamp: new Date().toISOString(),
         stats: this.getStats()
       });

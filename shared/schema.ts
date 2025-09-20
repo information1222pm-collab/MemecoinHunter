@@ -41,12 +41,16 @@ export const trades = pgTable("trades", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   portfolioId: varchar("portfolio_id").notNull().references(() => portfolios.id),
   tokenId: varchar("token_id").notNull().references(() => tokens.id),
+  patternId: varchar("pattern_id").references(() => patterns.id), // Link to originating pattern
   type: text("type").notNull(), // 'buy' or 'sell'
   amount: decimal("amount", { precision: 20, scale: 8 }).notNull(),
   price: decimal("price", { precision: 20, scale: 8 }).notNull(),
   totalValue: decimal("total_value", { precision: 20, scale: 2 }).notNull(),
+  exitPrice: decimal("exit_price", { precision: 20, scale: 8 }), // Price when position was closed
+  realizedPnL: decimal("realized_pnl", { precision: 20, scale: 2 }), // Actual profit/loss
   status: text("status").default("completed"), // 'pending', 'completed', 'cancelled'
   createdAt: timestamp("created_at").defaultNow(),
+  closedAt: timestamp("closed_at"), // When trade was closed
 });
 
 export const positions = pgTable("positions", {
@@ -83,6 +87,7 @@ export const patterns = pgTable("patterns", {
   tokenId: varchar("token_id").notNull().references(() => tokens.id),
   patternType: text("pattern_type").notNull(), // 'bull_flag', 'double_bottom', 'volume_spike', etc.
   confidence: decimal("confidence", { precision: 5, scale: 2 }).notNull(), // 0.00-100.00
+  adjustedConfidence: decimal("adjusted_confidence", { precision: 5, scale: 2 }), // ML-adjusted confidence
   timeframe: text("timeframe").notNull(), // '1h', '4h', '1d', '1w'
   metadata: jsonb("metadata"), // Additional pattern data
   detectedAt: timestamp("detected_at").defaultNow(),
@@ -97,6 +102,30 @@ export const subscriptions = pgTable("subscriptions", {
   currentPeriodEnd: timestamp("current_period_end").notNull(),
   cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Pattern Performance Tracking
+export const patternPerformance = pgTable("pattern_performance", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  patternType: text("pattern_type").notNull(),
+  timeframe: text("timeframe").notNull(),
+  totalTrades: integer("total_trades").default(0),
+  successfulTrades: integer("successful_trades").default(0),
+  totalProfit: decimal("total_profit", { precision: 20, scale: 2 }).default("0"),
+  averageReturn: decimal("average_return", { precision: 8, scale: 4 }).default("0"),
+  winRate: decimal("win_rate", { precision: 5, scale: 2 }).default("0"),
+  confidenceMultiplier: decimal("confidence_multiplier", { precision: 5, scale: 4 }).default("1.0"),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+});
+
+// ML Learning Parameters
+export const mlLearningParams = pgTable("ml_learning_params", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  paramKey: text("param_key").notNull().unique(),
+  paramValue: text("param_value").notNull(),
+  paramType: text("param_type").notNull(), // 'threshold', 'multiplier', 'weight'
+  description: text("description"),
+  lastUpdated: timestamp("last_updated").defaultNow(),
 });
 
 // Relations
@@ -122,6 +151,7 @@ export const tokensRelations = relations(tokens, ({ many }) => ({
 export const tradesRelations = relations(trades, ({ one }) => ({
   portfolio: one(portfolios, { fields: [trades.portfolioId], references: [portfolios.id] }),
   token: one(tokens, { fields: [trades.tokenId], references: [tokens.id] }),
+  pattern: one(patterns, { fields: [trades.patternId], references: [patterns.id] }),
 }));
 
 export const positionsRelations = relations(positions, ({ one }) => ({
@@ -137,8 +167,9 @@ export const priceHistoryRelations = relations(priceHistory, ({ one }) => ({
   token: one(tokens, { fields: [priceHistory.tokenId], references: [tokens.id] }),
 }));
 
-export const patternsRelations = relations(patterns, ({ one }) => ({
+export const patternsRelations = relations(patterns, ({ one, many }) => ({
   token: one(tokens, { fields: [patterns.tokenId], references: [tokens.id] }),
+  trades: many(trades),
 }));
 
 export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
@@ -165,6 +196,16 @@ export const insertPortfolioSchema = createInsertSchema(portfolios).omit({
 export const insertTradeSchema = createInsertSchema(trades).omit({
   id: true,
   createdAt: true,
+});
+
+export const insertPatternPerformanceSchema = createInsertSchema(patternPerformance).omit({
+  id: true,
+  lastUpdated: true,
+});
+
+export const insertMLLearningParamsSchema = createInsertSchema(mlLearningParams).omit({
+  id: true,
+  lastUpdated: true,
 });
 
 export const insertPositionSchema = createInsertSchema(positions).omit({
@@ -219,3 +260,9 @@ export type InsertPattern = z.infer<typeof insertPatternSchema>;
 
 export type Subscription = typeof subscriptions.$inferSelect;
 export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
+
+export type PatternPerformance = typeof patternPerformance.$inferSelect;
+export type InsertPatternPerformance = z.infer<typeof insertPatternPerformanceSchema>;
+
+export type MLLearningParams = typeof mlLearningParams.$inferSelect;
+export type InsertMLLearningParams = z.infer<typeof insertMLLearningParamsSchema>;
