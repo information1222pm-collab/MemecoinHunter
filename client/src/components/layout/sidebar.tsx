@@ -98,7 +98,7 @@ export function Sidebar() {
             />
           </motion.div>
           <div>
-            <h1 className="text-xl font-bold gradient-text">CryptoHobby</h1>
+            <h1 className="text-xl font-bold gradient-text">MemeCoin Hunter</h1>
             <p className="text-xs text-muted-foreground">v2.1.0 • Live</p>
           </div>
         </motion.div>

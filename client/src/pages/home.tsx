@@ -160,7 +160,7 @@ export default function Home() {
               transition={{ type: "spring", stiffness: 100, delay: 0.5 }}
               data-testid="text-app-title"
             >
-              CryptoHobby
+              MemeCoin Hunter
             </motion.h1>
             <motion.p 
               className="text-xl text-muted-foreground max-w-4xl mx-auto leading-relaxed"
