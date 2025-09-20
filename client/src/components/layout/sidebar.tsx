@@ -1,7 +1,8 @@
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/hooks/use-language";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   BarChart3,
   Zap,
@@ -15,6 +16,8 @@ import {
   Users,
   Home,
   Sparkles,
+  Menu,
+  ChevronLeft,
 } from "lucide-react";
 
 const navigationItems = [
@@ -35,6 +38,24 @@ const subscriptionItems = [
 export function Sidebar() {
   const [location] = useLocation();
   const { t } = useLanguage();
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // Load collapsed state from localStorage on mount
+  useEffect(() => {
+    const savedState = localStorage.getItem('sidebar-collapsed');
+    if (savedState) {
+      setIsCollapsed(JSON.parse(savedState));
+    }
+  }, []);
+
+  // Save collapsed state to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('sidebar-collapsed', JSON.stringify(isCollapsed));
+  }, [isCollapsed]);
+
+  const toggleSidebar = () => {
+    setIsCollapsed(!isCollapsed);
+  };
 
   const containerVariants = {
     hidden: { x: -100, opacity: 0 },
@@ -65,16 +86,22 @@ export function Sidebar() {
 
   return (
     <motion.aside 
-      className="w-64 glass-card border-r border-white/10 flex-shrink-0 backdrop-blur-xl" 
+      className={cn(
+        "glass-card border-r border-white/10 flex-shrink-0 backdrop-blur-xl transition-all duration-300",
+        isCollapsed ? "w-20" : "w-64"
+      )}
       data-testid="sidebar-main"
       variants={containerVariants}
       initial="hidden"
       animate="visible"
     >
       {/* Logo Section */}
-      <motion.div className="p-6" variants={itemVariants}>
+      <motion.div className={cn("p-6 relative", isCollapsed && "px-4")} variants={itemVariants}>
         <motion.div 
-          className="flex items-center space-x-3" 
+          className={cn(
+            "flex items-center", 
+            isCollapsed ? "justify-center" : "space-x-3"
+          )}
           data-testid="sidebar-logo"
           whileHover={{ scale: 1.05 }}
           transition={{ type: "spring", stiffness: 400, damping: 10 }}
@@ -97,11 +124,39 @@ export function Sidebar() {
               transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
             />
           </motion.div>
-          <div>
-            <h1 className="text-xl font-bold gradient-text">MemeCoin Hunter</h1>
-            <p className="text-xs text-muted-foreground">v2.1.0 • Live</p>
-          </div>
+          <AnimatePresence>
+            {!isCollapsed && (
+              <motion.div
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: "auto" }}
+                exit={{ opacity: 0, width: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <h1 className="text-xl font-bold gradient-text whitespace-nowrap">MemeCoin Hunter</h1>
+                <p className="text-xs text-muted-foreground">v2.1.0 • Live</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
+        
+        {/* Toggle Button */}
+        <motion.button
+          onClick={toggleSidebar}
+          className={cn(
+            "absolute top-6 -right-3 w-6 h-6 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white flex items-center justify-center shadow-lg transition-all duration-300 hover:scale-110",
+            "z-10 border-2 border-background"
+          )}
+          data-testid="button-sidebar-toggle"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <motion.div
+            animate={{ rotate: isCollapsed ? 0 : 180 }}
+            transition={{ duration: 0.2 }}
+          >
+            <ChevronLeft className="w-3 h-3" />
+          </motion.div>
+        </motion.button>
       </motion.div>
 
       {/* Navigation */}
