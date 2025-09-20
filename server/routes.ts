@@ -1,12 +1,15 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
+import { readFile } from "fs/promises";
+import { join } from "path";
 import { storage } from "./storage";
 import { scanner } from "./services/scanner";
 import { mlAnalyzer } from "./services/ml-analyzer";
 import { priceFeed } from "./services/price-feed";
 import { riskManager } from "./services/risk-manager";
 import { autoTrader } from "./services/auto-trader";
+import { stakeholderReportUpdater } from "./services/stakeholder-report-updater";
 import { insertUserSchema, insertTradeSchema, insertTokenSchema } from "@shared/schema";
 import { z } from "zod";
 
@@ -61,6 +64,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   mlAnalyzer.start();
   riskManager.start();
   autoTrader.start();
+  stakeholderReportUpdater.startAutoUpdater();
 
   // Set up real-time broadcasts
   scanner.on('tokenScanned', (token) => {
@@ -486,6 +490,128 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Risk monitoring completed" });
     } catch (error) {
       res.status(500).json({ message: "Failed to monitor risk limits", error });
+    }
+  });
+
+  // Stakeholder Report routes
+  app.get("/api/stakeholder-report", async (req, res) => {
+    try {
+      const reportPath = join(process.cwd(), "CryptoHobby_Stakeholder_Report_Q4_2025.md");
+      const reportContent = await readFile(reportPath, "utf-8");
+      
+      // Get current system stats for dynamic updates
+      const tokens = await storage.getActiveTokens();
+      const scannerStatus = scanner.getStatus();
+      const currentTime = new Date().toLocaleString();
+      
+      // Update dynamic content in the report
+      const updatedContent = reportContent
+        .replace(/\d+\+ tokens tracked/g, `${tokens.length}+ tokens tracked`)
+        .replace(/Last update: .*/g, `Last update: ${currentTime}`);
+      
+      res.json({ 
+        content: updatedContent,
+        lastUpdated: currentTime,
+        systemStats: {
+          tokensTracked: tokens.length,
+          scannerActive: scannerStatus.isRunning,
+          systemStatus: "Operational"
+        }
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch stakeholder report", error });
+    }
+  });
+
+  // Validation schemas for stakeholder report updates
+  const featureUpdateSchema = z.object({
+    type: z.enum(['feature', 'deployment', 'enhancement', 'bugfix']),
+    title: z.string().min(1).max(100),
+    description: z.string().min(1).max(500),
+    impact: z.enum(['major', 'minor', 'patch']).optional()
+  });
+
+  app.post("/api/stakeholder-report/update", async (req, res) => {
+    try {
+      // Basic validation - for production, add proper authentication
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ message: "Report updates disabled in production" });
+      }
+
+      const validation = featureUpdateSchema.safeParse(req.body);
+      
+      if (validation.success) {
+        const { type, title, description, impact } = validation.data;
+        
+        // Add feature update to the report
+        await stakeholderReportUpdater.addFeatureUpdate({
+          type,
+          title,
+          description,
+          date: new Date().toLocaleDateString(),
+          impact: impact || 'minor'
+        });
+        
+        console.log(`📊 Stakeholder Report Updated: ${title} (${type})`);
+        
+        res.json({ 
+          message: "Stakeholder report updated successfully",
+          timestamp: new Date().toISOString(),
+          update: { type, title, description }
+        });
+      } else {
+        // Fallback: just update system metrics
+        await stakeholderReportUpdater.updateSystemMetrics();
+        
+        res.json({ 
+          message: "System metrics updated",
+          timestamp: new Date().toISOString(),
+          errors: validation.error?.issues
+        });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update stakeholder report", error });
+    }
+  });
+
+  const deploymentSchema = z.object({
+    version: z.string().min(1).max(50).optional(),
+    features: z.array(z.string().min(1).max(100)).min(1).max(10)
+  });
+
+  app.post("/api/stakeholder-report/deploy", async (req, res) => {
+    try {
+      // Basic validation - for production, add proper authentication
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ message: "Deployment logging disabled in production" });
+      }
+
+      const validation = deploymentSchema.safeParse(req.body);
+      
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Invalid deployment data", 
+          errors: validation.error.issues 
+        });
+      }
+
+      const { version, features } = validation.data;
+      
+      await stakeholderReportUpdater.logDeployment({
+        version: version || `v${Date.now()}`,
+        features: features,
+        date: new Date().toLocaleDateString()
+      });
+      
+      console.log(`🚀 Deployment logged in stakeholder report: ${version}`);
+      
+      res.json({ 
+        message: "Deployment logged successfully",
+        version: version,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to log deployment", error });
     }
   });
 

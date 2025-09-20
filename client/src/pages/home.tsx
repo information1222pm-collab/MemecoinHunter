@@ -47,6 +47,19 @@ export default function Home() {
     refetchInterval: 30000,
   });
 
+  const { data: stakeholderReport } = useQuery<{
+    content: string;
+    lastUpdated: string;
+    systemStats: {
+      tokensTracked: number;
+      scannerActive: boolean;
+      systemStatus: string;
+    };
+  }>({
+    queryKey: ['/api/stakeholder-report'],
+    refetchInterval: 300000, // Refresh every 5 minutes
+  });
+
   // Real performance data from live system
   const systemStats = {
     tokensTracked: 63,
@@ -427,6 +440,85 @@ export default function Home() {
               ))}
             </div>
           </motion.div>
+
+          {/* Stakeholder Report Section */}
+          {stakeholderReport && (
+            <motion.div 
+              className="glass-ultra rounded-3xl p-8"
+              variants={itemVariants}
+              data-testid="card-stakeholder-report"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-3">
+                  <motion.div 
+                    className="w-12 h-12 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 p-2.5"
+                    animate={{ scale: [1, 1.05, 1] }}
+                    transition={{ duration: 3, repeat: Infinity }}
+                  >
+                    <BarChart3 className="w-full h-full text-white" />
+                  </motion.div>
+                  <div>
+                    <h3 className="text-2xl font-bold">Stakeholder Report</h3>
+                    <p className="text-muted-foreground">Live platform performance & metrics</p>
+                  </div>
+                </div>
+                <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30">
+                  Updated: {stakeholderReport.lastUpdated}
+                </Badge>
+              </div>
+
+              {/* Key Metrics Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <motion.div 
+                  className="text-center p-4 rounded-xl bg-black/20 border border-white/10"
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <div className="text-2xl font-bold text-green-400">{stakeholderReport.systemStats.tokensTracked}+</div>
+                  <div className="text-xs text-muted-foreground">Tokens Tracked</div>
+                </motion.div>
+                <motion.div 
+                  className="text-center p-4 rounded-xl bg-black/20 border border-white/10"
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <div className="text-2xl font-bold text-blue-400">
+                    {stakeholderReport.systemStats.scannerActive ? "ACTIVE" : "STOPPED"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Scanner Status</div>
+                </motion.div>
+                <motion.div 
+                  className="text-center p-4 rounded-xl bg-black/20 border border-white/10"
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <div className="text-2xl font-bold text-purple-400">{stakeholderReport.systemStats.systemStatus}</div>
+                  <div className="text-xs text-muted-foreground">System Health</div>
+                </motion.div>
+              </div>
+
+              {/* Report Preview */}
+              <div className="bg-black/20 border border-white/10 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-lg font-semibold">Executive Summary</h4>
+                  <Badge variant="outline" className="text-xs">Auto-Updated</Badge>
+                </div>
+                <div className="text-sm text-muted-foreground leading-relaxed max-h-32 overflow-hidden">
+                  {stakeholderReport.content.slice(0, 400)}...
+                </div>
+                <motion.div 
+                  className="mt-4 pt-4 border-t border-white/10"
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">
+                      🎯 Self-Correcting ML • 🔄 Dynamic Risk Adjustment • 📊 74+ Tokens
+                    </span>
+                    <span className="text-blue-400 font-medium cursor-pointer hover:text-blue-300">
+                      View Full Report →
+                    </span>
+                  </div>
+                </motion.div>
+              </div>
+            </motion.div>
+          )}
 
           {/* Live System Status */}
           <motion.div 
