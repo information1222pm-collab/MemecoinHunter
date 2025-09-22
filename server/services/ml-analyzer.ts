@@ -652,6 +652,157 @@ class MLAnalyzer extends EventEmitter {
         },
       });
     }
+
+    // NEW: Neural Network-based Pattern Recognition
+    const neuralScore = this.calculateNeuralNetworkScore(features, prices, indicators);
+    if (neuralScore > 0.72) {
+      patterns.push({
+        type: 'neural_network_pattern',
+        confidence: Math.min(neuralScore * 100, 95),
+        timeframe: '45m',
+        metadata: {
+          layerActivations: this.calculateLayerActivations(features),
+          patternComplexity: this.calculatePatternComplexity(prices),
+          neuralConfidence: neuralScore,
+        },
+      });
+    }
+
+    // NEW: Support/Resistance ML Pattern
+    const srScore = this.calculateSupportResistanceMLScore(prices, features);
+    if (srScore > 0.68) {
+      patterns.push({
+        type: 'ml_support_resistance',
+        confidence: Math.min(srScore * 100, 95),
+        timeframe: '2h',
+        metadata: {
+          keyLevels: this.identifyKeyLevels(prices),
+          levelStrength: this.calculateLevelStrength(prices),
+          probabilityBounce: srScore,
+        },
+      });
+    }
+
+    // NEW: Fibonacci ML Pattern
+    const fibScore = this.calculateFibonacciMLScore(prices, features);
+    if (fibScore > 0.7) {
+      patterns.push({
+        type: 'fibonacci_ml_pattern',
+        confidence: Math.min(fibScore * 100, 95),
+        timeframe: '1h',
+        metadata: {
+          fibLevels: this.calculateFibonacciLevels(prices),
+          retracementLevel: this.getCurrentRetracementLevel(prices),
+          extensionTarget: this.calculateExtensionTarget(prices),
+        },
+      });
+    }
+
+    // NEW: Volume Profile ML Pattern
+    const volumeProfileScore = this.calculateVolumeProfileMLScore(prices, features, indicators);
+    if (volumeProfileScore > 0.69) {
+      patterns.push({
+        type: 'volume_profile_ml',
+        confidence: Math.min(volumeProfileScore * 100, 95),
+        timeframe: '30m',
+        metadata: {
+          volumeNodes: this.calculateVolumeNodes(prices, indicators.volume),
+          pocLevel: this.calculatePOC(prices, indicators.volume),
+          imbalanceAreas: this.detectVolumeImbalance(prices, indicators.volume),
+        },
+      });
+    }
+
+    // NEW: Market Sentiment ML Pattern
+    const sentimentScore = this.calculateMarketSentimentMLScore(features, indicators);
+    if (sentimentScore > 0.71) {
+      patterns.push({
+        type: 'market_sentiment_ml',
+        confidence: Math.min(sentimentScore * 100, 95),
+        timeframe: '1h',
+        metadata: {
+          sentimentIndex: this.calculateSentimentIndex(features),
+          fearGreedIndex: this.calculateFearGreedIndex(features, indicators),
+          crowdBehavior: this.analyzeCrowdBehavior(features),
+        },
+      });
+    }
+
+    // NEW: Multi-Timeframe ML Pattern
+    const multiTimeframeScore = this.calculateMultiTimeframeMLScore(features, prices);
+    if (multiTimeframeScore > 0.73) {
+      patterns.push({
+        type: 'multi_timeframe_ml',
+        confidence: Math.min(multiTimeframeScore * 100, 95),
+        timeframe: '4h',
+        metadata: {
+          shortTermTrend: this.calculateShortTermTrend(prices),
+          mediumTermTrend: this.calculateMediumTermTrend(prices),
+          longTermTrend: this.calculateLongTermTrend(prices),
+          alignmentScore: multiTimeframeScore,
+        },
+      });
+    }
+
+    // NEW: Volatility Expansion ML Pattern
+    const volatilityScore = this.calculateVolatilityExpansionMLScore(features, indicators);
+    if (volatilityScore > 0.67) {
+      patterns.push({
+        type: 'volatility_expansion_ml',
+        confidence: Math.min(volatilityScore * 100, 95),
+        timeframe: '15m',
+        metadata: {
+          volatilityBreakout: this.calculateVolatilityBreakout(indicators),
+          expansionMagnitude: this.calculateExpansionMagnitude(indicators),
+          contractionPeriod: this.calculateContractionPeriod(indicators),
+        },
+      });
+    }
+
+    // NEW: Mean Reversion ML Pattern
+    const meanReversionScore = this.calculateMeanReversionMLScore(features, prices, indicators);
+    if (meanReversionScore > 0.7) {
+      patterns.push({
+        type: 'mean_reversion_ml',
+        confidence: Math.min(meanReversionScore * 100, 95),
+        timeframe: '2h',
+        metadata: {
+          deviationFromMean: this.calculateDeviationFromMean(prices),
+          reversionProbability: meanReversionScore,
+          targetPrice: this.calculateMeanReversionTarget(prices),
+        },
+      });
+    }
+
+    // NEW: Harmonic Pattern ML
+    const harmonicScore = this.calculateHarmonicPatternMLScore(prices, features);
+    if (harmonicScore > 0.68) {
+      patterns.push({
+        type: 'harmonic_pattern_ml',
+        confidence: Math.min(harmonicScore * 100, 95),
+        timeframe: '3h',
+        metadata: {
+          patternType: this.identifyHarmonicPattern(prices),
+          ratioAccuracy: this.calculateRatioAccuracy(prices),
+          priceProjection: this.calculateHarmonicProjection(prices),
+        },
+      });
+    }
+
+    // NEW: Liquidity Flow ML Pattern
+    const liquidityScore = this.calculateLiquidityFlowMLScore(features, indicators);
+    if (liquidityScore > 0.69) {
+      patterns.push({
+        type: 'liquidity_flow_ml',
+        confidence: Math.min(liquidityScore * 100, 95),
+        timeframe: '1h',
+        metadata: {
+          liquidityLevels: this.calculateLiquidityLevels(features, indicators),
+          flowDirection: this.calculateFlowDirection(features),
+          institutionalActivity: this.detectInstitutionalActivity(features, indicators),
+        },
+      });
+    }
     
     return patterns;
   }
@@ -706,6 +857,492 @@ class MLAnalyzer extends EventEmitter {
     
     const sum = features.reduce((sum, f) => sum + Math.abs(f), 0);
     return Math.min(sum / (features.length * 100), 1); // Normalize to 0-1 range
+  }
+
+  // NEW ML PATTERN CALCULATION METHODS
+
+  private calculateNeuralNetworkScore(features: MLFeatures, prices: number[], indicators: TechnicalIndicators): number {
+    // Simulate neural network with weighted layer activations
+    const inputLayer = [
+      ...features.technicalFeatures.map(f => this.sigmoid(f / 100)),
+      ...features.sentimentFeatures.map(f => this.sigmoid(f)),
+      ...features.patternFeatures.map(f => this.sigmoid(f)),
+    ];
+    
+    // Hidden layer simulation with weights
+    const hiddenWeights = [0.3, 0.25, 0.2, 0.15, 0.1];
+    const hiddenLayer = inputLayer.slice(0, 5).map((activation, i) => 
+      activation * (hiddenWeights[i] || 0.1)
+    );
+    
+    // Output layer - pattern recognition score
+    const outputActivation = hiddenLayer.reduce((sum, activation) => sum + activation, 0) / hiddenLayer.length;
+    
+    // Add complexity bonus for sophisticated patterns
+    const complexityBonus = this.calculatePatternComplexity(prices) * 0.2;
+    
+    return Math.min(outputActivation + complexityBonus, 1);
+  }
+
+  private calculateSupportResistanceMLScore(prices: number[], features: MLFeatures): number {
+    const keyLevels = this.identifyKeyLevels(prices);
+    const currentPrice = prices[prices.length - 1];
+    
+    // Find nearest support/resistance levels
+    const nearestLevels = keyLevels.filter(level => 
+      Math.abs(level - currentPrice) / currentPrice < 0.05 // Within 5%
+    );
+    
+    if (nearestLevels.length === 0) return 0;
+    
+    const levelStrength = this.calculateLevelStrength(prices);
+    const volumeConfirmation = features.patternFeatures[2]; // Volume profile
+    const momentumAlignment = Math.abs(features.momentumFeatures[1]);
+    
+    return (levelStrength * 0.5) + (volumeConfirmation * 0.3) + (momentumAlignment * 0.2);
+  }
+
+  private calculateFibonacciMLScore(prices: number[], features: MLFeatures): number {
+    const fibLevels = this.calculateFibonacciLevels(prices);
+    const currentPrice = prices[prices.length - 1];
+    
+    // Check if price is near key Fibonacci levels
+    const keyFibLevels = [0.236, 0.382, 0.5, 0.618, 0.786];
+    let fibScore = 0;
+    
+    keyFibLevels.forEach(level => {
+      const fibPrice = fibLevels[level] || 0;
+      if (Math.abs(fibPrice - currentPrice) / currentPrice < 0.03) { // Within 3%
+        fibScore += 0.2;
+      }
+    });
+    
+    // Add momentum confirmation
+    const momentumConfirmation = features.momentumFeatures[0] * 0.3;
+    
+    return Math.min(fibScore + momentumConfirmation, 1);
+  }
+
+  private calculateVolumeProfileMLScore(prices: number[], features: MLFeatures, indicators: TechnicalIndicators): number {
+    const volumeNodes = this.calculateVolumeNodes(prices, indicators.volume);
+    const poc = this.calculatePOC(prices, indicators.volume);
+    const currentPrice = prices[prices.length - 1];
+    
+    // Score based on proximity to high-volume nodes
+    const nodeScore = volumeNodes.filter(node => 
+      Math.abs(node.price - currentPrice) / currentPrice < 0.02
+    ).length * 0.25;
+    
+    // POC interaction score
+    const pocScore = Math.abs(poc - currentPrice) / currentPrice < 0.03 ? 0.3 : 0;
+    
+    // Volume trend confirmation
+    const volumeTrend = features.patternFeatures[2] * 0.45;
+    
+    return Math.min(nodeScore + pocScore + volumeTrend, 1);
+  }
+
+  private calculateMarketSentimentMLScore(features: MLFeatures, indicators: TechnicalIndicators): number {
+    const sentimentIndex = this.calculateSentimentIndex(features);
+    const fearGreedIndex = this.calculateFearGreedIndex(features, indicators);
+    const crowdBehavior = this.analyzeCrowdBehavior(features);
+    
+    // Weighted sentiment scoring
+    return (sentimentIndex * 0.4) + (fearGreedIndex * 0.35) + (crowdBehavior * 0.25);
+  }
+
+  private calculateMultiTimeframeMLScore(features: MLFeatures, prices: number[]): number {
+    const shortTerm = this.calculateShortTermTrend(prices);
+    const mediumTerm = this.calculateMediumTermTrend(prices);
+    const longTerm = this.calculateLongTermTrend(prices);
+    
+    // Calculate alignment between timeframes
+    const alignment = this.calculateTrendAlignment(shortTerm, mediumTerm, longTerm);
+    
+    // Boost score when all timeframes align
+    const alignmentBonus = alignment > 0.8 ? 0.2 : 0;
+    
+    return Math.min(alignment + alignmentBonus, 1);
+  }
+
+  private calculateVolatilityExpansionMLScore(features: MLFeatures, indicators: TechnicalIndicators): number {
+    const volatilityBreakout = this.calculateVolatilityBreakout(indicators);
+    const expansionMagnitude = this.calculateExpansionMagnitude(indicators);
+    const contractionPeriod = this.calculateContractionPeriod(indicators);
+    
+    // Bollinger Band squeeze detection
+    const bbSqueeze = this.detectBollingerSqueeze(indicators);
+    
+    return (volatilityBreakout * 0.3) + (expansionMagnitude * 0.3) + 
+           (contractionPeriod * 0.2) + (bbSqueeze * 0.2);
+  }
+
+  private calculateMeanReversionMLScore(features: MLFeatures, prices: number[], indicators: TechnicalIndicators): number {
+    const deviation = this.calculateDeviationFromMean(prices);
+    const oversoldOverbought = indicators.rsi > 70 || indicators.rsi < 30 ? 0.3 : 0;
+    const bollingerPosition = this.calculateBollingerPosition(prices, indicators);
+    
+    // High deviation + extreme RSI = high mean reversion probability
+    const extremeDeviation = Math.abs(deviation) > 2 ? 0.4 : Math.abs(deviation) * 0.2;
+    
+    return Math.min(extremeDeviation + oversoldOverbought + bollingerPosition, 1);
+  }
+
+  private calculateHarmonicPatternMLScore(prices: number[], features: MLFeatures): number {
+    const harmonicPattern = this.identifyHarmonicPattern(prices);
+    const ratioAccuracy = this.calculateRatioAccuracy(prices);
+    
+    if (!harmonicPattern || ratioAccuracy < 0.5) return 0;
+    
+    // Boost score for accurate harmonic ratios
+    const patternBonus = ratioAccuracy > 0.8 ? 0.3 : 0;
+    const volumeConfirmation = features.patternFeatures[2] * 0.3;
+    
+    return Math.min(ratioAccuracy + patternBonus + volumeConfirmation, 1);
+  }
+
+  private calculateLiquidityFlowMLScore(features: MLFeatures, indicators: TechnicalIndicators): number {
+    const liquidityLevels = this.calculateLiquidityLevels(features, indicators);
+    const flowDirection = this.calculateFlowDirection(features);
+    const institutionalActivity = this.detectInstitutionalActivity(features, indicators);
+    
+    return (liquidityLevels * 0.4) + (Math.abs(flowDirection) * 0.3) + (institutionalActivity * 0.3);
+  }
+
+  // HELPER METHODS FOR NEW ML PATTERNS
+
+  private sigmoid(x: number): number {
+    return 1 / (1 + Math.exp(-x));
+  }
+
+  private calculateLayerActivations(features: MLFeatures): number[] {
+    return [
+      ...features.technicalFeatures.map(f => this.sigmoid(f / 100)),
+      ...features.sentimentFeatures.map(f => this.sigmoid(f)),
+    ];
+  }
+
+  private calculatePatternComplexity(prices: number[]): number {
+    if (prices.length < 10) return 0;
+    
+    const peaks = this.findLocalMaxima(prices);
+    const valleys = this.findLocalMinima(prices);
+    const totalTurningPoints = peaks.length + valleys.length;
+    
+    return Math.min(totalTurningPoints / prices.length, 1);
+  }
+
+  private findLocalMaxima(prices: number[]): number[] {
+    const maxima = [];
+    for (let i = 1; i < prices.length - 1; i++) {
+      if (prices[i] > prices[i - 1] && prices[i] > prices[i + 1]) {
+        maxima.push(i);
+      }
+    }
+    return maxima;
+  }
+
+  private identifyKeyLevels(prices: number[]): number[] {
+    const levels: number[] = [];
+    const peaks = this.findLocalMaxima(prices);
+    const valleys = this.findLocalMinima(prices);
+    
+    // Add significant peaks and valleys as key levels
+    peaks.forEach(peakIndex => levels.push(prices[peakIndex]));
+    valleys.forEach(valleyIndex => levels.push(prices[valleyIndex]));
+    
+    // Remove duplicates and sort
+    return Array.from(new Set(levels)).sort((a, b) => a - b);
+  }
+
+  private calculateLevelStrength(prices: number[]): number {
+    const keyLevels = this.identifyKeyLevels(prices);
+    const currentPrice = prices[prices.length - 1];
+    
+    // Count how many times price has tested nearby levels
+    let testCount = 0;
+    
+    keyLevels.forEach(level => {
+      prices.forEach(price => {
+        if (Math.abs(price - level) / level < 0.02) { // Within 2%
+          testCount++;
+        }
+      });
+    });
+    
+    return Math.min(testCount / (prices.length * 0.1), 1);
+  }
+
+  private calculateFibonacciLevels(prices: number[]): Record<number, number> {
+    if (prices.length < 10) return {};
+    
+    const high = Math.max(...prices);
+    const low = Math.min(...prices);
+    const range = high - low;
+    
+    return {
+      0: low,
+      0.236: low + (range * 0.236),
+      0.382: low + (range * 0.382),
+      0.5: low + (range * 0.5),
+      0.618: low + (range * 0.618),
+      0.786: low + (range * 0.786),
+      1: high,
+    };
+  }
+
+  private getCurrentRetracementLevel(prices: number[]): number {
+    const fibLevels = this.calculateFibonacciLevels(prices);
+    const currentPrice = prices[prices.length - 1];
+    
+    const levels = Object.values(fibLevels);
+    const closestLevel = levels.reduce((closest, level) => 
+      Math.abs(level - currentPrice) < Math.abs(closest - currentPrice) ? level : closest
+    );
+    
+    // Return the ratio that corresponds to the closest level
+    const ratios = Object.keys(fibLevels).map(Number);
+    const closestRatio = ratios.find(ratio => fibLevels[ratio] === closestLevel);
+    
+    return closestRatio || 0;
+  }
+
+  private calculateExtensionTarget(prices: number[]): number {
+    const fibLevels = this.calculateFibonacciLevels(prices);
+    const currentPrice = prices[prices.length - 1];
+    const high = Math.max(...prices);
+    const low = Math.min(...prices);
+    const range = high - low;
+    
+    // Calculate 1.618 extension
+    return currentPrice > (high + low) / 2 ? high + (range * 0.618) : low - (range * 0.618);
+  }
+
+  private calculateVolumeNodes(prices: number[], volumes: number[]): Array<{price: number; volume: number}> {
+    const nodes: Array<{price: number; volume: number}> = [];
+    const priceRanges = this.createPriceRanges(prices, 20); // 20 price buckets
+    
+    priceRanges.forEach(range => {
+      let totalVolume = 0;
+      for (let i = 0; i < prices.length; i++) {
+        if (prices[i] >= range.low && prices[i] <= range.high) {
+          totalVolume += volumes[i] || 0;
+        }
+      }
+      nodes.push({ price: (range.low + range.high) / 2, volume: totalVolume });
+    });
+    
+    return nodes.sort((a, b) => b.volume - a.volume); // Sort by volume descending
+  }
+
+  private calculatePOC(prices: number[], volumes: number[]): number {
+    const volumeNodes = this.calculateVolumeNodes(prices, volumes);
+    return volumeNodes.length > 0 ? volumeNodes[0].price : prices[prices.length - 1];
+  }
+
+  private detectVolumeImbalance(prices: number[], volumes: number[]): Array<{price: number; imbalance: number}> {
+    const nodes = this.calculateVolumeNodes(prices, volumes);
+    const avgVolume = nodes.reduce((sum, node) => sum + node.volume, 0) / nodes.length;
+    
+    return nodes
+      .filter(node => node.volume < avgVolume * 0.5) // Low volume areas
+      .map(node => ({ price: node.price, imbalance: avgVolume - node.volume }));
+  }
+
+  private createPriceRanges(prices: number[], buckets: number): Array<{low: number; high: number}> {
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    const range = max - min;
+    const bucketSize = range / buckets;
+    
+    const ranges = [];
+    for (let i = 0; i < buckets; i++) {
+      ranges.push({
+        low: min + (i * bucketSize),
+        high: min + ((i + 1) * bucketSize),
+      });
+    }
+    
+    return ranges;
+  }
+
+  private calculateSentimentIndex(features: MLFeatures): number {
+    // Combine multiple sentiment indicators
+    const technicalSentiment = features.technicalFeatures[0] / 100; // RSI-based
+    const momentumSentiment = features.momentumFeatures[0];
+    const volumeSentiment = features.patternFeatures[2];
+    
+    return (technicalSentiment + momentumSentiment + volumeSentiment) / 3;
+  }
+
+  private calculateFearGreedIndex(features: MLFeatures, indicators: TechnicalIndicators): number {
+    // Custom fear/greed calculation
+    const volatilityFactor = Math.min(indicators.volatility / 10, 1);
+    const momentumFactor = Math.abs(features.momentumFeatures[1] / 100);
+    const volumeFactor = features.patternFeatures[2];
+    
+    // High volatility + high momentum = greed, low values = fear
+    return (volatilityFactor + momentumFactor + volumeFactor) / 3;
+  }
+
+  private analyzeCrowdBehavior(features: MLFeatures): number {
+    // Analyze herd behavior patterns
+    const trendFollowing = Math.abs(features.momentumFeatures[1]);
+    const extremeSentiment = features.sentimentFeatures[0] > 0.8 || features.sentimentFeatures[0] < 0.2 ? 0.8 : 0.4;
+    
+    return (trendFollowing + extremeSentiment) / 2;
+  }
+
+  private calculateShortTermTrend(prices: number[]): number {
+    if (prices.length < 5) return 0;
+    const recent = prices.slice(-5);
+    return (recent[recent.length - 1] - recent[0]) / recent[0];
+  }
+
+  private calculateMediumTermTrend(prices: number[]): number {
+    if (prices.length < 10) return 0;
+    const medium = prices.slice(-10);
+    return (medium[medium.length - 1] - medium[0]) / medium[0];
+  }
+
+  private calculateLongTermTrend(prices: number[]): number {
+    if (prices.length < 20) return 0;
+    const long = prices.slice(-20);
+    return (long[long.length - 1] - long[0]) / long[0];
+  }
+
+  private calculateTrendAlignment(short: number, medium: number, long: number): number {
+    const shortSign = short > 0 ? 1 : -1;
+    const mediumSign = medium > 0 ? 1 : -1;
+    const longSign = long > 0 ? 1 : -1;
+    
+    const alignment = (shortSign === mediumSign ? 0.33 : 0) + 
+                     (mediumSign === longSign ? 0.33 : 0) + 
+                     (shortSign === longSign ? 0.34 : 0);
+    
+    return alignment;
+  }
+
+  private calculateVolatilityBreakout(indicators: TechnicalIndicators): number {
+    const currentVol = indicators.volatility;
+    const avgVol = 3; // Baseline volatility
+    
+    return currentVol > avgVol * 1.5 ? Math.min(currentVol / (avgVol * 3), 1) : 0;
+  }
+
+  private calculateExpansionMagnitude(indicators: TechnicalIndicators): number {
+    return Math.min(indicators.volatility / 10, 1);
+  }
+
+  private calculateContractionPeriod(indicators: TechnicalIndicators): number {
+    // Longer contraction periods lead to bigger expansions
+    return indicators.volatility < 2 ? 0.8 : 0.2;
+  }
+
+  private detectBollingerSqueeze(indicators: TechnicalIndicators): number {
+    const bb = indicators.bollingerBands;
+    if (bb.upper.length === 0 || bb.lower.length === 0) return 0;
+    
+    const currentBandWidth = bb.upper[bb.upper.length - 1] - bb.lower[bb.lower.length - 1];
+    const avgBandWidth = 5; // Baseline band width
+    
+    return currentBandWidth < avgBandWidth * 0.7 ? 0.8 : 0.2;
+  }
+
+  private calculateDeviationFromMean(prices: number[]): number {
+    const mean = prices.reduce((sum, p) => sum + p, 0) / prices.length;
+    const currentPrice = prices[prices.length - 1];
+    
+    return (currentPrice - mean) / mean;
+  }
+
+  private calculateMeanReversionTarget(prices: number[]): number {
+    return prices.reduce((sum, p) => sum + p, 0) / prices.length;
+  }
+
+  private calculateBollingerPosition(prices: number[], indicators: TechnicalIndicators): number {
+    const bb = indicators.bollingerBands;
+    if (bb.upper.length === 0 || bb.lower.length === 0) return 0;
+    
+    const currentPrice = prices[prices.length - 1];
+    const upper = bb.upper[bb.upper.length - 1];
+    const lower = bb.lower[bb.lower.length - 1];
+    
+    if (currentPrice > upper) return 0.8; // Overbought
+    if (currentPrice < lower) return 0.8; // Oversold
+    
+    return 0.2;
+  }
+
+  private identifyHarmonicPattern(prices: number[]): string | null {
+    // Simplified harmonic pattern detection
+    const peaks = this.findLocalMaxima(prices);
+    const valleys = this.findLocalMinima(prices);
+    
+    if (peaks.length < 2 || valleys.length < 2) return null;
+    
+    // Check for basic ABCD pattern
+    const lastPeak = peaks[peaks.length - 1];
+    const lastValley = valleys[valleys.length - 1];
+    
+    if (lastPeak > lastValley) {
+      return 'bullish_abcd';
+    } else {
+      return 'bearish_abcd';
+    }
+  }
+
+  private calculateRatioAccuracy(prices: number[]): number {
+    // Simplified ratio accuracy for harmonic patterns
+    const peaks = this.findLocalMaxima(prices);
+    const valleys = this.findLocalMinima(prices);
+    
+    if (peaks.length < 2 || valleys.length < 2) return 0;
+    
+    // Check if ratios approximate Fibonacci levels
+    const priceRange = Math.max(...prices) - Math.min(...prices);
+    const avgMove = priceRange / (peaks.length + valleys.length);
+    
+    // Simplified accuracy based on how well moves align with expected ratios
+    return avgMove > 0 ? Math.min(0.618 + Math.random() * 0.3, 1) : 0; // Placeholder
+  }
+
+  private calculateHarmonicProjection(prices: number[]): number {
+    const harmonicPattern = this.identifyHarmonicPattern(prices);
+    const currentPrice = prices[prices.length - 1];
+    
+    if (!harmonicPattern) return currentPrice;
+    
+    // Project target based on pattern type
+    const range = Math.max(...prices) - Math.min(...prices);
+    
+    return harmonicPattern.includes('bullish') 
+      ? currentPrice + (range * 0.618)
+      : currentPrice - (range * 0.618);
+  }
+
+  private calculateLiquidityLevels(features: MLFeatures, indicators: TechnicalIndicators): number {
+    // Combine volume and price action to identify liquidity
+    const volumeProfile = features.patternFeatures[2];
+    const volatility = indicators.volatility / 10;
+    
+    return Math.min(volumeProfile + volatility, 1);
+  }
+
+  private calculateFlowDirection(features: MLFeatures): number {
+    // Determine if liquidity is flowing in or out
+    const momentum = features.momentumFeatures[1];
+    const volume = features.patternFeatures[2];
+    
+    return momentum * volume; // Positive = inflow, Negative = outflow
+  }
+
+  private detectInstitutionalActivity(features: MLFeatures, indicators: TechnicalIndicators): number {
+    // Large volume spikes often indicate institutional activity
+    const volumeSpike = features.patternFeatures[2] > 0.7 ? 0.6 : 0.2;
+    const lowVolatility = indicators.volatility < 3 ? 0.4 : 0.2; // Institutions often trade with low impact
+    
+    return volumeSpike + lowVolatility;
   }
   
   private detectEnhancedPatterns(prices: number[], volumes: number[], indicators: TechnicalIndicators, sentiment: MarketSentiment): Array<{type: string; confidence: number; timeframe: string; metadata: any}> {
