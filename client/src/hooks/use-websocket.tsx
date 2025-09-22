@@ -24,7 +24,7 @@ export function useWebSocket() {
         setIsConnected(true);
         setError(null);
         
-        // Subscribe to updates
+        // Subscribe to supported real-time updates only
         ws.current?.send(JSON.stringify({ type: 'subscribe_scanner' }));
         ws.current?.send(JSON.stringify({ type: 'subscribe_prices' }));
       };

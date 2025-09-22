@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useWebSocket } from "@/hooks/use-websocket";
+import { useEffect } from "react";
 
 const languages = [
   { code: "en", flag: "🇺🇸", name: "English" },
@@ -18,6 +20,8 @@ const languages = [
 
 export function Header() {
   const { language, setLanguage, t } = useLanguage();
+  const { isConnected, lastMessage } = useWebSocket();
+  const queryClient = useQueryClient();
 
   const currentLanguage = languages.find(lang => lang.code === language) || languages[0];
   
@@ -58,6 +62,34 @@ export function Header() {
       style: 'currency',
       currency: 'USD',
     }).format(parseFloat(demoPortfolioValue));
+
+  // Real-time WebSocket data updates for header portfolio value
+  useEffect(() => {
+    if (!lastMessage || !isConnected) return;
+
+    const { type, data } = lastMessage;
+
+    switch (type) {
+      case 'portfolio_update':
+        // Update portfolio value in real-time
+        if (data?.totalValue) {
+          queryClient.setQueryData(['/api/portfolio', 'default'], (oldData: any) => 
+            oldData ? { ...oldData, totalValue: data.totalValue } : { totalValue: data.totalValue }
+          );
+        }
+        break;
+      
+      case 'trade_executed':
+        // Invalidate portfolio data when trades are executed
+        queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default'] });
+        break;
+      
+      case 'price_update':
+        // Invalidate portfolio when prices change (affects total value)
+        queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default'] });
+        break;
+    }
+  }, [lastMessage, isConnected, queryClient]);
 
   return (
     <header className="bg-card border-b border-border px-4 md:px-6 py-3 md:py-4" data-testid="header-main">

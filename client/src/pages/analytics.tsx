@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/hooks/use-language";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useWebSocket } from "@/hooks/use-websocket";
+import { useEffect } from "react";
 import { TrendingUp, TrendingDown, BarChart3, PieChart, Activity, AlertTriangle, Target, Zap, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -12,6 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 export default function Analytics() {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
+  const { isConnected, lastMessage } = useWebSocket();
 
   // Fetch real analytics data from API with error handling
   const { data: autoTraderStats, error: autoTraderError } = useQuery<{
@@ -95,6 +98,56 @@ export default function Analytics() {
   };
 
   const isAuthenticated = !hasAuthError(portfolioError) && !hasAuthError(autoTraderError) && !hasAuthError(tradesError);
+
+  // Real-time WebSocket data updates
+  useEffect(() => {
+    if (!lastMessage || !isConnected) return;
+
+    const { type, data } = lastMessage;
+
+    switch (type) {
+      case 'trading_stats':
+        // Update auto-trader statistics in real-time
+        if (data) {
+          queryClient.setQueryData(['/api/auto-trader/portfolio'], (oldData: any) => 
+            oldData ? { ...oldData, ...data } : data
+          );
+        }
+        break;
+      
+      case 'trade_executed':
+        // Invalidate auto-trader and trades data when a new trade is executed
+        queryClient.invalidateQueries({ queryKey: ['/api/auto-trader/portfolio'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default', 'trades'] });
+        break;
+      
+      case 'pattern_detected':
+        // Invalidate risk analysis when new ML patterns are detected
+        queryClient.invalidateQueries({ queryKey: ['/api/risk/portfolio'] });
+        break;
+      
+      case 'portfolio_update':
+        // Update portfolio data that affects analytics
+        queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/risk/portfolio'] });
+        break;
+      
+      case 'price_update':
+        // Invalidate analytics when prices change
+        queryClient.invalidateQueries({ queryKey: ['/api/auto-trader/portfolio'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/risk/portfolio'] });
+        break;
+      
+      case 'risk_limit_exceeded':
+        // Update risk analysis immediately when risk limits are exceeded
+        if (data && autoTraderStats?.portfolioId) {
+          queryClient.setQueryData(['/api/risk/portfolio', autoTraderStats.portfolioId], (oldData: any) => 
+            oldData ? { ...oldData, riskScore: data.riskScore, portfolioRisk: data.level } : oldData
+          );
+        }
+        break;
+    }
+  }, [lastMessage, isConnected, queryClient, autoTraderStats?.portfolioId]);
 
   // Demo data for unauthenticated users
   const demoAutoTraderStats = {

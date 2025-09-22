@@ -3,13 +3,17 @@ import { Header } from "@/components/layout/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "@/hooks/use-language";
+import { useWebSocket } from "@/hooks/use-websocket";
+import { useEffect } from "react";
 import { TrendingUp, TrendingDown, DollarSign, Percent, Clock, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function Portfolio() {
   const { t } = useLanguage();
+  const { isConnected, lastMessage } = useWebSocket();
+  const queryClient = useQueryClient();
   
   const { data: portfolio, error: portfolioError } = useQuery<{
     id: string;
@@ -67,6 +71,44 @@ export default function Portfolio() {
   };
 
   const isAuthenticated = !hasAuthError(portfolioError) && !hasAuthError(tradesError);
+
+  // Real-time WebSocket data updates
+  useEffect(() => {
+    if (!lastMessage || !isConnected) return;
+
+    const { type, data } = lastMessage;
+
+    switch (type) {
+      case 'trade_executed':
+        // Invalidate portfolio and trades data when a new trade is executed
+        queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default', 'trades'] });
+        break;
+      
+      case 'portfolio_update':
+        // Update portfolio data in real-time
+        if (data) {
+          queryClient.setQueryData(['/api/portfolio', 'default'], (oldData: any) => 
+            oldData ? { ...oldData, ...data } : data
+          );
+        }
+        break;
+      
+      case 'price_update':
+        // Invalidate portfolio when prices change (affects position values)
+        queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default'] });
+        break;
+      
+      case 'trading_stats':
+        // Update trading statistics in real-time
+        if (data) {
+          queryClient.setQueryData(['/api/portfolio', 'default'], (oldData: any) => 
+            oldData ? { ...oldData, winRate: data.winRate?.toString() } : oldData
+          );
+        }
+        break;
+    }
+  }, [lastMessage, isConnected, queryClient]);
   
   // Demo data for unauthenticated users
   const demoPortfolioData = {
