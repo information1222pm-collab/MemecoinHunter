@@ -228,7 +228,7 @@ export default function Home() {
 
           {/* Interactive Performance Grid */}
           <motion.div 
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+            className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6"
             variants={containerVariants}
           >
             {[
@@ -268,31 +268,31 @@ export default function Home() {
                   scale: 1.05,
                   boxShadow: "0 20px 40px hsla(225, 39%, 5%, 0.4)"
                 }}
-                className="glass-card p-6 hover-lift cursor-pointer group"
+                className="glass-card p-3 md:p-6 hover-lift cursor-pointer group min-h-[100px] md:min-h-[120px]"
                 data-testid={`stat-card-${index}`}
               >
-                <div className="flex items-center justify-between mb-4">
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${stat.gradient} p-2.5 group-hover:scale-110 transition-transform duration-300`}>
+                <div className="flex items-center justify-between mb-2 md:mb-4">
+                  <div className={`w-8 h-8 md:w-12 md:h-12 rounded-xl bg-gradient-to-r ${stat.gradient} p-1.5 md:p-2.5 group-hover:scale-110 transition-transform duration-300 flex-shrink-0`}>
                     <stat.icon className="w-full h-full text-white" />
                   </div>
-                  <Sparkles className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                  <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-muted-foreground group-hover:text-primary transition-colors" />
                 </div>
-                <div className="text-3xl font-bold mb-1" data-testid={`text-${stat.title.toLowerCase().replace(' ', '-')}`}>
+                <div className="text-lg md:text-3xl font-bold mb-1" data-testid={`text-${stat.title.toLowerCase().replace(' ', '-')}`}>
                   {stat.value}
                 </div>
-                <div className="text-sm text-muted-foreground">{stat.title}</div>
+                <div className="text-xs md:text-sm text-muted-foreground">{stat.title}</div>
               </motion.div>
             ))}
           </motion.div>
 
           {/* Main Feature Showcase */}
           <motion.div 
-            className="grid grid-cols-1 lg:grid-cols-2 gap-8"
+            className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8"
             variants={containerVariants}
           >
             {/* Left Panel: Trading Engine */}
             <motion.div 
-              className="glass-ultra rounded-3xl p-8 relative overflow-hidden"
+              className="glass-ultra rounded-2xl md:rounded-3xl p-4 md:p-8 relative overflow-hidden"
               variants={itemVariants}
               whileHover={{ scale: 1.02 }}
               data-testid="card-trading-engine"
@@ -314,17 +314,17 @@ export default function Home() {
               />
               
               <div className="relative z-10">
-                <div className="flex items-center space-x-3 mb-6">
+                <div className="flex items-center space-x-3 mb-4 md:mb-6">
                   <motion.div 
-                    className="w-14 h-14 rounded-2xl bg-gradient-to-r from-purple-500 to-pink-500 p-3"
+                    className="w-10 h-10 md:w-14 md:h-14 rounded-2xl bg-gradient-to-r from-purple-500 to-pink-500 p-2 md:p-3 flex-shrink-0"
                     animate={{ rotate: [0, 360] }}
                     transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
                   >
                     <Bot className="w-full h-full text-white" />
                   </motion.div>
-                  <div>
-                    <h3 className="text-2xl font-bold">Automated Trading Engine</h3>
-                    <p className="text-muted-foreground">AI-powered execution system</p>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-lg md:text-2xl font-bold leading-tight">Automated Trading Engine</h3>
+                    <p className="text-sm md:text-base text-muted-foreground">AI-powered execution system</p>
                   </div>
                 </div>
 

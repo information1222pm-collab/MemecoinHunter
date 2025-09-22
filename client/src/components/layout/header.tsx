@@ -99,7 +99,7 @@ export function Header() {
           <div className="md:hidden">
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="w-10 h-10 p-0" data-testid="button-mobile-menu">
+                <Button variant="outline" size="sm" className="w-11 h-11 p-0 min-h-[44px] min-w-[44px]" data-testid="button-mobile-menu">
                   <MoreHorizontal className="w-4 h-4" />
                 </Button>
               </PopoverTrigger>

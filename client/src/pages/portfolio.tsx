@@ -86,11 +86,11 @@ export default function Portfolio() {
       <main className="flex-1 overflow-auto">
         <Header />
         
-        <div className="p-6 space-y-6">
+        <div className="p-4 md:p-6 space-y-4 md:space-y-6">
           {/* Portfolio Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
             <Card data-testid="card-total-value">
-              <CardContent className="p-6">
+              <CardContent className="p-3 md:p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">{t("portfolio.totalValue")}</p>
@@ -109,7 +109,7 @@ export default function Portfolio() {
             </Card>
 
             <Card data-testid="card-daily-pnl">
-              <CardContent className="p-6">
+              <CardContent className="p-3 md:p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Daily P&L</p>
@@ -128,7 +128,7 @@ export default function Portfolio() {
             </Card>
 
             <Card data-testid="card-total-pnl">
-              <CardContent className="p-6">
+              <CardContent className="p-3 md:p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Total P&L</p>
@@ -147,7 +147,7 @@ export default function Portfolio() {
             </Card>
 
             <Card data-testid="card-win-rate">
-              <CardContent className="p-6">
+              <CardContent className="p-3 md:p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Win Rate</p>
@@ -180,31 +180,31 @@ export default function Portfolio() {
                     return (
                       <div
                         key={position.token?.symbol || position.id}
-                        className="flex items-center justify-between p-4 bg-secondary/30 rounded-lg"
+                        className="flex items-center justify-between p-3 md:p-4 bg-secondary/30 rounded-lg min-h-[60px]"
                         data-testid={`position-${position.token?.symbol || 'unknown'}`}
                       >
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-full" />
-                          <div>
-                            <div className="font-medium" data-testid={`text-position-symbol-${position.token?.symbol || 'unknown'}`}>
+                        <div className="flex items-center space-x-2 md:space-x-3 min-w-0 flex-1">
+                          <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex-shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-sm md:text-base" data-testid={`text-position-symbol-${position.token?.symbol || 'unknown'}`}>
                               {position.token?.symbol || 'Unknown'}
                             </div>
-                            <div className="text-sm text-muted-foreground" data-testid={`text-position-name-${position.token?.symbol || 'unknown'}`}>
+                            <div className="text-xs md:text-sm text-muted-foreground truncate" data-testid={`text-position-name-${position.token?.symbol || 'unknown'}`}>
                               {position.token?.name || 'Unknown Token'}
                             </div>
-                            <div className="text-xs text-muted-foreground">
+                            <div className="text-xs text-muted-foreground hidden md:block">
                               {parseFloat(position.amount).toLocaleString()} tokens
                             </div>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="font-medium" data-testid={`text-position-value-${position.token?.symbol || 'unknown'}`}>
+                        <div className="text-right flex-shrink-0">
+                          <div className="font-medium text-sm md:text-base" data-testid={`text-position-value-${position.token?.symbol || 'unknown'}`}>
                             {formatCurrency(position.currentValue)}
                           </div>
-                          <div className={`text-sm ${getPnLColor(position.unrealizedPnL)}`} data-testid={`text-position-pnl-${position.token?.symbol || 'unknown'}`}>
+                          <div className={`text-xs md:text-sm ${getPnLColor(position.unrealizedPnL)}`} data-testid={`text-position-pnl-${position.token?.symbol || 'unknown'}`}>
                             {formatPercentage(position.unrealizedPnL)}
                           </div>
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-xs text-muted-foreground hidden md:block">
                             @ {formatCurrency(parseFloat(position.token?.currentPrice || '0'))}
                           </div>
                         </div>
