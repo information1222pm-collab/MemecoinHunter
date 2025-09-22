@@ -12,6 +12,7 @@ import { autoTrader } from "./services/auto-trader";
 import { stakeholderReportUpdater } from "./services/stakeholder-report-updater";
 import { insertUserSchema, insertTradeSchema, insertTokenSchema } from "@shared/schema";
 import { z } from "zod";
+import * as bcrypt from "bcrypt";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -114,13 +115,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "User already exists" });
       }
 
-      const user = await storage.createUser(userData);
+      // Hash password before storing (CRITICAL SECURITY FIX)
+      const saltRounds = 12;
+      const hashedPassword = await bcrypt.hash(userData.password, saltRounds);
+      const userDataWithHashedPassword = {
+        ...userData,
+        password: hashedPassword
+      };
+
+      const user = await storage.createUser(userDataWithHashedPassword);
       
       // Create default portfolio for new user
       await storage.createPortfolio({ userId: user.id });
       
+      // Security audit log
+      console.log(`[AUDIT] User registered: ${user.email} at ${new Date().toISOString()}`);
+      
       res.json({ user: { id: user.id, username: user.username, email: user.email } });
     } catch (error) {
+      console.error(`[SECURITY] Registration failed for ${req.body?.email}: ${error}`);
       res.status(400).json({ message: "Invalid user data", error });
     }
   });
@@ -128,14 +141,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { email, password } = req.body;
+      
+      if (!email || !password) {
+        console.warn(`[SECURITY] Login attempt with missing credentials from ${req.ip || 'unknown'}`);
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+      
       const user = await storage.getUserByEmail(email);
       
-      if (!user || user.password !== password) {
+      if (!user) {
+        console.warn(`[SECURITY] Login attempt for non-existent user: ${email} from ${req.ip || 'unknown'}`);
         return res.status(401).json({ message: "Invalid credentials" });
       }
       
+      // Verify password using bcrypt (CRITICAL SECURITY FIX)
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      
+      if (!isPasswordValid) {
+        console.warn(`[SECURITY] Failed login attempt for ${email} from ${req.ip || 'unknown'}`);
+        return res.status(401).json({ message: "Invalid credentials" });
+      }
+      
+      // Security audit log
+      console.log(`[AUDIT] Successful login: ${user.email} from ${req.ip || 'unknown'} at ${new Date().toISOString()}`);
+      
       res.json({ user: { id: user.id, username: user.username, email: user.email } });
     } catch (error) {
+      console.error(`[SECURITY] Login error for ${req.body?.email}: ${error}`);
       res.status(500).json({ message: "Login failed", error });
     }
   });
