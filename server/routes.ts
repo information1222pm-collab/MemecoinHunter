@@ -140,17 +140,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/audit-logs', requireAuth, requireRole(['pro']));
 
   // Properly Authenticated WebSocket server (CRITICAL SECURITY FIX)
-  const wss = new WebSocketServer({ noServer: true });
+  const wss = new WebSocketServer({ noServer: true, perMessageDeflate: false });
   
   // User-scoped WebSocket connections map (CRITICAL SECURITY FIX)
   const userConnections = new Map<string, Set<WebSocket>>();
   
-  // Handle WebSocket upgrade - simplified for stability
+  // Handle WebSocket upgrade - only for /ws path to avoid conflict with Vite HMR
   httpServer.on('upgrade', async (request, socket, head) => {
     try {
-      console.log(`[AUDIT] WebSocket upgrade request from ${request.socket.remoteAddress}`);
+      const url = new URL(request.url || '/', 'http://localhost');
       
-      // Allow all connections for public real-time data
+      // Only handle /ws upgrades - let Vite handle HMR upgrades
+      if (url.pathname !== '/ws') {
+        return; // Don't destroy - allow Vite to handle other paths
+      }
+      
+      console.log(`[AUDIT] WebSocket upgrade request to ${url.pathname} from ${request.socket.remoteAddress}`);
+      
+      // Handle our application WebSocket connections
       wss.handleUpgrade(request, socket, head, (ws) => {
         // Mark as anonymous connection for now
         (ws as any).isAnonymous = true;
