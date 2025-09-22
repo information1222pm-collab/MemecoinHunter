@@ -2,9 +2,13 @@ import crypto from 'crypto';
 import { storage } from '../storage';
 import { auditLog, insertAuditLogSchema } from '@shared/schema';
 
-// Stable encryption key from environment or fallback (CRITICAL SECURITY FIX)
-// In production, MUST set ENCRYPTION_KEY environment variable
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+// Encryption key MUST be provided via environment variable (CRITICAL SECURITY FIX)
+// No fallback allowed for real-money trading security
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 64) {
+  console.error('[CRITICAL] ENCRYPTION_KEY must be set to 64-char hex in all environments');
+  process.exit(1);
+}
 const ALGORITHM = 'aes-256-gcm';
 
 /**

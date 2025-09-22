@@ -86,6 +86,9 @@ export interface IStorage {
   // Security - Audit Log operations (CRITICAL SECURITY FIX)
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
   getAuditLogs(userId?: string, limit?: number): Promise<AuditLog[]>;
+  
+  // WebSocket session validation (CRITICAL SECURITY FIX)
+  getSessionData(sessionId: string): Promise<{ userId: string } | null>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -394,6 +397,29 @@ export class DatabaseStorage implements IStorage {
       return await db.select().from(auditLog)
         .orderBy(desc(auditLog.timestamp))
         .limit(limit);
+    }
+  }
+  
+  // WebSocket session validation (CRITICAL SECURITY FIX)
+  async getSessionData(sessionId: string): Promise<{ userId: string } | null> {
+    try {
+      // Query the session table directly to validate session exists
+      const result = await db.execute(sql`
+        SELECT sess->'userId' as user_id 
+        FROM session 
+        WHERE sid = ${sessionId}
+        AND expire > NOW()
+      `);
+      
+      if (result.length === 0) {
+        return null;
+      }
+      
+      const userId = result[0].user_id as string;
+      return userId ? { userId: userId.replace(/"/g, '') } : null;
+    } catch (error) {
+      console.error('[SECURITY] Session validation error:', error);
+      return null;
     }
   }
 }

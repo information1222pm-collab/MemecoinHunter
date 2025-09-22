@@ -16,6 +16,9 @@ import * as bcrypt from "bcrypt";
 import session from "express-session";
 import ConnectPgSimple from "connect-pg-simple";
 import csrf from "csurf";
+import cookie from "cookie";
+import rateLimit from "express-rate-limit";
+import signature from "cookie-signature";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -34,7 +37,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     cookie: {
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax'
     },
     name: 'cryptohobby.sid'
   }));
@@ -42,35 +46,163 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CSRF Protection for state-changing routes (CRITICAL SECURITY FIX)
   const csrfProtection = csrf({ cookie: false }); // Use session-based CSRF
   
-  // Apply CSRF to state-changing endpoints
-  app.use(['/api/auth/login', '/api/auth/register', '/api/auth/logout'], csrfProtection);
+  // Comprehensive CSRF protection for ALL state-changing endpoints (CRITICAL SECURITY FIX)
+  app.use([
+    '/api/auth/login', '/api/auth/register', '/api/auth/logout',
+    '/api/portfolio', '/api/trades', '/api/positions', '/api/alerts', 
+    '/api/api-keys', '/api/settings', '/api/auto-trader'
+  ].map(path => [path, path + '/*']).flat(), csrfProtection);
+  
+  // CSRF token endpoint for SPA (CRITICAL SECURITY FIX)
+  app.get('/api/csrf-token', csrfProtection, (req, res) => {
+    res.json({ csrfToken: req.csrfToken() });
+  });
+
+  // Rate Limiting for Security (CRITICAL SECURITY FIX)
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 5, // 5 attempts per window
+    message: { error: 'Too many login attempts, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false
+  });
+  
+  const apiLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    limit: 100, // 100 requests per minute
+    message: { error: 'Too many API requests, please slow down' },
+    standardHeaders: true,
+    legacyHeaders: false
+  });
+  
+  const tradingLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    limit: 10, // 10 trades per minute
+    message: { error: 'Trading rate limit exceeded' },
+    standardHeaders: true,
+    legacyHeaders: false
+  });
+  
+  // Apply rate limiting
+  app.use('/api/auth/login', authLimiter);
+  app.use('/api/auth/register', authLimiter);
+  app.use('/api/trades', tradingLimiter);
+  app.use('/api/auto-trader', tradingLimiter);
+  app.use('/api', apiLimiter);
+
+  // RBAC Middleware for Role-Based Access Control (CRITICAL SECURITY FIX)
+  const requireAuth = async (req: any, res: any, next: any) => {
+    if (!req.session?.userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(401).json({ error: 'Invalid user session' });
+      }
+      req.user = user;
+      next();
+    } catch (error) {
+      console.error('[SECURITY] Auth middleware error:', error);
+      return res.status(500).json({ error: 'Authentication failed' });
+    }
+  };
+  
+  const requireRole = (allowedTiers: string[]) => {
+    return async (req: any, res: any, next: any) => {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
+      if (!allowedTiers.includes(req.user.subscriptionTier)) {
+        await logSecurityEvent({
+          userId: req.user.id,
+          action: 'UNAUTHORIZED_ACCESS',
+          resource: req.path,
+          details: { requiredTiers: allowedTiers, userTier: req.user.subscriptionTier },
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent'),
+          success: false
+        });
+        return res.status(403).json({ error: 'Insufficient permissions' });
+      }
+      
+      next();
+    };
+  };
+  
+  // Apply RBAC to sensitive endpoints (CRITICAL SECURITY FIX)
+  app.use('/api/auto-trader', requireAuth);
+  app.use('/api/portfolio', requireAuth);
+  app.use('/api/trades', requireAuth);
+  app.use('/api/api-keys', requireAuth, requireRole(['premium', 'pro']));
+  app.use('/api/audit-logs', requireAuth, requireRole(['pro']));
 
   // Properly Authenticated WebSocket server (CRITICAL SECURITY FIX)
-  const wss = new WebSocketServer({ 
-    server: httpServer, 
-    path: '/ws',
-    verifyClient: async (info) => {
-      try {
-        // Extract and verify session cookie from WebSocket upgrade request
-        const cookies = info.req.headers.cookie;
-        if (!cookies || !cookies.includes('cryptohobby.sid=')) {
-          console.warn('[SECURITY] WebSocket connection rejected: No valid session cookie');
-          return false;
-        }
-        
-        // Basic session verification - in production, parse and validate session
-        // For now, require session cookie presence
-        console.log('[AUDIT] WebSocket connection verified with session cookie');
-        return true;
-      } catch (error) {
-        console.error('[SECURITY] WebSocket verification error:', error);
-        return false;
+  const wss = new WebSocketServer({ noServer: true });
+  
+  // User-scoped WebSocket connections map (CRITICAL SECURITY FIX)
+  const userConnections = new Map<string, Set<WebSocket>>();
+  
+  // Handle WebSocket upgrade with session store validation (CRITICAL SECURITY FIX)
+  httpServer.on('upgrade', async (request, socket, head) => {
+    // Parse session cookie and validate authentication
+    const cookies = request.headers.cookie;
+    if (!cookies || !cookies.includes('cryptohobby.sid=')) {
+      console.warn('[SECURITY] WebSocket upgrade rejected: No session cookie');
+      socket.destroy();
+      return;
+    }
+    
+    // Parse and validate session signature
+    const parsedCookies = cookie.parse(cookies);
+    const sessionCookie = parsedCookies['cryptohobby.sid'];
+    
+    try {
+      const sessionSecret = process.env.SESSION_SECRET || 'crypto-hobby-dev-secret-key';
+      const sessionId = signature.unsign(sessionCookie.slice(2), sessionSecret);
+      
+      if (!sessionId) {
+        console.warn('[SECURITY] WebSocket upgrade rejected: Invalid session signature');
+        socket.destroy();
+        return;
       }
+      
+      // Validate session exists in session store (CRITICAL SECURITY FIX)
+      const sessionData = await storage.getSessionData(sessionId);
+      if (!sessionData || !sessionData.userId) {
+        console.warn('[SECURITY] WebSocket upgrade rejected: Session not found or expired');
+        socket.destroy();
+        return;
+      }
+      
+      console.log('[AUDIT] WebSocket upgrade authenticated for user:', sessionData.userId);
+      
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        // Attach user info to WebSocket connection (CRITICAL SECURITY FIX)
+        (ws as any).userId = sessionData.userId;
+        (ws as any).sessionId = sessionId;
+        
+        // Add to user-scoped connections (CRITICAL SECURITY FIX)
+        if (!userConnections.has(sessionData.userId)) {
+          userConnections.set(sessionData.userId, new Set());
+        }
+        userConnections.get(sessionData.userId)!.add(ws);
+        
+        wss.emit('connection', ws, request);
+      });
+      
+    } catch (error) {
+      console.warn('[SECURITY] WebSocket authentication failed:', error.message);
+      socket.destroy();
     }
   });
   
+  // Handle authenticated WebSocket connections
   wss.on('connection', (ws: WebSocket, req) => {
-    console.log('[AUDIT] New WebSocket connection established from', req.socket.remoteAddress);
+    const userId = (ws as any).userId;
+    console.log('[AUDIT] Authenticated WebSocket connection for user:', userId, 'from', req.socket.remoteAddress);
     
     // Store connection metadata for security tracking
     (ws as any).connectionTime = new Date().toISOString();
@@ -87,12 +219,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
     
     ws.on('close', () => {
-      console.log('[AUDIT] WebSocket connection closed from', req.socket.remoteAddress);
+      const userId = (ws as any).userId;
+      console.log('[AUDIT] WebSocket connection closed for user:', userId, 'from', req.socket.remoteAddress);
+      
+      // Remove from user-scoped connections (CRITICAL SECURITY FIX)
+      if (userId && userConnections.has(userId)) {
+        const userSet = userConnections.get(userId)!;
+        userSet.delete(ws);
+        if (userSet.size === 0) {
+          userConnections.delete(userId);
+        }
+      }
     });
   });
 
-  // Broadcast to all connected clients
-  function broadcast(data: any) {
+  // User-scoped broadcast for security (CRITICAL SECURITY FIX)
+  function broadcastToUser(userId: string, data: any) {
+    if (userConnections.has(userId)) {
+      const userSockets = userConnections.get(userId)!;
+      userSockets.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify(data));
+        }
+      });
+    }
+  }
+  
+  // Global broadcast for non-sensitive market data only
+  function broadcastMarketData(data: any) {
     wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
         client.send(JSON.stringify(data));
@@ -100,14 +254,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }
 
-  // Authentication middleware for protected routes
-  function requireAuth(req: any, res: any, next: any) {
-    if (!req.session?.userId) {
-      console.warn(`[SECURITY] Unauthorized API access attempt from ${req.ip || 'unknown'}`);
-      return res.status(401).json({ message: 'Authentication required' });
-    }
-    next();
-  }
 
   // WebSocket message handler with session validation (CRITICAL SECURITY FIX)
   function handleWebSocketMessage(ws: WebSocket, data: any, req: any) {
