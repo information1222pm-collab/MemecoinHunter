@@ -82,6 +82,10 @@ export interface IStorage {
   getSubscriptionByUserId(userId: string): Promise<Subscription | undefined>;
   createSubscription(subscription: InsertSubscription): Promise<Subscription>;
   updateSubscription(id: string, updates: Partial<InsertSubscription>): Promise<Subscription>;
+
+  // Security - Audit Log operations (CRITICAL SECURITY FIX)
+  createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
+  getAuditLogs(userId?: string, limit?: number): Promise<AuditLog[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -372,6 +376,25 @@ export class DatabaseStorage implements IStorage {
   async updateSubscription(id: string, updates: Partial<InsertSubscription>): Promise<Subscription> {
     const [subscription] = await db.update(subscriptions).set(updates).where(eq(subscriptions.id, id)).returning();
     return subscription;
+  }
+
+  // Security - Audit Log operations (CRITICAL SECURITY FIX)
+  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
+    const [created] = await db.insert(auditLog).values(log).returning();
+    return created;
+  }
+
+  async getAuditLogs(userId?: string, limit: number = 100): Promise<AuditLog[]> {
+    if (userId) {
+      return await db.select().from(auditLog)
+        .where(eq(auditLog.userId, userId))
+        .orderBy(desc(auditLog.timestamp))
+        .limit(limit);
+    } else {
+      return await db.select().from(auditLog)
+        .orderBy(desc(auditLog.timestamp))
+        .limit(limit);
+    }
   }
 }
 
