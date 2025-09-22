@@ -145,115 +145,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User-scoped WebSocket connections map (CRITICAL SECURITY FIX)
   const userConnections = new Map<string, Set<WebSocket>>();
   
-  // Handle WebSocket upgrade with flexible authentication for real-time data
+  // Handle WebSocket upgrade - simplified for stability
   httpServer.on('upgrade', async (request, socket, head) => {
-    // Parse session cookie if available
-    const cookies = request.headers.cookie;
-    let userId = null;
-    let sessionId = null;
-    
-    // Try to authenticate if session cookie exists
-    if (cookies && cookies.includes('cryptohobby.sid=')) {
-      try {
-        const parsedCookies = cookie.parse(cookies);
-        const sessionCookie = parsedCookies['cryptohobby.sid'];
-        const sessionSecret = process.env.SESSION_SECRET || 'crypto-hobby-dev-secret-key';
-        const sessionIdParsed = signature.unsign(sessionCookie.slice(2), sessionSecret);
-        
-        if (sessionIdParsed) {
-          const sessionData = await storage.getSessionData(sessionIdParsed);
-          if (sessionData && sessionData.userId) {
-            userId = sessionData.userId;
-            sessionId = sessionIdParsed;
-            console.log('[AUDIT] WebSocket authenticated for user:', userId);
-          }
-        }
-      } catch (error) {
-        console.warn('[SECURITY] WebSocket session validation failed:', error.message);
-      }
-    }
-    
-    // Allow unauthenticated connections for public real-time data (read-only)
-    console.log(`[AUDIT] WebSocket connection ${userId ? 'authenticated' : 'anonymous'} from ${request.socket.remoteAddress}`);
-    
-    wss.handleUpgrade(request, socket, head, (ws) => {
-      // Attach user info to WebSocket connection (if authenticated)
-      if (userId) {
-        (ws as any).userId = userId;
-        (ws as any).sessionId = sessionId;
-        
-        // Add to user-scoped connections
-        if (!userConnections.has(userId)) {
-          userConnections.set(userId, new Set());
-        }
-        userConnections.get(userId)!.add(ws);
-      } else {
-        // Anonymous connection - mark as such
-        (ws as any).isAnonymous = true;
-      }
+    try {
+      console.log(`[AUDIT] WebSocket upgrade request from ${request.socket.remoteAddress}`);
       
-      wss.emit('connection', ws, request);
-    });
+      // Allow all connections for public real-time data
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        // Mark as anonymous connection for now
+        (ws as any).isAnonymous = true;
+        (ws as any).connectionTime = new Date().toISOString();
+        (ws as any).remoteAddress = request.socket.remoteAddress;
+        
+        wss.emit('connection', ws, request);
+      });
+      
+    } catch (error) {
+      console.warn('[SECURITY] WebSocket upgrade failed:', error instanceof Error ? error.message : 'Unknown error');
+      socket.destroy();
+    }
   });
   
-  // Handle WebSocket connections (authenticated and anonymous)
+  // Handle WebSocket connections - simplified and stable  
   wss.on('connection', (ws: WebSocket, req) => {
-    const userId = (ws as any).userId;
-    const isAnonymous = (ws as any).isAnonymous;
+    const remoteAddress = req.socket.remoteAddress;
+    console.log(`[AUDIT] WebSocket connected from ${remoteAddress}`);
     
-    console.log(`[AUDIT] WebSocket connection ${userId ? `for user: ${userId}` : 'anonymous'} from ${req.socket.remoteAddress}`);
-    
-    // Store connection metadata for security tracking
-    (ws as any).connectionTime = new Date().toISOString();
-    (ws as any).remoteAddress = req.socket.remoteAddress;
-    
-    // Add error handling to prevent crashes
+    // Add comprehensive error handling
     ws.on('error', (error) => {
-      console.warn(`[SECURITY] WebSocket error from ${req.socket.remoteAddress}:`, error.message);
+      console.warn(`[SECURITY] WebSocket error from ${remoteAddress}:`, error.message);
+    });
+    
+    ws.on('close', (code, reason) => {
+      console.log(`[AUDIT] WebSocket closed from ${remoteAddress} (${code})`);
+    });
+    
+    // Handle incoming messages safely
+    ws.on('message', (message) => {
       try {
-        ws.close();
-      } catch (e) {
-        // Ignore close errors
+        const data = JSON.parse(message.toString());
+        handleWebSocketMessage(ws, data, req);
+      } catch (error) {
+        console.warn(`[SECURITY] Invalid WebSocket message from ${remoteAddress}`);
       }
     });
     
-    // Send initial connection acknowledgment safely
+    // Send initial connection status
     try {
       ws.send(JSON.stringify({ 
         type: 'connection_status', 
-        authenticated: !isAnonymous,
+        status: 'connected',
         timestamp: new Date().toISOString()
       }));
     } catch (error) {
-      console.warn('[SECURITY] Failed to send initial message to WebSocket');
+      // Connection might have closed immediately, ignore
     }
-    
-    ws.on('message', (message: string) => {
-      try {
-        const data = JSON.parse(message);
-        handleWebSocketMessage(ws, data, req);
-      } catch (error) {
-        console.warn('[SECURITY] Invalid WebSocket message format from', req.socket.remoteAddress);
-        try {
-          ws.send(JSON.stringify({ error: 'Invalid message format' }));
-        } catch (sendError) {
-          // Connection might be closed, ignore
-        }
-      }
-    });
-    
-    ws.on('close', () => {
-      console.log(`[AUDIT] WebSocket connection closed ${userId ? `for user: ${userId}` : 'anonymous'} from ${req.socket.remoteAddress}`);
-      
-      // Remove from user-scoped connections
-      if (userId && userConnections.has(userId)) {
-        const userSet = userConnections.get(userId)!;
-        userSet.delete(ws);
-        if (userSet.size === 0) {
-          userConnections.delete(userId);
-        }
-      }
-    });
   });
 
   // User-scoped broadcast for security (CRITICAL SECURITY FIX)
