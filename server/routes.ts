@@ -284,39 +284,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
   autoTrader.start();
   stakeholderReportUpdater.startAutoUpdater();
 
-  // Set up real-time broadcasts
+  // Set up real-time broadcasts with user scoping (CRITICAL SECURITY FIX)
   scanner.on('tokenScanned', (token) => {
-    broadcast({ type: 'token_update', data: token });
+    broadcastMarketData({ type: 'token_update', data: token });
   });
 
   scanner.on('alertTriggered', (alert) => {
-    broadcast({ type: 'new_alert', data: alert });
+    // Alert has userId, broadcast to specific user only
+    if (alert.userId) {
+      broadcastToUser(alert.userId, { type: 'new_alert', data: alert });
+    }
   });
 
   priceFeed.on('priceUpdate', (update) => {
-    broadcast({ type: 'price_update', data: update });
+    broadcastMarketData({ type: 'price_update', data: update });
   });
 
-  // Auto-trader real-time events
+  // Auto-trader real-time events (CRITICAL SECURITY FIX)
   autoTrader.on('tradeExecuted', (tradeData) => {
-    broadcast({ type: 'trade_executed', data: tradeData });
+    // Trading data is sensitive - broadcast to all authenticated users for now
+    // TODO: Scope to specific user portfolio when user-specific trading is implemented
+    broadcastMarketData({ type: 'trade_executed', data: tradeData });
   });
 
   autoTrader.on('statsUpdate', (statsData) => {
-    broadcast({ type: 'trading_stats', data: statsData });
+    broadcastMarketData({ type: 'trading_stats', data: statsData });
   });
 
   mlAnalyzer.on('patternDetected', (pattern) => {
-    broadcast({ type: 'pattern_detected', data: pattern });
+    broadcastMarketData({ type: 'pattern_detected', data: pattern });
   });
 
-  // Risk management events
+  // Risk management events (CRITICAL SECURITY FIX)
   riskManager.on('stopLossTriggered', (data) => {
-    broadcast({ type: 'stop_loss_triggered', data });
+    // Risk events are sensitive - broadcast to all for now
+    // TODO: Scope to affected user when user-specific portfolios implemented
+    broadcastMarketData({ type: 'stop_loss_triggered', data });
   });
 
   riskManager.on('riskLimitExceeded', (data) => {
-    broadcast({ type: 'risk_limit_exceeded', data });
+    broadcastMarketData({ type: 'risk_limit_exceeded', data });
   });
 
   // API Routes

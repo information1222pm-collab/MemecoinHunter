@@ -1,6 +1,6 @@
 import { 
   users, tokens, portfolios, trades, positions, scanAlerts, 
-  priceHistory, patterns, subscriptions, patternPerformance, mlLearningParams,
+  priceHistory, patterns, subscriptions, patternPerformance, mlLearningParams, auditLog,
   type User, type InsertUser, type Token, type InsertToken,
   type Portfolio, type InsertPortfolio, type Trade, type InsertTrade,
   type Position, type InsertPosition, type ScanAlert, type InsertScanAlert,
@@ -9,7 +9,11 @@ import {
   type MLLearningParams, type InsertMLLearningParams
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, gte, lte } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
+
+// Audit log types from schema inference
+type AuditLog = typeof auditLog.$inferSelect;
+type InsertAuditLog = typeof auditLog.$inferInsert;
 
 export interface IStorage {
   // User operations
@@ -411,11 +415,16 @@ export class DatabaseStorage implements IStorage {
         AND expire > NOW()
       `);
       
-      if (result.length === 0) {
+      if (!result.rows || result.rows.length === 0) {
         return null;
       }
       
-      const userId = result[0].user_id as string;
+      const row = result.rows[0];
+      if (!row || !row.user_id) {
+        return null;
+      }
+      
+      const userId = row.user_id as string;
       return userId ? { userId: userId.replace(/"/g, '') } : null;
     } catch (error) {
       console.error('[SECURITY] Session validation error:', error);
