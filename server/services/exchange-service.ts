@@ -75,6 +75,7 @@ class ExchangeService extends EventEmitter {
   private exchanges = new Map<string, ExchangeAPI>();
   private isActive = false;
   private healthCheckInterval?: NodeJS.Timeout;
+  private orderMonitors = new Map<string, NodeJS.Timeout>();
 
   async start() {
     if (this.isActive) return;
@@ -362,9 +363,9 @@ class ExchangeService extends EventEmitter {
           await storage.upsertExchangeBalance({
             exchangeName: name,
             currency: balance.currency,
-            available: balance.available.toString(),
-            locked: balance.locked.toString(),
-            total: balance.total.toString(),
+            available: (balance.available || 0).toString(),
+            locked: (balance.locked || 0).toString(),
+            total: (balance.total || 0).toString(),
             syncStatus: 'synced',
           });
         }
@@ -419,8 +420,6 @@ class ExchangeService extends EventEmitter {
     });
     return status;
   }
-
-  // Check if real money trading is enabled and properly configured (CRITICAL FIX)
   async isRealTradingEnabled(portfolioId: string): Promise<boolean> {
     try {
       const config = await storage.getTradingConfigByPortfolio(portfolioId);
@@ -431,6 +430,95 @@ class ExchangeService extends EventEmitter {
     } catch (error) {
       console.error('Error checking real trading status:', error);
       return false;
+    }
+  }
+
+  // Order lifecycle monitoring for real money trades  
+  private async startOrderMonitoring(exchangeTradeId: string, exchange: ExchangeAPI, orderId: string) {
+    const monitor = async () => {
+      try {
+        const orderStatus = await exchange.getOrderStatus(orderId);
+        
+        // Update exchange trade status
+        await storage.updateExchangeTrade(exchangeTradeId, {
+          status: orderStatus.status,
+          executedPrice: orderStatus.executedPrice?.toString(),
+          executedAmount: orderStatus.executedAmount?.toString(),
+          fees: orderStatus.fees?.toString(),
+          executionTime: orderStatus.status === 'filled' ? new Date() : undefined,
+        });
+
+        // AUDIT: Log order status update
+        await logSecurityEvent({
+          action: 'order_status_updated',
+          resource: 'exchange_service',
+          resourceId: exchangeTradeId,
+          details: {
+            orderId,
+            exchangeName: exchange.name,
+            status: orderStatus.status,
+            executedPrice: orderStatus.executedPrice,
+            executedAmount: orderStatus.executedAmount
+          },
+          success: true
+        });
+
+        // If order completed, stop monitoring and reconcile
+        if (orderStatus.status === 'filled' || orderStatus.status === 'cancelled' || orderStatus.status === 'failed') {
+          this.stopOrderMonitoring(exchangeTradeId);
+          
+          if (orderStatus.status === 'filled') {
+            // TODO: Update portfolio balances and positions
+            await this.reconcileCompletedOrder(exchangeTradeId, orderStatus);
+          }
+        }
+        
+      } catch (error) {
+        console.error(`❌ Order monitoring failed for ${orderId}:`, error);
+        
+        // AUDIT: Log monitoring error
+        await logSecurityEvent({
+          action: 'order_monitoring_error',
+          resource: 'exchange_service',
+          resourceId: exchangeTradeId,
+          details: { orderId, error: error instanceof Error ? error.message : 'Unknown error' },
+          success: false
+        });
+      }
+    };
+
+    // Monitor every 30 seconds
+    const intervalId = setInterval(monitor, 30000);
+    this.orderMonitors.set(exchangeTradeId, intervalId);
+    
+    // Initial check immediately
+    await monitor();
+  }
+
+  private stopOrderMonitoring(exchangeTradeId: string) {
+    const intervalId = this.orderMonitors.get(exchangeTradeId);
+    if (intervalId) {
+      clearInterval(intervalId);
+      this.orderMonitors.delete(exchangeTradeId);
+    }
+  }
+
+  private async reconcileCompletedOrder(exchangeTradeId: string, orderStatus: ExchangeOrderStatus) {
+    try {
+      // TODO: Implement portfolio balance reconciliation
+      // This should update portfolio positions and cash balances based on filled orders
+      console.log(`💰 Order reconciliation needed for ${exchangeTradeId}`);
+      
+      // AUDIT: Log reconciliation event
+      await logSecurityEvent({
+        action: 'order_reconciliation_needed',
+        resource: 'exchange_service', 
+        resourceId: exchangeTradeId,
+        details: { orderStatus },
+        success: true
+      });
+    } catch (error) {
+      console.error(`❌ Order reconciliation failed for ${exchangeTradeId}:`, error);
     }
   }
 }
@@ -627,96 +715,5 @@ class CoinbaseAPI implements ExchangeAPI {
     return Date.now();
   }
 }
-
-  // Order lifecycle monitoring for real money trades  
-  private orderMonitors = new Map<string, NodeJS.Timeout>();
-
-  private async startOrderMonitoring(exchangeTradeId: string, exchange: ExchangeAPI, orderId: string) {
-    const monitor = async () => {
-      try {
-        const orderStatus = await exchange.getOrderStatus(orderId);
-        
-        // Update exchange trade status
-        await storage.updateExchangeTrade(exchangeTradeId, {
-          status: orderStatus.status,
-          executedPrice: orderStatus.executedPrice?.toString(),
-          executedAmount: orderStatus.executedAmount?.toString(),
-          fees: orderStatus.fees?.toString(),
-          executionTime: orderStatus.status === 'filled' ? new Date() : undefined,
-        });
-
-        // AUDIT: Log order status update
-        await logSecurityEvent({
-          action: 'order_status_updated',
-          resource: 'exchange_service',
-          resourceId: exchangeTradeId,
-          details: {
-            orderId,
-            exchangeName: exchange.name,
-            status: orderStatus.status,
-            executedPrice: orderStatus.executedPrice,
-            executedAmount: orderStatus.executedAmount
-          },
-          success: true
-        });
-
-        // If order completed, stop monitoring and reconcile
-        if (orderStatus.status === 'filled' || orderStatus.status === 'cancelled' || orderStatus.status === 'failed') {
-          this.stopOrderMonitoring(exchangeTradeId);
-          
-          if (orderStatus.status === 'filled') {
-            // TODO: Update portfolio balances and positions
-            await this.reconcileCompletedOrder(exchangeTradeId, orderStatus);
-          }
-        }
-        
-      } catch (error) {
-        console.error(`❌ Order monitoring failed for ${orderId}:`, error);
-        
-        // AUDIT: Log monitoring error
-        await logSecurityEvent({
-          action: 'order_monitoring_error',
-          resource: 'exchange_service',
-          resourceId: exchangeTradeId,
-          details: { orderId, error: error instanceof Error ? error.message : 'Unknown error' },
-          success: false
-        });
-      }
-    };
-
-    // Monitor every 30 seconds
-    const intervalId = setInterval(monitor, 30000);
-    this.orderMonitors.set(exchangeTradeId, intervalId);
-    
-    // Initial check immediately
-    await monitor();
-  }
-
-  private stopOrderMonitoring(exchangeTradeId: string) {
-    const intervalId = this.orderMonitors.get(exchangeTradeId);
-    if (intervalId) {
-      clearInterval(intervalId);
-      this.orderMonitors.delete(exchangeTradeId);
-    }
-  }
-
-  private async reconcileCompletedOrder(exchangeTradeId: string, orderStatus: ExchangeOrderStatus) {
-    try {
-      // TODO: Implement portfolio balance reconciliation
-      // This should update portfolio positions and cash balances based on filled orders
-      console.log(`💰 Order reconciliation needed for ${exchangeTradeId}`);
-      
-      // AUDIT: Log reconciliation event
-      await logSecurityEvent({
-        action: 'order_reconciliation_needed',
-        resource: 'exchange_service', 
-        resourceId: exchangeTradeId,
-        details: { orderStatus },
-        success: true
-      });
-    } catch (error) {
-      console.error(`❌ Order reconciliation failed for ${exchangeTradeId}:`, error);
-    }
-  }
 
 export const exchangeService = new ExchangeService();
