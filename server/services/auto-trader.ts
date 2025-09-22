@@ -20,12 +20,15 @@ class AutoTrader extends EventEmitter {
   private isActive = false;
   private defaultPortfolioId: string | null = null;
   private monitoringInterval?: NodeJS.Timeout;
+  private sellOnlyMode = false; // Track when portfolio can no longer buy
+  private sellingPositions = new Set<string>(); // Track positions currently being sold to prevent concurrent sells
   
   private strategy = {
     minConfidence: 75, // Dynamic minimum confidence
     maxPositionSize: 1000, // $1000 max per position
     stopLossPercentage: 8, // 8% stop loss
     takeProfitPercentage: 15, // 15% take profit
+    sellOnlyTakeProfit: 5, // More aggressive take profit when in sell-only mode
   };
 
   private tradingStats = {
@@ -91,10 +94,21 @@ class AutoTrader extends EventEmitter {
         autoPortfolio = await storage.createPortfolio({
           userId: 'auto-trader',
           totalValue: '10000',
+          startingCapital: '10000',
+          cashBalance: '10000',
+          realizedPnL: '0',
           dailyPnL: '0',
           totalPnL: '0',
         });
-        console.log('📊 Created auto-trading portfolio with $10,000 capital');
+        console.log('📊 Created auto-trading portfolio with $10,000 capital (Cash: $10,000)');
+      } else if (!autoPortfolio.startingCapital || !autoPortfolio.cashBalance) {
+        // Update existing portfolio to have proper cash tracking fields
+        await storage.updatePortfolio(autoPortfolio.id, {
+          startingCapital: autoPortfolio.startingCapital || '10000',
+          cashBalance: autoPortfolio.cashBalance || '10000',
+          realizedPnL: autoPortfolio.realizedPnL || '0',
+        });
+        console.log('📊 Updated auto-trading portfolio with cash tracking fields');
       }
       
       this.defaultPortfolioId = autoPortfolio.id;
@@ -131,7 +145,7 @@ class AutoTrader extends EventEmitter {
       const token = await storage.getToken(pattern.tokenId);
       if (!token) return;
       
-      const signal = this.evaluatePattern(pattern, token, adjustedConfidence);
+      const signal = await this.evaluatePattern(pattern, token, adjustedConfidence);
       if (signal) {
         signal.patternId = pattern.id; // Link signal to pattern
         await this.executeTradeSignal(signal, pattern.id);
@@ -162,11 +176,11 @@ class AutoTrader extends EventEmitter {
     }
   }
 
-  private evaluatePattern(pattern: Pattern, token: Token, confidence: number): TradingSignal | null {
+  private async evaluatePattern(pattern: Pattern, token: Token, confidence: number): Promise<TradingSignal | null> {
     const currentPrice = parseFloat(token.currentPrice || '0');
     if (currentPrice <= 0) return null;
     
-    // Strong bullish patterns - BUY signals
+    // Strong bullish patterns - BUY signals (only when not in sell-only mode)
     const bullishPatterns = [
       'enhanced_bull_flag',
       'macd_golden_cross', 
@@ -175,7 +189,53 @@ class AutoTrader extends EventEmitter {
       'bull_flag'
     ];
     
-    if (bullishPatterns.includes(pattern.patternType)) {
+    // Strong bearish patterns - SELL signals (for existing positions)
+    const bearishPatterns = [
+      'ml_reversal',
+      'head_and_shoulders',
+      'double_top',
+      'bearish_flag',
+      'volume_collapse'
+    ];
+    
+    // Check if we have an existing position in this token
+    const existingPosition = this.defaultPortfolioId ? 
+      await storage.getPositionByPortfolioAndToken(this.defaultPortfolioId, token.id) : null;
+    
+    // In sell-only mode, prioritize sell signals for positions we hold
+    if (this.sellOnlyMode && existingPosition && parseFloat(existingPosition.amount) > 0) {
+      // Generate sell signal for bearish patterns on held positions
+      if (bearishPatterns.includes(pattern.patternType)) {
+        return {
+          tokenId: token.id,
+          type: 'sell',
+          confidence,
+          source: `ML Pattern: ${pattern.patternType}`,
+          price: currentPrice,
+          reason: `🔴 ${pattern.patternType} detected - Sell-only mode active (${confidence.toFixed(1)}% confidence)`
+        };
+      }
+      
+      // Also consider selling on weaker bullish patterns to lock in gains
+      if (bullishPatterns.includes(pattern.patternType) && confidence > 80) {
+        const avgBuyPrice = parseFloat(existingPosition.avgBuyPrice);
+        const profitPercent = ((currentPrice - avgBuyPrice) / avgBuyPrice) * 100;
+        
+        if (profitPercent > this.strategy.sellOnlyTakeProfit) {
+          return {
+            tokenId: token.id,
+            type: 'sell',
+            confidence: confidence * 0.8, // Reduce confidence for profit-taking
+            source: `ML Pattern: ${pattern.patternType} (Profit Taking)`,
+            price: currentPrice,
+            reason: `📈 Taking profit on ${pattern.patternType} - ${profitPercent.toFixed(1)}% gain (Sell-only mode)`
+          };
+        }
+      }
+    }
+    
+    // Regular buy signals when not in sell-only mode
+    if (!this.sellOnlyMode && bullishPatterns.includes(pattern.patternType)) {
       return {
         tokenId: token.id,
         type: 'buy',
@@ -193,8 +253,8 @@ class AutoTrader extends EventEmitter {
     const currentPrice = parseFloat(token.currentPrice || '0');
     if (currentPrice <= 0) return null;
     
-    // Volume surge + price momentum = buy signal
-    if (alert.alertType === 'volume_surge' || alert.alertType === 'price_spike') {
+    // Only generate buy signals when not in sell-only mode
+    if (!this.sellOnlyMode && (alert.alertType === 'volume_surge' || alert.alertType === 'price_spike')) {
       return {
         tokenId: token.id,
         type: 'buy',
@@ -212,8 +272,13 @@ class AutoTrader extends EventEmitter {
     if (!this.defaultPortfolioId) return;
     
     try {
-      // Check current portfolio cash balance for trade execution
-      if (!this.defaultPortfolioId) return;
+      // Handle sell signals differently from buy signals
+      if (signal.type === 'sell') {
+        await this.executeSellSignal(signal, patternId);
+        return;
+      }
+      
+      // Buy signal handling - check cash balance
       const portfolio = await storage.getPortfolio(this.defaultPortfolioId);
       if (!portfolio) return;
       
@@ -267,8 +332,10 @@ class AutoTrader extends EventEmitter {
       const newCashBalance = (availableCash - tradeValue).toString();
       await storage.updatePortfolio(this.defaultPortfolioId, {
         cashBalance: newCashBalance,
-        updatedAt: new Date(),
       });
+      
+      // Update sell-only mode immediately after cash change
+      await this.updateSellOnlyModeState();
       
       // Update stats
       this.tradingStats.totalTrades++;
@@ -298,12 +365,72 @@ class AutoTrader extends EventEmitter {
     }
   }
 
+  private async executeSellSignal(signal: TradingSignal, patternId?: string) {
+    if (!this.defaultPortfolioId) return;
+    
+    try {
+      // Find the existing position for this token
+      const position = await storage.getPositionByPortfolioAndToken(
+        this.defaultPortfolioId,
+        signal.tokenId
+      );
+      
+      if (!position || parseFloat(position.amount) <= 0) {
+        console.log(`⚠️ No position found for ${signal.tokenId}, skipping sell signal`);
+        return;
+      }
+      
+      const token = await storage.getToken(signal.tokenId);
+      if (!token) return;
+      
+      // Execute the sell using the existing executeSell method
+      await this.executeSell(position, token, 'ml_pattern', signal.reason);
+      
+    } catch (error) {
+      console.error('Error executing sell signal:', error);
+    }
+  }
+
+  private async updateSellOnlyModeState() {
+    if (!this.defaultPortfolioId) return;
+    
+    try {
+      const portfolio = await storage.getPortfolio(this.defaultPortfolioId);
+      if (!portfolio) return;
+      
+      const availableCash = parseFloat(portfolio.cashBalance || '0');
+      const tradeValue = 500;
+      const previousMode = this.sellOnlyMode;
+      
+      // Update sell-only mode based on cash balance
+      if (availableCash < tradeValue) {
+        this.sellOnlyMode = true;
+        if (!previousMode) {
+          console.log(`🔴 SELL-ONLY MODE ACTIVATED: Portfolio switching to exit-focused strategy`);
+          console.log(`💰 Available cash: $${availableCash.toFixed(2)}, Required: $${tradeValue}`);
+        }
+      } else if (availableCash >= tradeValue * 2) {
+        this.sellOnlyMode = false;
+        if (previousMode) {
+          console.log(`🟢 BUY MODE REACTIVATED: Sufficient cash restored for new positions`);
+          console.log(`💰 Available cash: $${availableCash.toFixed(2)}, Required: $${tradeValue}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error updating sell-only mode state:', error);
+    }
+  }
+
   private async monitorPositions() {
     if (!this.isActive || !this.defaultPortfolioId) return;
     
     try {
+      // Update sell-only mode state based on current cash balance
+      await this.updateSellOnlyModeState();
+      
       const positions = await storage.getPositionsByPortfolio(this.defaultPortfolioId);
       let totalPortfolioValue = 0;
+      const positionsSold = new Set<string>(); // Track positions sold in this cycle
       
       for (const position of positions) {
         const token = await storage.getToken(position.tokenId);
@@ -318,17 +445,30 @@ class AutoTrader extends EventEmitter {
           totalPortfolioValue += positionValue;
           
           const profitLoss = ((currentPrice - avgBuyPrice) / avgBuyPrice) * 100;
+          let sellReason: string | null = null;
+          let sellTrigger: string | null = null;
           
-          // Check stop-loss (8% loss)
+          // Check stop-loss (8% loss) - highest priority
           if (profitLoss <= -this.strategy.stopLossPercentage) {
-            await this.executeSell(position, token, 'stop_loss', 
-              `Stop-loss triggered at ${profitLoss.toFixed(1)}% loss`);
+            sellReason = `Stop-loss triggered at ${profitLoss.toFixed(1)}% loss`;
+            sellTrigger = 'stop_loss';
+          }
+          // Use more aggressive take-profit when in sell-only mode
+          else if (profitLoss >= (this.sellOnlyMode ? this.strategy.sellOnlyTakeProfit : this.strategy.takeProfitPercentage)) {
+            const mode = this.sellOnlyMode ? 'SELL-ONLY' : 'NORMAL';
+            sellReason = `${mode} take-profit triggered at ${profitLoss.toFixed(1)}% gain`;
+            sellTrigger = 'take_profit';
+          }
+          // In sell-only mode, also monitor for any meaningful profit to exit positions
+          else if (this.sellOnlyMode && profitLoss > 2) {
+            sellReason = `Sell-only mode: Exiting profitable position (${profitLoss.toFixed(1)}% gain)`;
+            sellTrigger = 'cash_generation';
           }
           
-          // Check take-profit (15% gain)  
-          if (profitLoss >= this.strategy.takeProfitPercentage) {
-            await this.executeSell(position, token, 'take_profit', 
-              `Take-profit triggered at ${profitLoss.toFixed(1)}% gain`);
+          // Execute sell only once per position per cycle
+          if (sellReason && sellTrigger && !positionsSold.has(position.id)) {
+            await this.executeSell(position, token, sellTrigger, sellReason);
+            positionsSold.add(position.id);
           }
         }
       }
@@ -371,10 +511,26 @@ class AutoTrader extends EventEmitter {
   private async executeSell(position: any, token: Token, trigger: string, reason: string) {
     if (!this.defaultPortfolioId) return;
     
+    // Check if this position is already being sold (prevent concurrent sells)
+    if (this.sellingPositions.has(position.id)) {
+      console.log(`❌ Cannot sell ${token.symbol}: position is already being sold`);
+      return;
+    }
+    
+    // Mark position as being sold
+    this.sellingPositions.add(position.id);
+    
     try {
+      // Re-fetch position to ensure it still exists and has non-zero amount (prevent double sells)
+      const currentPosition = await storage.getPosition(position.id);
+      if (!currentPosition || parseFloat(currentPosition.amount) <= 0) {
+        console.log(`❌ Cannot sell ${token.symbol}: position no longer exists or has zero amount`);
+        return;
+      }
+      
       const currentPrice = parseFloat(token.currentPrice || '0');
-      const amount = parseFloat(position.amount);
-      const avgBuyPrice = parseFloat(position.avgBuyPrice);
+      const amount = parseFloat(currentPosition.amount); // Use fresh position data
+      const avgBuyPrice = parseFloat(currentPosition.avgBuyPrice);
       
       // Calculate realized P&L
       const totalSellValue = amount * currentPrice;
@@ -382,20 +538,23 @@ class AutoTrader extends EventEmitter {
       const realizedPnL = totalSellValue - totalBuyValue;
       const totalValue = (amount * currentPrice).toString();
       
+      // CRITICAL: Delete position first to prevent concurrent sells (atomic operation)
+      await storage.deletePosition(currentPosition.id);
+      
       // Find the original buy trade to get pattern linkage
       const buyTrades = await storage.getTradesByPortfolio(this.defaultPortfolioId);
       const originalBuyTrade = buyTrades.find(t => 
-        t.tokenId === position.tokenId && 
+        t.tokenId === currentPosition.tokenId && 
         t.type === 'buy' && 
         parseFloat(t.price) === avgBuyPrice
       );
       
       const tradeData: InsertTrade = {
         portfolioId: this.defaultPortfolioId,
-        tokenId: position.tokenId,
+        tokenId: currentPosition.tokenId,
         patternId: originalBuyTrade?.patternId || null, // Link to same pattern as buy trade
         type: 'sell',
-        amount: position.amount,
+        amount: currentPosition.amount,
         price: currentPrice.toString(),
         exitPrice: currentPrice.toString(),
         realizedPnL: realizedPnL.toString(),
@@ -414,7 +573,26 @@ class AutoTrader extends EventEmitter {
         });
       }
       
-      await storage.updatePosition(position.id, { amount: "0" });
+      // CRITICAL: Credit cash balance with sell proceeds
+      if (this.defaultPortfolioId) {
+        const portfolio = await storage.getPortfolio(this.defaultPortfolioId);
+        if (portfolio) {
+          const currentCash = parseFloat(portfolio.cashBalance || '0');
+          const newCashBalance = (currentCash + totalSellValue).toString();
+          const currentRealizedPnL = parseFloat(portfolio.realizedPnL || '0');
+          const newRealizedPnL = (currentRealizedPnL + realizedPnL).toString();
+          
+          await storage.updatePortfolio(this.defaultPortfolioId, {
+            cashBalance: newCashBalance,
+            realizedPnL: newRealizedPnL,
+          });
+          
+          console.log(`   💰 Cash credited: +$${totalSellValue.toFixed(2)}, New balance: $${(currentCash + totalSellValue).toFixed(2)}`);
+          
+          // Update sell-only mode immediately after cash change
+          await this.updateSellOnlyModeState();
+        }
+      }
       
       // Update success stats
       if (realizedPnL > 0) {
@@ -445,6 +623,9 @@ class AutoTrader extends EventEmitter {
       
     } catch (error) {
       console.error('Error executing sell:', error);
+    } finally {
+      // Always remove position from selling set to prevent deadlock
+      this.sellingPositions.delete(position.id);
     }
   }
 
