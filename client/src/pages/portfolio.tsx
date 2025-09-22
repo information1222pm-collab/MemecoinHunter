@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 export default function Portfolio() {
   const { t } = useLanguage();
   
-  const { data: portfolio } = useQuery<{
+  const { data: portfolio, error: portfolioError } = useQuery<{
     id: string;
     totalValue: string;
     cashBalance: string;
@@ -33,9 +33,10 @@ export default function Portfolio() {
     }>;
   }>({
     queryKey: ['/api/portfolio', 'default'],
+    retry: false, // Don't retry on 401 errors
   });
 
-  const { data: trades } = useQuery<Array<{
+  const { data: trades, error: tradesError } = useQuery<Array<{
     id: string;
     type: string;
     amount: string;
@@ -49,18 +50,85 @@ export default function Portfolio() {
     };
   }>>({
     queryKey: ['/api/portfolio', 'default', 'trades'],
+    retry: false, // Don't retry on 401 errors
   });
 
-  // Use real portfolio data
-  const portfolioData = portfolio || {
+  // Check if user is authenticated (401 errors indicate unauthenticated)
+  // React Query errors can have different structures depending on the fetcher
+  const hasAuthError = (error: any) => {
+    if (!error) return false;
+    // Check multiple possible error structures
+    return (
+      error?.response?.status === 401 ||
+      error?.status === 401 ||
+      (error?.message && error.message.includes('401')) ||
+      (error?.cause?.status === 401)
+    );
+  };
+
+  const isAuthenticated = !hasAuthError(portfolioError) && !hasAuthError(tradesError);
+  
+  // Demo data for unauthenticated users
+  const demoPortfolioData = {
+    totalValue: "25847.32",
+    dailyPnL: "567.89", 
+    totalPnL: "3247.12",
+    winRate: "72.3",
+    positions: [
+      {
+        id: "demo-1",
+        tokenId: "demo-btc",
+        amount: "0.5",
+        avgBuyPrice: "42500.00",
+        currentValue: "21250.00",
+        unrealizedPnL: "2750.00",
+        token: { symbol: "BTC", name: "Bitcoin", currentPrice: "45000.00" }
+      },
+      {
+        id: "demo-2", 
+        tokenId: "demo-eth",
+        amount: "15.2",
+        avgBuyPrice: "2200.00",
+        currentValue: "33440.00",
+        unrealizedPnL: "440.00",
+        token: { symbol: "ETH", name: "Ethereum", currentPrice: "2200.00" }
+      }
+    ]
+  };
+
+  const demoTrades = [
+    {
+      id: "demo-trade-1",
+      type: "buy",
+      amount: "0.25",
+      price: "43000.00",
+      totalValue: "10750.00",
+      status: "completed",
+      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+      token: { symbol: "BTC", name: "Bitcoin" }
+    },
+    {
+      id: "demo-trade-2",
+      type: "sell",
+      amount: "5.0",
+      price: "2180.00",
+      totalValue: "10900.00",
+      status: "completed",
+      createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+      token: { symbol: "ETH", name: "Ethereum" }
+    }
+  ];
+
+  // Use real data if authenticated, demo data if not
+  const portfolioData = isAuthenticated ? (portfolio || {
     totalValue: "0",
     dailyPnL: "0", 
     totalPnL: "0",
     winRate: "0",
     positions: []
-  };
+  }) : demoPortfolioData;
 
-  const tradeData = trades || [];
+  const tradeData = isAuthenticated ? (trades || []) : demoTrades;
 
   const formatCurrency = (value: string | number) => {
     const numValue = typeof value === 'string' ? parseFloat(value) || 0 : (value || 0);
@@ -87,6 +155,19 @@ export default function Portfolio() {
         <Header />
         
         <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+          {/* Authentication Status */}
+          {!isAuthenticated && (
+            <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <span className="text-sm text-blue-500">You're viewing demo data. Sign in to see your actual portfolio.</span>
+              </div>
+              <Button variant="outline" size="sm" className="border-blue-500/20 text-blue-500 hover:bg-blue-500/10">
+                Sign In
+              </Button>
+            </div>
+          )}
+          
           {/* Portfolio Overview */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
             <Card data-testid="card-total-value">

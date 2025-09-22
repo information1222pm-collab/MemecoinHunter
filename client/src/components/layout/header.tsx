@@ -22,19 +22,42 @@ export function Header() {
   const currentLanguage = languages.find(lang => lang.code === language) || languages[0];
   
   // Fetch real portfolio data
-  const { data: portfolio } = useQuery<{
+  const { data: portfolio, error: portfolioError } = useQuery<{
     totalValue: string;
   }>({
     queryKey: ['/api/portfolio', 'default'],
     refetchInterval: 30000,
+    retry: false, // Don't retry on 401 errors
   });
 
-  const portfolioValue = portfolio?.totalValue ? 
+  // Check if user is authenticated (401 errors indicate unauthenticated)
+  const hasAuthError = (error: any) => {
+    if (!error) return false;
+    // Check multiple possible error structures
+    return (
+      error?.response?.status === 401 ||
+      error?.status === 401 ||
+      (error?.message && error.message.includes('401')) ||
+      (error?.cause?.status === 401)
+    );
+  };
+
+  const isAuthenticated = !hasAuthError(portfolioError);
+
+  // Demo data for unauthenticated users
+  const demoPortfolioValue = "25847.32";
+
+  const portfolioValue = isAuthenticated ? 
+    (portfolio?.totalValue ? 
+      new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+      }).format(parseFloat(portfolio.totalValue)) : 
+      '$0.00') :
     new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-    }).format(parseFloat(portfolio.totalValue)) : 
-    '$0.00';
+    }).format(parseFloat(demoPortfolioValue));
 
   return (
     <header className="bg-card border-b border-border px-4 md:px-6 py-3 md:py-4" data-testid="header-main">

@@ -13,8 +13,8 @@ export default function Analytics() {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
 
-  // Fetch real analytics data from API
-  const { data: autoTraderStats } = useQuery<{
+  // Fetch real analytics data from API with error handling
+  const { data: autoTraderStats, error: autoTraderError } = useQuery<{
     portfolioId: string;
     totalValue: number;
     totalPositionValue: number;
@@ -36,6 +36,7 @@ export default function Analytics() {
   }>({
     queryKey: ['/api/auto-trader/portfolio'],
     refetchInterval: 30000,
+    retry: false, // Don't retry on 401 errors
   });
 
   const { data: riskAnalysis, isLoading: riskLoading, error: riskError } = useQuery<{
@@ -50,6 +51,7 @@ export default function Analytics() {
     queryKey: ['/api/risk/portfolio', autoTraderStats?.portfolioId],
     enabled: !!autoTraderStats?.portfolioId,
     refetchInterval: 60000,
+    retry: false, // Don't retry on 401 errors
   });
 
   const { data: portfolio, isLoading: portfolioLoading, error: portfolioError } = useQuery<{
@@ -65,9 +67,10 @@ export default function Analytics() {
   }>({
     queryKey: ['/api/portfolio', 'default'],
     refetchInterval: 30000,
+    retry: false, // Don't retry on 401 errors
   });
 
-  const { data: trades } = useQuery<Array<{
+  const { data: trades, error: tradesError } = useQuery<Array<{
     id: string;
     type: string;
     realizedPnL: string;
@@ -75,20 +78,75 @@ export default function Analytics() {
   }>>({ 
     queryKey: ['/api/portfolio', 'default', 'trades'],
     refetchInterval: 60000,
+    retry: false, // Don't retry on 401 errors
   });
 
+  // Check if user is authenticated (401 errors indicate unauthenticated)
+  // React Query errors can have different structures depending on the fetcher
+  const hasAuthError = (error: any) => {
+    if (!error) return false;
+    // Check multiple possible error structures
+    return (
+      error?.response?.status === 401 ||
+      error?.status === 401 ||
+      (error?.message && error.message.includes('401')) ||
+      (error?.cause?.status === 401)
+    );
+  };
+
+  const isAuthenticated = !hasAuthError(portfolioError) && !hasAuthError(autoTraderError) && !hasAuthError(tradesError);
+
+  // Demo data for unauthenticated users
+  const demoAutoTraderStats = {
+    portfolioId: "demo-portfolio",
+    totalValue: 25847.32,
+    totalPositionValue: 24280.00,
+    availableCash: 1567.32,
+    totalTrades: 45,
+    buyTrades: 24,
+    sellTrades: 21,
+    activePositions: 6,
+    positions: [
+      { tokenId: "btc", symbol: "BTC", amount: 0.5, avgBuyPrice: 42500, currentPrice: 45000, positionValue: 22500, profitLoss: 1250 },
+      { tokenId: "eth", symbol: "ETH", amount: 15.2, avgBuyPrice: 2200, currentPrice: 2180, positionValue: 33136, profitLoss: -304 }
+    ],
+    winRate: "72.3"
+  };
+
+  const demoRiskAnalysis = {
+    portfolioRisk: "Medium",
+    riskScore: 6.2,
+    volatility: 15.8,
+    diversificationScore: 7.3,
+    concentrationRisk: "Low",
+    maxDrawdown: 8.4,
+    sharpeRatio: 1.42
+  };
+
+  const demoTrades = [
+    { id: "1", type: "buy", realizedPnL: "150.00", totalValue: "5000.00" },
+    { id: "2", type: "sell", realizedPnL: "245.50", totalValue: "8200.00" },
+    { id: "3", type: "buy", realizedPnL: "-85.00", totalValue: "3400.00" },
+    { id: "4", type: "sell", realizedPnL: "380.25", totalValue: "12500.00" }
+  ];
+
+  // Use real data if authenticated, demo data if not
+  const currentAutoTraderStats = isAuthenticated ? autoTraderStats : demoAutoTraderStats;
+  const currentRiskAnalysis = isAuthenticated ? riskAnalysis : demoRiskAnalysis;
+  const currentTrades = isAuthenticated ? trades : demoTrades;
+
   // Calculate real performance metrics from API data
-  const winningTrades = trades?.filter(t => parseFloat(t.realizedPnL || '0') > 0) || [];
-  const losingTrades = trades?.filter(t => parseFloat(t.realizedPnL || '0') < 0) || [];
+  const winningTrades = currentTrades?.filter(t => parseFloat(t.realizedPnL || '0') > 0) || [];
+  const losingTrades = currentTrades?.filter(t => parseFloat(t.realizedPnL || '0') < 0) || [];
   const avgWin = winningTrades.length ? winningTrades.reduce((sum, t) => sum + parseFloat(t.realizedPnL || '0'), 0) / winningTrades.length : 0;
   const avgLoss = losingTrades.length ? Math.abs(losingTrades.reduce((sum, t) => sum + parseFloat(t.realizedPnL || '0'), 0) / losingTrades.length) : 0;
   
   const performanceMetrics = {
     totalReturn: parseFloat(portfolio?.totalPnL || '0') / parseFloat(portfolio?.totalValue || '1') * 100, // Convert to percentage
-    sharpeRatio: riskAnalysis?.sharpeRatio || 0,
-    maxDrawdown: riskAnalysis?.maxDrawdown || 0,
-    volatility: riskAnalysis?.volatility || 0,
-    winRate: parseFloat(autoTraderStats?.winRate || portfolio?.winRate || '0'),
+    sharpeRatio: currentRiskAnalysis?.sharpeRatio || 0,
+    maxDrawdown: currentRiskAnalysis?.maxDrawdown || 0,
+    volatility: currentRiskAnalysis?.volatility || 0,
+    winRate: parseFloat(currentAutoTraderStats?.winRate || portfolio?.winRate || '0'),
     avgWin: avgWin,
     avgLoss: avgLoss,
     profitFactor: avgLoss ? avgWin / avgLoss : 0,
@@ -109,11 +167,17 @@ export default function Analytics() {
       };
     })
     .sort((a, b) => b.return - a.return)
-    .slice(0, 5) || [];
+    .slice(0, 5) || [
+      { symbol: "BTC", return: 12.5, allocation: 42.3 },
+      { symbol: "ETH", return: 8.7, allocation: 28.9 },
+      { symbol: "SOL", return: 15.2, allocation: 15.1 },
+      { symbol: "DOGE", return: -3.2, allocation: 8.4 },
+      { symbol: "PEPE", return: 22.8, allocation: 5.3 }
+    ];
 
   const riskMetrics = {
-    portfolioRisk: riskAnalysis?.portfolioRisk || "Unknown",
-    concentrationRisk: riskAnalysis?.concentrationRisk || "Unknown",
+    portfolioRisk: currentRiskAnalysis?.portfolioRisk || "Unknown",
+    concentrationRisk: currentRiskAnalysis?.concentrationRisk || "Unknown",
     correlationRisk: "Low", // Placeholder - needs additional endpoint
     liquidityRisk: "Medium", // Placeholder - needs additional endpoint
   };
@@ -147,6 +211,19 @@ export default function Analytics() {
         <Header />
         
         <div className="p-6 space-y-6">
+          {/* Authentication Status */}
+          {!isAuthenticated && (
+            <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <span className="text-sm text-blue-500">You're viewing demo analytics data. Sign in to see your actual trading performance.</span>
+              </div>
+              <Button variant="outline" size="sm" className="border-blue-500/20 text-blue-500 hover:bg-blue-500/10">
+                Sign In
+              </Button>
+            </div>
+          )}
+          
           {/* Page Header */}
           <div className="flex items-center justify-between">
             <div>
@@ -175,8 +252,8 @@ export default function Analytics() {
             </div>
           </div>
 
-          {/* Error Handling */}
-          {(portfolioError || riskError) && (
+          {/* Error Handling - only show errors if not using demo data */}
+          {(portfolioError || riskError) && isAuthenticated && (
             <Alert variant="destructive" data-testid="alert-analytics-error">
               <AlertTriangle className="w-4 h-4" />
               <AlertDescription>
