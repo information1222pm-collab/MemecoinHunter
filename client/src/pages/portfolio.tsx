@@ -11,92 +11,56 @@ import { cn } from "@/lib/utils";
 export default function Portfolio() {
   const { t } = useLanguage();
   
-  const { data: portfolio } = useQuery({
+  const { data: portfolio } = useQuery<{
+    id: string;
+    totalValue: string;
+    cashBalance: string;
+    dailyPnL: string;
+    totalPnL: string;
+    winRate: string;
+    positions: Array<{
+      id: string;
+      tokenId: string;
+      amount: string;
+      avgBuyPrice: string;
+      currentValue: string;
+      unrealizedPnL: string;
+      token: {
+        symbol: string;
+        name: string;
+        currentPrice: string;
+      };
+    }>;
+  }>({
     queryKey: ['/api/portfolio', 'default'],
   });
 
-  const { data: trades } = useQuery({
+  const { data: trades } = useQuery<Array<{
+    id: string;
+    type: string;
+    amount: string;
+    price: string;
+    totalValue: string;
+    status: string;
+    createdAt: string;
+    token: {
+      symbol: string;
+      name: string;
+    };
+  }>>({
     queryKey: ['/api/portfolio', 'default', 'trades'],
   });
 
-  // Mock data for demonstration
-  const mockPortfolio = {
-    totalValue: 12847.32,
-    dailyPnL: 347.82,
-    totalPnL: 2156.45,
-    winRate: 73.2,
-    positions: [
-      {
-        tokenSymbol: "PEPE",
-        tokenName: "Pepe Coin",
-        amount: "847200",
-        currentValue: "4234.56",
-        unrealizedPnL: "23.45",
-        avgBuyPrice: "0.000010",
-        currentPrice: "0.000012",
-      },
-      {
-        tokenSymbol: "DOGE",
-        tokenName: "Dogecoin",
-        amount: "3247",
-        currentValue: "2847.33",
-        unrealizedPnL: "12.67",
-        avgBuyPrice: "0.078",
-        currentPrice: "0.082",
-      },
-      {
-        tokenSymbol: "FLOKI",
-        tokenName: "Floki Inu",
-        amount: "156800",
-        currentValue: "1892.12",
-        unrealizedPnL: "45.23",
-        avgBuyPrice: "0.000029",
-        currentPrice: "0.000034",
-      },
-      {
-        tokenSymbol: "SHIB",
-        tokenName: "Shiba Inu",
-        amount: "2500000",
-        currentValue: "1673.89",
-        unrealizedPnL: "-8.34",
-        avgBuyPrice: "0.0000095",
-        currentPrice: "0.0000087",
-      },
-    ],
+  // Use real portfolio data
+  const portfolioData = portfolio || {
+    totalValue: "0",
+    dailyPnL: "0", 
+    totalPnL: "0",
+    winRate: "0",
+    positions: []
   };
 
-  const mockTrades = [
-    {
-      id: "1",
-      type: "buy",
-      tokenSymbol: "PEPE",
-      amount: "100000",
-      price: "0.000012",
-      totalValue: "1.20",
-      timestamp: "2024-01-15T10:30:00Z",
-      status: "completed",
-    },
-    {
-      id: "2",
-      type: "sell",
-      tokenSymbol: "DOGE",
-      amount: "500",
-      price: "0.082",
-      totalValue: "41.00",
-      timestamp: "2024-01-15T09:15:00Z",
-      status: "completed",
-    },
-    {
-      id: "3",
-      type: "buy",
-      tokenSymbol: "FLOKI",
-      amount: "50000",
-      price: "0.000034",
-      totalValue: "1.70",
-      timestamp: "2024-01-15T08:45:00Z",
-      status: "completed",
-    },
-  ];
+  const tradeData = trades || [];
 
   const formatCurrency = (value: string | number) => {
     return new Intl.NumberFormat('en-US', {
@@ -130,7 +94,7 @@ export default function Portfolio() {
                   <div>
                     <p className="text-sm text-muted-foreground">{t("portfolio.totalValue")}</p>
                     <p className="text-2xl font-bold" data-testid="text-total-value">
-                      {formatCurrency(mockPortfolio.totalValue)}
+                      {formatCurrency(parseFloat(portfolioData.totalValue) || 0)}
                     </p>
                   </div>
                   <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
@@ -148,8 +112,8 @@ export default function Portfolio() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Daily P&L</p>
-                    <p className={`text-2xl font-bold ${getPnLColor(mockPortfolio.dailyPnL)}`} data-testid="text-daily-pnl">
-                      {formatCurrency(mockPortfolio.dailyPnL)}
+                    <p className={`text-2xl font-bold ${getPnLColor(parseFloat(portfolioData.dailyPnL) || 0)}`} data-testid="text-daily-pnl">
+                      {formatCurrency(parseFloat(portfolioData.dailyPnL) || 0)}
                     </p>
                   </div>
                   <div className="w-12 h-12 bg-green-400/10 rounded-full flex items-center justify-center">
@@ -167,8 +131,8 @@ export default function Portfolio() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">Total P&L</p>
-                    <p className={`text-2xl font-bold ${getPnLColor(mockPortfolio.totalPnL)}`} data-testid="text-total-pnl">
-                      {formatCurrency(mockPortfolio.totalPnL)}
+                    <p className={`text-2xl font-bold ${getPnLColor(parseFloat(portfolioData.totalPnL) || 0)}`} data-testid="text-total-pnl">
+                      {formatCurrency(parseFloat(portfolioData.totalPnL) || 0)}
                     </p>
                   </div>
                   <div className="w-12 h-12 bg-accent/10 rounded-full flex items-center justify-center">
@@ -187,7 +151,7 @@ export default function Portfolio() {
                   <div>
                     <p className="text-sm text-muted-foreground">Win Rate</p>
                     <p className="text-2xl font-bold" data-testid="text-win-rate">
-                      {formatPercentage(mockPortfolio.winRate)}
+                      {formatPercentage(parseFloat(portfolioData.winRate) || 0)}
                     </p>
                   </div>
                   <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
@@ -210,22 +174,22 @@ export default function Portfolio() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {mockPortfolio.positions.map((position, index) => {
+                  {portfolioData.positions.map((position) => {
                     const pnlValue = parseFloat(position.unrealizedPnL);
                     return (
                       <div
-                        key={position.tokenSymbol}
+                        key={position.token?.symbol || position.id}
                         className="flex items-center justify-between p-4 bg-secondary/30 rounded-lg"
-                        data-testid={`position-${position.tokenSymbol}`}
+                        data-testid={`position-${position.token?.symbol || 'unknown'}`}
                       >
                         <div className="flex items-center space-x-3">
                           <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-full" />
                           <div>
-                            <div className="font-medium" data-testid={`text-position-symbol-${position.tokenSymbol}`}>
-                              {position.tokenSymbol}
+                            <div className="font-medium" data-testid={`text-position-symbol-${position.token?.symbol || 'unknown'}`}>
+                              {position.token?.symbol || 'Unknown'}
                             </div>
-                            <div className="text-sm text-muted-foreground" data-testid={`text-position-name-${position.tokenSymbol}`}>
-                              {position.tokenName}
+                            <div className="text-sm text-muted-foreground" data-testid={`text-position-name-${position.token?.symbol || 'unknown'}`}>
+                              {position.token?.name || 'Unknown Token'}
                             </div>
                             <div className="text-xs text-muted-foreground">
                               {parseFloat(position.amount).toLocaleString()} tokens
@@ -233,14 +197,14 @@ export default function Portfolio() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="font-medium" data-testid={`text-position-value-${position.tokenSymbol}`}>
+                          <div className="font-medium" data-testid={`text-position-value-${position.token?.symbol || 'unknown'}`}>
                             {formatCurrency(position.currentValue)}
                           </div>
-                          <div className={`text-sm ${getPnLColor(position.unrealizedPnL)}`} data-testid={`text-position-pnl-${position.tokenSymbol}`}>
+                          <div className={`text-sm ${getPnLColor(position.unrealizedPnL)}`} data-testid={`text-position-pnl-${position.token?.symbol || 'unknown'}`}>
                             {formatPercentage(position.unrealizedPnL)}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            @ {formatCurrency(parseFloat(position.currentPrice))}
+                            @ {formatCurrency(parseFloat(position.token?.currentPrice || '0'))}
                           </div>
                         </div>
                       </div>
@@ -257,7 +221,7 @@ export default function Portfolio() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {mockTrades.map((trade, index) => (
+                  {tradeData.map((trade) => (
                     <div
                       key={trade.id}
                       className="flex items-center justify-between p-4 bg-secondary/30 rounded-lg"
@@ -283,7 +247,7 @@ export default function Portfolio() {
                               {trade.type.toUpperCase()}
                             </Badge>
                             <span className="font-medium" data-testid={`text-trade-symbol-${trade.id}`}>
-                              {trade.tokenSymbol}
+                              {trade.token?.symbol || 'Unknown'}
                             </span>
                           </div>
                           <div className="text-sm text-muted-foreground">
@@ -297,7 +261,7 @@ export default function Portfolio() {
                         </div>
                         <div className="text-xs text-muted-foreground flex items-center">
                           <Clock className="w-3 h-3 mr-1" />
-                          {new Date(trade.timestamp).toLocaleTimeString()}
+                          {new Date(trade.createdAt).toLocaleTimeString()}
                         </div>
                       </div>
                     </div>
