@@ -4,36 +4,118 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/hooks/use-language";
-import { TrendingUp, TrendingDown, BarChart3, PieChart, Activity, AlertTriangle, Target, Zap } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { TrendingUp, TrendingDown, BarChart3, PieChart, Activity, AlertTriangle, Target, Zap, RefreshCw } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Analytics() {
   const { t } = useLanguage();
+  const queryClient = useQueryClient();
 
-  // Mock analytics data
+  // Fetch real analytics data from API
+  const { data: autoTraderStats } = useQuery<{
+    portfolioId: string;
+    totalValue: number;
+    totalPositionValue: number;
+    availableCash: number;
+    totalTrades: number;
+    buyTrades: number;
+    sellTrades: number;
+    activePositions: number;
+    positions: Array<{
+      tokenId: string;
+      symbol: string;
+      amount: number;
+      avgBuyPrice: number;
+      currentPrice: number;
+      positionValue: number;
+      profitLoss: number;
+    }>;
+    winRate: string;
+  }>({
+    queryKey: ['/api/auto-trader/portfolio'],
+    refetchInterval: 30000,
+  });
+
+  const { data: riskAnalysis, isLoading: riskLoading, error: riskError } = useQuery<{
+    portfolioRisk: string;
+    riskScore: number;
+    volatility: number;
+    diversificationScore: number;
+    concentrationRisk: string;
+    maxDrawdown: number;
+    sharpeRatio: number;
+  }>({
+    queryKey: ['/api/risk/portfolio', autoTraderStats?.portfolioId],
+    enabled: !!autoTraderStats?.portfolioId,
+    refetchInterval: 60000,
+  });
+
+  const { data: portfolio, isLoading: portfolioLoading, error: portfolioError } = useQuery<{
+    totalValue: string;
+    dailyPnL: string;
+    totalPnL: string;
+    winRate: string;
+    positions: Array<{
+      token: { symbol: string; name: string; };
+      currentValue: string;
+      unrealizedPnL: string;
+    }>;
+  }>({
+    queryKey: ['/api/portfolio', 'default'],
+    refetchInterval: 30000,
+  });
+
+  const { data: trades } = useQuery<Array<{
+    id: string;
+    type: string;
+    realizedPnL: string;
+    totalValue: string;
+  }>>({ 
+    queryKey: ['/api/portfolio', 'default', 'trades'],
+    refetchInterval: 60000,
+  });
+
+  // Calculate real performance metrics from API data
+  const winningTrades = trades?.filter(t => parseFloat(t.realizedPnL || '0') > 0) || [];
+  const losingTrades = trades?.filter(t => parseFloat(t.realizedPnL || '0') < 0) || [];
+  const avgWin = winningTrades.length ? winningTrades.reduce((sum, t) => sum + parseFloat(t.realizedPnL || '0'), 0) / winningTrades.length : 0;
+  const avgLoss = losingTrades.length ? Math.abs(losingTrades.reduce((sum, t) => sum + parseFloat(t.realizedPnL || '0'), 0) / losingTrades.length) : 0;
+  
   const performanceMetrics = {
-    totalReturn: 18.5,
-    sharpeRatio: 1.84,
-    maxDrawdown: -12.3,
-    volatility: 24.7,
-    winRate: 73.2,
-    avgWin: 8.4,
-    avgLoss: -3.2,
-    profitFactor: 2.1,
+    totalReturn: parseFloat(portfolio?.totalPnL || '0') / parseFloat(portfolio?.totalValue || '1') * 100, // Convert to percentage
+    sharpeRatio: riskAnalysis?.sharpeRatio || 0,
+    maxDrawdown: riskAnalysis?.maxDrawdown || 0,
+    volatility: riskAnalysis?.volatility || 0,
+    winRate: parseFloat(autoTraderStats?.winRate || portfolio?.winRate || '0'),
+    avgWin: avgWin,
+    avgLoss: avgLoss,
+    profitFactor: avgLoss ? avgWin / avgLoss : 0,
   };
 
-  const topPerformers = [
-    { symbol: "PEPE", return: 187.3, allocation: 32.9 },
-    { symbol: "FLOKI", return: 45.8, allocation: 14.7 },
-    { symbol: "DOGE", return: 23.7, allocation: 22.1 },
-    { symbol: "BONK", return: 12.4, allocation: 13.0 },
-    { symbol: "WIF", return: -8.2, allocation: 17.3 },
-  ];
+  // Calculate top performers from real positions (convert PnL to percentage return)
+  const topPerformers = portfolio?.positions
+    ?.map(position => {
+      const currentValue = parseFloat(position.currentValue || '0');
+      const unrealizedPnL = parseFloat(position.unrealizedPnL || '0');
+      const costBasis = currentValue - unrealizedPnL;
+      const returnPercent = costBasis ? (unrealizedPnL / costBasis) * 100 : 0;
+      
+      return {
+        symbol: position.token?.symbol || 'Unknown',
+        return: returnPercent, // Now correctly as percentage
+        allocation: (currentValue / parseFloat(portfolio?.totalValue || '1')) * 100,
+      };
+    })
+    .sort((a, b) => b.return - a.return)
+    .slice(0, 5) || [];
 
   const riskMetrics = {
-    portfolioRisk: "Medium",
-    concentrationRisk: "High",
-    correlationRisk: "Low",
-    liquidityRisk: "Medium",
+    portfolioRisk: riskAnalysis?.portfolioRisk || "Unknown",
+    concentrationRisk: riskAnalysis?.concentrationRisk || "Unknown",
+    correlationRisk: "Low", // Placeholder - needs additional endpoint
+    liquidityRisk: "Medium", // Placeholder - needs additional endpoint
   };
 
   const formatPercentage = (value: number) => {
@@ -75,11 +157,33 @@ export default function Analytics() {
               <Button variant="outline" size="sm" data-testid="button-export">
                 Export Report
               </Button>
-              <Button size="sm" data-testid="button-refresh-analytics">
+              <Button 
+                size="sm" 
+                data-testid="button-refresh-analytics"
+                onClick={() => {
+                  queryClient.invalidateQueries({ queryKey: ['/api/auto-trader/portfolio'] });
+                  queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default'] });
+                  if (autoTraderStats?.portfolioId) {
+                    queryClient.invalidateQueries({ queryKey: ['/api/risk/portfolio', autoTraderStats.portfolioId] });
+                  }
+                }}
+                disabled={portfolioLoading || riskLoading}
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
                 Refresh Data
               </Button>
             </div>
           </div>
+
+          {/* Error Handling */}
+          {(portfolioError || riskError) && (
+            <Alert variant="destructive" data-testid="alert-analytics-error">
+              <AlertTriangle className="w-4 h-4" />
+              <AlertDescription>
+                Failed to load analytics data. Please try refreshing the page.
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* Performance Overview */}
           <Card data-testid="card-performance-overview">
@@ -90,6 +194,16 @@ export default function Analytics() {
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {portfolioLoading || riskLoading ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="text-center">
+                      <Skeleton className="h-8 w-20 mx-auto mb-2" />
+                      <Skeleton className="h-4 w-16 mx-auto" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                 <div className="text-center" data-testid="metric-total-return">
                   <div className="text-2xl font-bold text-price-up">
@@ -116,6 +230,7 @@ export default function Analytics() {
                   <div className="text-sm text-muted-foreground">Volatility</div>
                 </div>
               </div>
+              )}
             </CardContent>
           </Card>
 
