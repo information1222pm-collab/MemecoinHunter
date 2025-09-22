@@ -57,6 +57,14 @@ class TokenScanner extends EventEmitter {
       }
       
       console.log(`📊 Scanned ${tokens.length} tokens`);
+      
+      // Emit scanner status update for real-time dashboard
+      this.emit('scanCompleted', {
+        tokenCount: tokens.length,
+        totalScanned: this.scannedTokens.size,
+        isRunning: this.isRunning,
+        lastScanTime: new Date().toISOString()
+      });
     } catch (error) {
       console.error('Error scanning tokens:', error);
     }

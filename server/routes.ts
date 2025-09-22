@@ -266,10 +266,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   scanner.on('alertTriggered', (alert) => {
-    // Alert has userId, broadcast to specific user only
-    if (alert.userId) {
-      broadcastToUser(alert.userId, { type: 'new_alert', data: alert });
-    }
+    // Broadcast alerts globally for now (public market data)
+    broadcastMarketData({ type: 'new_alert', data: alert });
+  });
+
+  scanner.on('scanCompleted', (status) => {
+    // Broadcast scanner status updates for dashboard
+    broadcastMarketData({ type: 'scanner_update', data: status });
   });
 
   priceFeed.on('priceUpdate', (update) => {
