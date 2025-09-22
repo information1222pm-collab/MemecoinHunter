@@ -60,6 +60,30 @@ export default function Home() {
     refetchInterval: 300000, // Refresh every 5 minutes
   });
 
+  const { data: autoTraderPortfolio } = useQuery<{
+    portfolioId: string;
+    totalValue: number;
+    totalPositionValue: number;
+    availableCash: number;
+    totalTrades: number;
+    buyTrades: number;
+    sellTrades: number;
+    activePositions: number;
+    positions: Array<{
+      tokenId: string;
+      symbol: string;
+      amount: number;
+      avgBuyPrice: number;
+      currentPrice: number;
+      positionValue: number;
+      profitLoss: number;
+    }>;
+    winRate: string;
+  }>({
+    queryKey: ['/api/auto-trader/portfolio'],
+    refetchInterval: 15000, // Refresh every 15 seconds
+  });
+
   // Real performance data from live system
   const systemStats = {
     tokensTracked: 63,
@@ -517,6 +541,166 @@ export default function Home() {
                   </div>
                 </motion.div>
               </div>
+            </motion.div>
+          )}
+
+          {/* Auto-Trader Portfolio Section */}
+          {autoTraderPortfolio && (
+            <motion.div 
+              className="glass-ultra rounded-3xl p-8"
+              variants={itemVariants}
+              data-testid="card-autotrader-portfolio"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-3">
+                  <motion.div 
+                    className="w-12 h-12 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 p-2.5"
+                    animate={{ rotateY: [0, 180, 360] }}
+                    transition={{ duration: 4, repeat: Infinity }}
+                  >
+                    <Bot className="w-full h-full text-white" />
+                  </motion.div>
+                  <div>
+                    <h3 className="text-2xl font-bold">Auto-Trader Portfolio</h3>
+                    <p className="text-muted-foreground">Real-time paper trading performance</p>
+                  </div>
+                </div>
+                <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
+                  Live Trading
+                </Badge>
+              </div>
+
+              {/* Portfolio Metrics Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <motion.div 
+                  className="text-center p-4 rounded-xl bg-black/20 border border-white/10"
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <div className="text-2xl font-bold text-green-400">
+                    ${autoTraderPortfolio.totalValue.toFixed(2)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Total Portfolio</div>
+                </motion.div>
+                <motion.div 
+                  className="text-center p-4 rounded-xl bg-black/20 border border-white/10"
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <div className="text-2xl font-bold text-blue-400">
+                    ${autoTraderPortfolio.availableCash.toFixed(2)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Available Cash</div>
+                </motion.div>
+                <motion.div 
+                  className="text-center p-4 rounded-xl bg-black/20 border border-white/10"
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <div className="text-2xl font-bold text-purple-400">{autoTraderPortfolio.totalTrades}</div>
+                  <div className="text-xs text-muted-foreground">Total Trades</div>
+                </motion.div>
+                <motion.div 
+                  className="text-center p-4 rounded-xl bg-black/20 border border-white/10"
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <div className="text-2xl font-bold text-yellow-400">{autoTraderPortfolio.winRate}%</div>
+                  <div className="text-xs text-muted-foreground">Win Rate</div>
+                </motion.div>
+              </div>
+
+              {/* Trading Activity */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="bg-black/20 border border-white/10 rounded-xl p-4">
+                  <h4 className="text-lg font-semibold mb-3 flex items-center">
+                    <TrendingUp className="w-5 h-5 mr-2 text-green-400" />
+                    Trade Summary
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Buy Orders:</span>
+                      <span className="text-green-400 font-medium">{autoTraderPortfolio.buyTrades}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Sell Orders:</span>
+                      <span className="text-red-400 font-medium">{autoTraderPortfolio.sellTrades}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Active Positions:</span>
+                      <span className="text-blue-400 font-medium">{autoTraderPortfolio.activePositions}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-black/20 border border-white/10 rounded-xl p-4">
+                  <h4 className="text-lg font-semibold mb-3 flex items-center">
+                    <DollarSign className="w-5 h-5 mr-2 text-blue-400" />
+                    Position Value
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Holdings Value:</span>
+                      <span className="text-blue-400 font-medium">
+                        ${autoTraderPortfolio.totalPositionValue.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Cash Reserve:</span>
+                      <span className="text-emerald-400 font-medium">
+                        ${autoTraderPortfolio.availableCash.toFixed(2)}
+                      </span>
+                    </div>
+                    <Separator className="my-2" />
+                    <div className="flex justify-between font-medium">
+                      <span>Portfolio Total:</span>
+                      <span className="text-green-400">
+                        ${autoTraderPortfolio.totalValue.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Active Positions Preview */}
+              {autoTraderPortfolio.positions && autoTraderPortfolio.positions.length > 0 && (
+                <div className="bg-black/20 border border-white/10 rounded-xl p-4">
+                  <h4 className="text-lg font-semibold mb-3 flex items-center">
+                    <Target className="w-5 h-5 mr-2 text-purple-400" />
+                    Active Positions ({autoTraderPortfolio.positions.length})
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {autoTraderPortfolio.positions.slice(0, 4).map((position, index) => (
+                      <motion.div 
+                        key={position.tokenId}
+                        className="flex items-center justify-between p-3 rounded-lg bg-black/20 border border-white/10"
+                        whileHover={{ scale: 1.02 }}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                      >
+                        <div>
+                          <div className="font-medium text-sm">{position.symbol}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {position.amount.toFixed(4)} @ ${position.avgBuyPrice.toFixed(6)}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-medium">
+                            ${position.positionValue.toFixed(2)}
+                          </div>
+                          <div className={`text-xs ${position.profitLoss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {position.profitLoss >= 0 ? '+' : ''}{position.profitLoss.toFixed(2)}%
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                  {autoTraderPortfolio.positions.length > 4 && (
+                    <div className="text-center mt-3">
+                      <span className="text-xs text-muted-foreground">
+                        +{autoTraderPortfolio.positions.length - 4} more positions
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </motion.div>
           )}
 

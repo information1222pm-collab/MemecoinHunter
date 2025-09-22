@@ -230,6 +230,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Auto-trader portfolio status route
+  app.get("/api/auto-trader/portfolio", async (req, res) => {
+    try {
+      const stats = await autoTrader.getDetailedStats();
+      if (!stats) {
+        return res.status(404).json({ message: "Auto-trader portfolio not found" });
+      }
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch auto-trader portfolio", error });
+    }
+  });
+
   // Trading routes
   app.post("/api/trades", async (req, res) => {
     try {

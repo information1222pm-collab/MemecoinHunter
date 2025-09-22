@@ -212,6 +212,20 @@ class AutoTrader extends EventEmitter {
     if (!this.defaultPortfolioId) return;
     
     try {
+      // Check current portfolio cash balance for trade execution
+      if (!this.defaultPortfolioId) return;
+      const portfolio = await storage.getPortfolio(this.defaultPortfolioId);
+      if (!portfolio) return;
+      
+      const tradeValue = 500;
+      const availableCash = parseFloat(portfolio.cashBalance || '0');
+      
+      // Strict cash balance validation - no negative balance allowed
+      if (availableCash < tradeValue) {
+        console.log(`💸 Insufficient funds: Available $${availableCash.toFixed(2)}, Need $${tradeValue}`);
+        return;
+      }
+      
       // Check if we already have a position in this token
       const existingPosition = await storage.getPositionByPortfolioAndToken(
         this.defaultPortfolioId,
@@ -219,11 +233,11 @@ class AutoTrader extends EventEmitter {
       );
       
       if (existingPosition && parseFloat(existingPosition.amount) > 0) {
+        console.log(`📋 Position already exists for ${signal.tokenId}, skipping duplicate buy`);
         return; // Skip if we already have a position
       }
       
       // Calculate trade amount ($500 per trade)
-      const tradeValue = 500;
       const tradeAmount = (tradeValue / signal.price).toString();
       const totalValue = (parseFloat(tradeAmount) * signal.price).toString();
       
@@ -241,12 +255,19 @@ class AutoTrader extends EventEmitter {
       // Execute trade
       const trade = await storage.createTrade(tradeData);
       
-      // Create/update position
+      // Create position (first time buying this token)
       await storage.createPosition({
         portfolioId: this.defaultPortfolioId,
         tokenId: signal.tokenId,
         amount: tradeAmount,
         avgBuyPrice: signal.price.toString(),
+      });
+      
+      // Update portfolio cash balance atomically
+      const newCashBalance = (availableCash - tradeValue).toString();
+      await storage.updatePortfolio(this.defaultPortfolioId, {
+        cashBalance: newCashBalance,
+        updatedAt: new Date(),
       });
       
       // Update stats
@@ -312,14 +333,17 @@ class AutoTrader extends EventEmitter {
         }
       }
       
-      // Update portfolio value
+      // Update portfolio value based on current positions + cash balance
       const portfolio = await storage.getPortfolio(this.defaultPortfolioId);
       if (portfolio) {
-        const startingValue = 10000;
-        const cashUsed = this.tradingStats.totalTrades * 500; // $500 per trade
-        const remainingCash = Math.max(0, startingValue - cashUsed);
-        const newTotalValue = totalPortfolioValue + remainingCash;
-        const totalPnL = newTotalValue - startingValue;
+        const startingCapital = parseFloat(portfolio.startingCapital || '10000');
+        const currentCashBalance = parseFloat(portfolio.cashBalance || '0');
+        
+        // Total portfolio value = current positions value + current cash balance
+        const newTotalValue = totalPortfolioValue + currentCashBalance;
+        const totalPnL = newTotalValue - startingCapital;
+        
+        console.log(`💰 Portfolio Update: Positions $${totalPortfolioValue.toFixed(2)}, Cash $${currentCashBalance.toFixed(2)}, Total $${newTotalValue.toFixed(2)}`);
         
         await storage.updatePortfolio(portfolio.id, {
           totalValue: newTotalValue.toString(),
@@ -421,6 +445,73 @@ class AutoTrader extends EventEmitter {
       
     } catch (error) {
       console.error('Error executing sell:', error);
+    }
+  }
+
+  async getDetailedStats() {
+    if (!this.defaultPortfolioId) return null;
+    
+    try {
+      const portfolio = await storage.getPortfolio(this.defaultPortfolioId);
+      const positions = await storage.getPositionsByPortfolio(this.defaultPortfolioId);
+      const trades = await storage.getTradesByPortfolio(this.defaultPortfolioId);
+      
+      if (!portfolio) return null;
+      
+      // Use portfolio's actual cash balance instead of recalculating from trades
+      const availableCash = parseFloat(portfolio.cashBalance || '0');
+      const startingCapital = parseFloat(portfolio.startingCapital || '10000');
+      const realizedPnL = parseFloat(portfolio.realizedPnL || '0');
+      
+      // Calculate current position values
+      let totalPositionValue = 0;
+      const activePositions = [];
+      
+      for (const position of positions) {
+        if (parseFloat(position.amount) > 0) {
+          const token = await storage.getToken(position.tokenId);
+          if (token) {
+            const currentPrice = parseFloat(token.currentPrice || '0');
+            const positionValue = parseFloat(position.amount) * currentPrice;
+            const avgBuyPrice = parseFloat(position.avgBuyPrice);
+            const profitLoss = currentPrice > 0 ? ((currentPrice - avgBuyPrice) / avgBuyPrice) * 100 : 0;
+            
+            totalPositionValue += positionValue;
+            activePositions.push({
+              tokenId: position.tokenId,
+              symbol: token.symbol,
+              amount: parseFloat(position.amount),
+              avgBuyPrice,
+              currentPrice,
+              positionValue,
+              profitLoss
+            });
+          }
+        }
+      }
+      
+      // Total portfolio value = cash + position values
+      const totalValue = availableCash + totalPositionValue;
+      
+      return {
+        portfolioId: this.defaultPortfolioId,
+        totalValue,
+        totalPositionValue,
+        availableCash,
+        startingCapital,
+        realizedPnL,
+        totalTrades: trades.length,
+        buyTrades: trades.filter(t => t.type === 'buy').length,
+        sellTrades: trades.filter(t => t.type === 'sell').length,
+        activePositions: activePositions.length,
+        positions: activePositions,
+        winRate: this.tradingStats.totalTrades > 0 
+          ? (this.tradingStats.successfulTrades / this.tradingStats.totalTrades * 100).toFixed(1)
+          : '0'
+      };
+    } catch (error) {
+      console.error('Error getting detailed stats:', error);
+      return null;
     }
   }
 
