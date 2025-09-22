@@ -1,6 +1,7 @@
 import { 
   users, tokens, portfolios, trades, positions, scanAlerts, 
   priceHistory, patterns, subscriptions, patternPerformance, mlLearningParams, auditLog,
+  exchangeConfig, exchangeTrades, exchangeBalances, tradingConfig, apiKeys,
   type User, type InsertUser, type Token, type InsertToken,
   type Portfolio, type InsertPortfolio, type Trade, type InsertTrade,
   type Position, type InsertPosition, type ScanAlert, type InsertScanAlert,
@@ -93,6 +94,15 @@ export interface IStorage {
   
   // WebSocket session validation (CRITICAL SECURITY FIX)
   getSessionData(sessionId: string): Promise<{ userId: string } | null>;
+
+  // Exchange integration methods for real money trading
+  getActiveExchangeConfigs(): Promise<any[]>; // ExchangeConfig[]
+  getApiKey(id: string): Promise<any | undefined>; // ApiKey
+  getTradingConfigByPortfolio(portfolioId: string): Promise<any | undefined>; // TradingConfig  
+  createExchangeTrade(trade: any): Promise<any>; // InsertExchangeTrade -> ExchangeTrade
+  updateExchangeHealth(exchangeName: string, status: string): Promise<void>;
+  upsertExchangeBalance(balance: any): Promise<any>; // InsertExchangeBalance -> ExchangeBalance
+  getAllExchangeBalances(): Promise<any[]>; // ExchangeBalance[]
 }
 
 export class DatabaseStorage implements IStorage {
@@ -429,6 +439,101 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error('[SECURITY] Session validation error:', error);
       return null;
+    }
+  }
+
+  // Exchange integration methods for real money trading
+  async getActiveExchangeConfigs(): Promise<any[]> {
+    try {
+      return await db.select().from(exchangeConfig).where(eq(exchangeConfig.isActive, true));
+    } catch (error) {
+      console.error('Error getting active exchange configs:', error);
+      return [];
+    }
+  }
+
+  async getApiKey(id: string): Promise<any | undefined> {
+    try {
+      const [apiKey] = await db.select().from(apiKeys).where(eq(apiKeys.id, id));
+      return apiKey;
+    } catch (error) {
+      console.error('Error getting API key:', error);
+      return undefined;
+    }
+  }
+
+  async getTradingConfigByPortfolio(portfolioId: string): Promise<any | undefined> {
+    try {
+      // First get the portfolio to find the user
+      const portfolio = await this.getPortfolio(portfolioId);
+      if (!portfolio) return undefined;
+      
+      const [config] = await db.select().from(tradingConfig)
+        .where(eq(tradingConfig.userId, portfolio.userId));
+      return config;
+    } catch (error) {
+      console.error('Error getting trading config by portfolio:', error);
+      return undefined;
+    }
+  }
+
+  async createExchangeTrade(trade: any): Promise<any> {
+    try {
+      const [created] = await db.insert(exchangeTrades).values(trade).returning();
+      return created;
+    } catch (error) {
+      console.error('Error creating exchange trade:', error);
+      throw error;
+    }
+  }
+
+  async updateExchangeHealth(exchangeName: string, status: string): Promise<void> {
+    try {
+      await db.update(exchangeConfig)
+        .set({ 
+          healthStatus: status,
+          lastHealthCheck: new Date(),
+          updatedAt: new Date()
+        })
+        .where(eq(exchangeConfig.exchangeName, exchangeName));
+    } catch (error) {
+      console.error('Error updating exchange health:', error);
+    }
+  }
+
+  async upsertExchangeBalance(balance: any): Promise<any> {
+    try {
+      // Try to find existing balance
+      const existing = await db.select().from(exchangeBalances)
+        .where(and(
+          eq(exchangeBalances.exchangeName, balance.exchangeName),
+          eq(exchangeBalances.currency, balance.currency)
+        ));
+      
+      if (existing.length > 0) {
+        // Update existing
+        const [updated] = await db.update(exchangeBalances)
+          .set({ ...balance, lastUpdated: new Date() })
+          .where(eq(exchangeBalances.id, existing[0].id))
+          .returning();
+        return updated;
+      } else {
+        // Create new
+        const [created] = await db.insert(exchangeBalances).values(balance).returning();
+        return created;
+      }
+    } catch (error) {
+      console.error('Error upserting exchange balance:', error);
+      throw error;
+    }
+  }
+
+  async getAllExchangeBalances(): Promise<any[]> {
+    try {
+      return await db.select().from(exchangeBalances);
+    } catch (error) {
+      console.error('Error getting all exchange balances:', error);
+      return [];
     }
   }
 }

@@ -306,6 +306,68 @@ export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({
   createdAt: true,
 });
 
+// Exchange configuration and API management
+export const exchangeConfig = pgTable("exchange_config", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  exchangeName: text("exchange_name").notNull(), // 'binance', 'kraken', 'coinbase'
+  isActive: boolean("is_active").default(true),
+  apiKeyId: varchar("api_key_id").references(() => apiKeys.id), // Reference to encrypted API key
+  testMode: boolean("test_mode").default(true), // Use testnet/sandbox
+  maxDailyVolume: decimal("max_daily_volume", { precision: 20, scale: 8 }),
+  tradingPairs: text("trading_pairs").array(), // Supported trading pairs
+  lastHealthCheck: timestamp("last_health_check"),
+  healthStatus: text("health_status").default("unknown"), // 'healthy', 'degraded', 'down'
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Exchange trade execution log for real money trading
+export const exchangeTrades = pgTable("exchange_trades", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tradeId: varchar("trade_id").notNull().references(() => trades.id), // References trades table
+  exchangeName: text("exchange_name").notNull(),
+  exchangeOrderId: text("exchange_order_id"), // Exchange's order ID
+  status: text("status").notNull().default("pending"), // 'pending', 'filled', 'cancelled', 'failed'
+  requestedPrice: decimal("requested_price", { precision: 20, scale: 8 }),
+  executedPrice: decimal("executed_price", { precision: 20, scale: 8 }),
+  requestedAmount: decimal("requested_amount", { precision: 20, scale: 8 }),
+  executedAmount: decimal("executed_amount", { precision: 20, scale: 8 }),
+  fees: decimal("fees", { precision: 20, scale: 8 }),
+  feeCurrency: text("fee_currency"),
+  executionTime: timestamp("execution_time"),
+  errorMessage: text("error_message"),
+  retryCount: integer("retry_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Exchange balance tracking for real money accounts
+export const exchangeBalances = pgTable("exchange_balances", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  exchangeName: text("exchange_name").notNull(),
+  currency: text("currency").notNull(), // 'USDT', 'BTC', 'ETH', etc.
+  available: decimal("available", { precision: 20, scale: 8 }).default("0"),
+  locked: decimal("locked", { precision: 20, scale: 8 }).default("0"),
+  total: decimal("total", { precision: 20, scale: 8 }).default("0"),
+  lastSyncTime: timestamp("last_sync_time").defaultNow(),
+  syncStatus: text("sync_status").default("synced"), // 'synced', 'syncing', 'error'
+  lastUpdated: timestamp("last_updated").defaultNow(),
+});
+
+// Trading mode configuration per user (paper vs real money)
+export const tradingConfig = pgTable("trading_config", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  tradingMode: text("trading_mode").notNull().default("paper"), // 'paper', 'real'
+  primaryExchange: text("primary_exchange"), // 'binance', 'kraken', 'coinbase'
+  enabledExchanges: text("enabled_exchanges").array().default(sql`'{}'::text[]`),
+  autoTradingEnabled: boolean("auto_trading_enabled").default(false),
+  realMoneyConfirmed: boolean("real_money_confirmed").default(false), // Explicit confirmation for real trading
+  lastModeSwitch: timestamp("last_mode_switch").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -339,3 +401,16 @@ export type InsertPatternPerformance = z.infer<typeof insertPatternPerformanceSc
 
 export type MLLearningParams = typeof mlLearningParams.$inferSelect;
 export type InsertMLLearningParams = z.infer<typeof insertMLLearningParamsSchema>;
+
+// Exchange integration types
+export type ExchangeConfig = typeof exchangeConfig.$inferSelect;
+export type InsertExchangeConfig = typeof exchangeConfig.$inferInsert;
+
+export type ExchangeTrade = typeof exchangeTrades.$inferSelect;
+export type InsertExchangeTrade = typeof exchangeTrades.$inferInsert;
+
+export type ExchangeBalance = typeof exchangeBalances.$inferSelect;
+export type InsertExchangeBalance = typeof exchangeBalances.$inferInsert;
+
+export type TradingConfig = typeof tradingConfig.$inferSelect;
+export type InsertTradingConfig = typeof tradingConfig.$inferInsert;
