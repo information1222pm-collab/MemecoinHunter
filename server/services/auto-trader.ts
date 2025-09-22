@@ -71,6 +71,8 @@ class AutoTrader extends EventEmitter {
     this.monitoringInterval = setInterval(() => {
       this.monitorPositions();
     }, 30000);
+    
+    console.log('🤖 Auto-Trader initialization complete - listening for ML patterns');
   }
 
   stop() {
@@ -120,7 +122,17 @@ class AutoTrader extends EventEmitter {
   }
 
   private async handleMLPattern(pattern: Pattern) {
-    if (!this.isActive || !this.defaultPortfolioId) return;
+    console.log(`🔍 AUTO-TRADER: Received ML pattern ${pattern.patternType} for token ${pattern.tokenId} with ${pattern.confidence}% confidence`);
+    
+    if (!this.isActive) {
+      console.log(`🔍 AUTO-TRADER: Inactive - skipping pattern ${pattern.patternType}`);
+      return;
+    }
+    
+    if (!this.defaultPortfolioId) {
+      console.log(`🔍 AUTO-TRADER: No portfolio ID - skipping pattern ${pattern.patternType}`);
+      return;
+    }
     
     try {
       const baseConfidence = parseFloat(pattern.confidence.toString());

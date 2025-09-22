@@ -42,10 +42,12 @@ class MLAnalyzer extends EventEmitter {
     
     // Analyze every 2 minutes
     this.analysisInterval = setInterval(() => {
+      console.log('🔍 ML-ANALYZER: Starting analysis cycle...');
       this.analyzePatterns();
     }, 120000);
     
     // Initial analysis
+    console.log('🔍 ML-ANALYZER: Running initial analysis...');
     this.analyzePatterns();
   }
 
@@ -75,16 +77,29 @@ class MLAnalyzer extends EventEmitter {
 
   private async analyzeTokenPatterns(token: Token) {
     try {
+      console.log(`🔍 ML-ANALYZER: Analyzing patterns for token ${token.symbol} (${token.id})`);
+      
       // Get price history for the last 24 hours
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
       const history = await storage.getPriceHistory(token.id, oneDayAgo);
       
-      if (history.length < 20) return; // Need at least 20 data points
+      console.log(`🔍 ML-ANALYZER: Found ${history.length} price history points for ${token.symbol}`);
       
+      if (history.length < 20) {
+        console.log(`🔍 ML-ANALYZER: Skipping ${token.symbol} - insufficient data (${history.length} < 20)`);
+        return; // Need at least 20 data points
+      }
+      
+      console.log(`🔍 ML-ANALYZER: Calculating indicators for ${token.symbol}`);
       const indicators = this.calculateTechnicalIndicators(history);
+      
+      console.log(`🔍 ML-ANALYZER: Detecting patterns for ${token.symbol}`);
       const patterns = this.detectPatterns(history, indicators);
       
+      console.log(`🔍 ML-ANALYZER: Found ${patterns.length} patterns for ${token.symbol}`);
+      
       for (const pattern of patterns) {
+        console.log(`🔍 ML-ANALYZER: Processing pattern ${pattern.type} for ${token.symbol}`);
         await this.savePattern(token.id, pattern);
       }
       
@@ -1443,6 +1458,8 @@ class MLAnalyzer extends EventEmitter {
 
   private async savePattern(tokenId: string, pattern: any) {
     try {
+      console.log(`🔍 ML-ANALYZER: Saving pattern ${pattern.type} for token ${tokenId} with ${pattern.confidence}% confidence`);
+      
       const patternData: InsertPattern = {
         tokenId,
         patternType: pattern.type,
@@ -1452,7 +1469,10 @@ class MLAnalyzer extends EventEmitter {
       };
       
       const savedPattern = await storage.createPattern(patternData);
+      console.log(`🔍 ML-ANALYZER: Pattern saved to DB, emitting event...`);
+      
       this.emit('patternDetected', savedPattern);
+      console.log(`🔍 ML-ANALYZER: Event emitted for pattern ${savedPattern.id}`);
       
       console.log(`🤖 Advanced ML Pattern: ${pattern.type} (${pattern.confidence.toFixed(1)}% confidence)`);
     } catch (error) {

@@ -252,12 +252,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }
 
-  // Start services
+  // Start services in correct order - auto-trader BEFORE ML analyzer to receive events
+  console.log('🚀 Starting trading services...');
   scanner.start();
   priceFeed.start();
-  mlAnalyzer.start();
-  riskManager.start();
+  
+  // CRITICAL: Start auto-trader BEFORE ML analyzer so it can listen for pattern events
+  console.log('🤖 Starting Auto-Trader service...');
   autoTrader.start();
+  
+  // Start ML analyzer after auto-trader is listening
+  console.log('🧠 Starting ML Pattern Analyzer...');
+  mlAnalyzer.start();
+  
+  riskManager.start();
   stakeholderReportUpdater.startAutoUpdater();
 
   // Set up real-time broadcasts with user scoping (CRITICAL SECURITY FIX)
@@ -306,6 +314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // API Routes
+
 
   // Authentication routes
   app.post("/api/auth/register", async (req, res) => {
