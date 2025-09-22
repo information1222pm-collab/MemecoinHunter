@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { LanguageProvider } from "@/contexts/language-context";
+import { useAuth } from "@/hooks/use-auth";
 import Home from "@/pages/home";
 import Dashboard from "@/pages/dashboard";
 import Scanner from "@/pages/scanner";
@@ -13,9 +14,30 @@ import Activity from "@/pages/activity";
 import Terminal from "@/pages/terminal";
 import Subscription from "@/pages/subscription";
 import Settings from "@/pages/settings";
+import SignIn from "@/pages/signin";
 import NotFound from "@/pages/not-found";
 
 function Router() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-emerald-400 mx-auto mb-4"></div>
+          <p className="text-slate-300">Loading CryptoHobby...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show sign-in page if not authenticated
+  if (!isAuthenticated) {
+    return <SignIn />;
+  }
+
+  // Show main app if authenticated
   return (
     <Switch>
       <Route path="/" component={Home} />

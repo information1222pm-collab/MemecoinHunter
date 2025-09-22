@@ -3,10 +3,15 @@ import { useLanguage } from "@/hooks/use-language";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWebSocket } from "@/hooks/use-websocket";
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { getCsrfToken } from "@/lib/auth-utils";
 import { useEffect } from "react";
 
 const languages = [
@@ -21,6 +26,8 @@ const languages = [
 export function Header() {
   const { language, setLanguage, t } = useLanguage();
   const { isConnected, lastMessage } = useWebSocket();
+  const { user, refetch } = useAuth();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const currentLanguage = languages.find(lang => lang.code === language) || languages[0];
@@ -47,6 +54,37 @@ export function Header() {
   };
 
   const isAuthenticated = !hasAuthError(portfolioError);
+
+  // Logout mutation
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      const csrfToken = await getCsrfToken();
+      await apiRequest("POST", "/api/auth/logout", {
+        _csrf: csrfToken
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out.",
+      });
+      // Clear all cached data
+      queryClient.clear();
+      // Refetch auth status
+      refetch();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Logout failed",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleLogout = () => {
+    logoutMutation.mutate();
+  };
 
   // Demo data for unauthenticated users
   const demoPortfolioValue = "25847.32";
@@ -183,15 +221,67 @@ export function Header() {
                       </SelectContent>
                     </Select>
                   </div>
+                  
+                  {user && (
+                    <div className="border-t pt-3">
+                      <div className="mb-2">
+                        <p className="text-sm font-medium">{user.username}</p>
+                        <p className="text-xs text-muted-foreground">{user.email}</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full flex items-center justify-center space-x-2"
+                        onClick={handleLogout}
+                        disabled={logoutMutation.isPending}
+                        data-testid="button-logout"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span>{logoutMutation.isPending ? "Logging out..." : "Logout"}</span>
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </PopoverContent>
             </Popover>
           </div>
           
-          {/* User Avatar */}
-          <Avatar className="w-8 h-8 md:w-10 md:h-10" data-testid="avatar-user">
-            <AvatarFallback className="bg-primary text-primary-foreground text-sm">JD</AvatarFallback>
-          </Avatar>
+          {/* User Avatar with Popover */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Avatar className="w-8 h-8 md:w-10 md:h-10 cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all" data-testid="avatar-user">
+                <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+                  {user ? user.username.slice(0, 2).toUpperCase() : "GU"}
+                </AvatarFallback>
+              </Avatar>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-3" align="end">
+              {user ? (
+                <div className="space-y-3">
+                  <div className="pb-2 border-b">
+                    <p className="text-sm font-medium">{user.username}</p>
+                    <p className="text-xs text-muted-foreground">{user.email}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{user.subscriptionTier} Plan</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full flex items-center justify-center space-x-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+                    onClick={handleLogout}
+                    disabled={logoutMutation.isPending}
+                    data-testid="button-avatar-logout"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>{logoutMutation.isPending ? "Logging out..." : "Sign Out"}</span>
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-center py-2">
+                  <p className="text-sm text-muted-foreground">Not signed in</p>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
     </header>
