@@ -131,6 +131,48 @@ export const mlLearningParams = pgTable("ml_learning_params", {
   lastUpdated: timestamp("last_updated").defaultNow(),
 });
 
+// Encrypted API Key Storage for Real Money Trading
+export const apiKeys = pgTable("api_keys", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  provider: text("provider").notNull(), // 'coinbase', 'kraken', 'binance'
+  keyName: text("key_name").notNull(), // User-friendly name
+  encryptedApiKey: text("encrypted_api_key").notNull(),
+  encryptedApiSecret: text("encrypted_api_secret").notNull(),
+  permissions: text("permissions").array(), // ['trade', 'view'] - no 'withdraw' ever
+  isActive: boolean("is_active").default(true),
+  lastUsed: timestamp("last_used"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Security Audit Log for Financial Compliance
+export const auditLog = pgTable("audit_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  action: text("action").notNull(), // 'login', 'trade_executed', 'api_key_added', etc.
+  resource: text("resource").notNull(), // 'user', 'trade', 'portfolio', 'api_key'
+  resourceId: varchar("resource_id"),
+  details: jsonb("details"), // Additional structured data
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  success: boolean("success").notNull(),
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
+// Trading Risk Settings per User
+export const riskSettings = pgTable("risk_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  maxPositionSize: decimal("max_position_size", { precision: 20, scale: 2 }).default("500.00"),
+  maxDailyLoss: decimal("max_daily_loss", { precision: 20, scale: 2 }).default("1000.00"),
+  maxWeeklyLoss: decimal("max_weekly_loss", { precision: 20, scale: 2 }).default("5000.00"),
+  enableStopLoss: boolean("enable_stop_loss").default(true),
+  stopLossPercent: decimal("stop_loss_percent", { precision: 5, scale: 2 }).default("10.00"),
+  requireManualApproval: boolean("require_manual_approval").default(false),
+  tradingEnabled: boolean("trading_enabled").default(false), // Must be explicitly enabled
+  lastUpdated: timestamp("last_updated").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   portfolio: one(portfolios),
@@ -179,6 +221,18 @@ export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
   user: one(users, { fields: [subscriptions.userId], references: [users.id] }),
 }));
 
+export const apiKeysRelations = relations(apiKeys, ({ one }) => ({
+  user: one(users, { fields: [apiKeys.userId], references: [users.id] }),
+}));
+
+export const auditLogRelations = relations(auditLog, ({ one }) => ({
+  user: one(users, { fields: [auditLog.userId], references: [users.id] }),
+}));
+
+export const riskSettingsRelations = relations(riskSettings, ({ one }) => ({
+  user: one(users, { fields: [riskSettings.userId], references: [users.id] }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -207,6 +261,22 @@ export const insertPatternPerformanceSchema = createInsertSchema(patternPerforma
 });
 
 export const insertMLLearningParamsSchema = createInsertSchema(mlLearningParams).omit({
+  id: true,
+  lastUpdated: true,
+});
+
+export const insertApiKeySchema = createInsertSchema(apiKeys).omit({
+  id: true,
+  createdAt: true,
+  lastUsed: true,
+});
+
+export const insertAuditLogSchema = createInsertSchema(auditLog).omit({
+  id: true,
+  timestamp: true,
+});
+
+export const insertRiskSettingsSchema = createInsertSchema(riskSettings).omit({
   id: true,
   lastUpdated: true,
 });
