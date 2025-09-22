@@ -157,14 +157,14 @@ export default function Home() {
         <Header />
         
         <motion.div 
-          className="p-6 space-y-8"
+          className="p-4 md:p-6 space-y-6 md:space-y-8"
           variants={containerVariants}
           initial="hidden"
           animate="visible"
         >
           {/* Hero Section with Floating Orbs */}
           <motion.div 
-            className="relative text-center space-y-6 py-12"
+            className="relative text-center space-y-4 md:space-y-6 py-8 md:py-12"
             variants={itemVariants}
           >
             {/* Background Orbs */}
@@ -191,7 +191,7 @@ export default function Home() {
             />
 
             <motion.h1 
-              className="text-5xl font-bold gradient-text mb-4"
+              className="text-3xl md:text-5xl font-bold gradient-text mb-3 md:mb-4 px-4"
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: "spring", stiffness: 100, delay: 0.5 }}
@@ -200,26 +200,26 @@ export default function Home() {
               MemeCoin Hunter
             </motion.h1>
             <motion.p 
-              className="text-xl text-muted-foreground max-w-4xl mx-auto leading-relaxed"
+              className="text-base md:text-xl text-muted-foreground max-w-4xl mx-auto leading-relaxed px-4"
               variants={itemVariants}
             >
               Next-Generation Memecoin Trading Platform with AI-Powered Pattern Recognition & Automated Execution
             </motion.p>
             <motion.div 
-              className="flex items-center justify-center space-x-6"
+              className="flex items-center justify-center space-x-3 md:space-x-6 flex-wrap gap-2 px-4"
               variants={itemVariants}
             >
               <motion.div variants={glowVariants} animate="pulse">
-                <Badge variant="default" className="px-4 py-2 glass-card" data-testid="badge-system-status">
+                <Badge variant="default" className="px-3 py-2 md:px-4 glass-card text-xs md:text-sm" data-testid="badge-system-status">
                   <Rocket className="w-4 h-4 mr-2" />
                   {systemStats.systemStatus}
                 </Badge>
               </motion.div>
-              <Badge variant="secondary" className="px-4 py-2 glass-card" data-testid="badge-uptime">
+              <Badge variant="secondary" className="px-3 py-2 md:px-4 glass-card text-xs md:text-sm" data-testid="badge-uptime">
                 <Clock className="w-4 h-4 mr-2" />
                 {systemStats.uptime}
               </Badge>
-              <Badge variant="outline" className="px-4 py-2 glass-card" data-testid="badge-tokens-tracked">
+              <Badge variant="outline" className="px-3 py-2 md:px-4 glass-card text-xs md:text-sm" data-testid="badge-tokens-tracked">
                 <Globe className="w-4 h-4 mr-2" />
                 {systemStats.tokensTracked} Tokens
               </Badge>

@@ -18,6 +18,7 @@ import {
   Sparkles,
   Menu,
   ChevronLeft,
+  X,
 } from "lucide-react";
 
 const navigationItems = [
@@ -39,22 +40,53 @@ export function Sidebar() {
   const [location] = useLocation();
   const { t } = useLanguage();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
-  // Load collapsed state from localStorage on mount
+  // Check if mobile on mount and window resize
   useEffect(() => {
-    const savedState = localStorage.getItem('sidebar-collapsed');
-    if (savedState) {
-      setIsCollapsed(JSON.parse(savedState));
-    }
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) {
+        setIsCollapsed(false); // Always expanded on mobile overlay
+      }
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Save collapsed state to localStorage when it changes
+  // Load collapsed state from localStorage on mount (desktop only)
   useEffect(() => {
-    localStorage.setItem('sidebar-collapsed', JSON.stringify(isCollapsed));
-  }, [isCollapsed]);
+    if (!isMobile) {
+      const savedState = localStorage.getItem('sidebar-collapsed');
+      if (savedState) {
+        setIsCollapsed(JSON.parse(savedState));
+      }
+    }
+  }, [isMobile]);
+
+  // Save collapsed state to localStorage when it changes (desktop only)
+  useEffect(() => {
+    if (!isMobile) {
+      localStorage.setItem('sidebar-collapsed', JSON.stringify(isCollapsed));
+    }
+  }, [isCollapsed, isMobile]);
 
   const toggleSidebar = () => {
-    setIsCollapsed(!isCollapsed);
+    if (isMobile) {
+      setIsMobileOpen(!isMobileOpen);
+    } else {
+      setIsCollapsed(!isCollapsed);
+    }
+  };
+
+  const closeMobileSidebar = () => {
+    if (isMobile) {
+      setIsMobileOpen(false);
+    }
   };
 
   const containerVariants = {
@@ -84,17 +116,55 @@ export function Sidebar() {
     }
   };
 
+  // Mobile overlay backdrop
+  const mobileOverlay = isMobile && isMobileOpen && (
+    <motion.div
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 md:hidden"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={closeMobileSidebar}
+      data-testid="mobile-sidebar-overlay"
+    />
+  );
+
   return (
-    <motion.aside 
-      className={cn(
-        "glass-card border-r border-white/10 flex-shrink-0 backdrop-blur-xl transition-all duration-300",
-        isCollapsed ? "w-20" : "w-64"
+    <>
+      {/* Mobile Menu Button - Only visible on mobile */}
+      {isMobile && (
+        <motion.button
+          onClick={toggleSidebar}
+          className="fixed top-4 left-4 z-50 md:hidden w-10 h-10 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white flex items-center justify-center shadow-lg"
+          data-testid="button-mobile-menu"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <Menu className="w-5 h-5" />
+        </motion.button>
       )}
-      data-testid="sidebar-main"
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-    >
+
+      {mobileOverlay}
+
+      <motion.aside 
+        className={cn(
+          "glass-card border-r border-white/10 backdrop-blur-xl transition-all duration-300 z-50",
+          // Desktop styles
+          !isMobile && "flex-shrink-0",
+          !isMobile && (isCollapsed ? "w-20" : "w-64"),
+          // Mobile styles
+          isMobile && "fixed top-0 left-0 h-full w-64",
+          isMobile && (isMobileOpen ? "translate-x-0" : "-translate-x-full")
+        )}
+        data-testid="sidebar-main"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        style={{
+          transform: isMobile 
+            ? (isMobileOpen ? 'translateX(0)' : 'translateX(-100%)')
+            : undefined
+        }}
+      >
       {/* Logo Section */}
       <motion.div className={cn("p-6 relative", isCollapsed && "px-4")} variants={itemVariants}>
         <motion.div 
@@ -139,23 +209,27 @@ export function Sidebar() {
           </AnimatePresence>
         </motion.div>
         
-        {/* Toggle Button */}
+        {/* Toggle Button - Desktop collapse or Mobile close */}
         <motion.button
           onClick={toggleSidebar}
           className={cn(
-            "absolute top-6 -right-3 w-6 h-6 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white flex items-center justify-center shadow-lg transition-all duration-300 hover:scale-110",
-            "z-10 border-2 border-background"
+            "absolute top-6 w-6 h-6 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white flex items-center justify-center shadow-lg transition-all duration-300 hover:scale-110 z-10 border-2 border-background",
+            isMobile ? "right-4" : "-right-3"
           )}
           data-testid="button-sidebar-toggle"
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.95 }}
         >
-          <motion.div
-            animate={{ rotate: isCollapsed ? 0 : 180 }}
-            transition={{ duration: 0.2 }}
-          >
-            <ChevronLeft className="w-3 h-3" />
-          </motion.div>
+          {isMobile ? (
+            <X className="w-3 h-3" />
+          ) : (
+            <motion.div
+              animate={{ rotate: isCollapsed ? 0 : 180 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ChevronLeft className="w-3 h-3" />
+            </motion.div>
+          )}
         </motion.button>
       </motion.div>
 
@@ -169,10 +243,13 @@ export function Sidebar() {
                 <Link
                   href={item.href}
                   data-testid={`link-nav-${item.href.slice(1) || 'home'}`}
+                  onClick={closeMobileSidebar}
                 >
                   <motion.div
                     className={cn(
                       "flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all duration-300 relative overflow-hidden group",
+                      // Increased touch targets for mobile
+                      isMobile && "py-4 min-h-[48px]",
                       isActive
                         ? "glass-card text-white"
                         : "text-muted-foreground hover:text-white hover:glass-card"
@@ -209,7 +286,19 @@ export function Sidebar() {
                       <item.icon className="w-full h-full" />
                     </motion.div>
                     
-                    <span className="relative z-10 font-medium">{t(item.labelKey)}</span>
+                    <AnimatePresence>
+                      {(!isCollapsed || isMobile) && (
+                        <motion.span 
+                          className="relative z-10 font-medium"
+                          initial={{ opacity: 0, width: 0 }}
+                          animate={{ opacity: 1, width: "auto" }}
+                          exit={{ opacity: 0, width: 0 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          {t(item.labelKey)}
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
                     
                     {item.hasIndicator && (
                       <motion.div 
@@ -254,9 +343,12 @@ export function Sidebar() {
           
           {subscriptionItems.map((item, index) => (
             <motion.div key={item.href} variants={itemVariants}>
-              <Link href={item.href} data-testid={`link-sub-${item.href.slice(1)}`}>
+              <Link href={item.href} data-testid={`link-sub-${item.href.slice(1)}`} onClick={closeMobileSidebar}>
                 <motion.div 
-                  className="flex items-center space-x-3 px-4 py-3 rounded-2xl text-muted-foreground hover:text-white hover:glass-card transition-all duration-300 group relative overflow-hidden"
+                  className={cn(
+                    "flex items-center space-x-3 px-4 py-3 rounded-2xl text-muted-foreground hover:text-white hover:glass-card transition-all duration-300 group relative overflow-hidden",
+                    isMobile && "py-4 min-h-[48px]"
+                  )}
                   whileHover={{ 
                     scale: 1.02,
                     x: 4
@@ -270,7 +362,19 @@ export function Sidebar() {
                   />
                   
                   <item.icon className="w-5 h-5 relative z-10" />
-                  <span className="relative z-10 font-medium">{t(item.labelKey)}</span>
+                  <AnimatePresence>
+                    {(!isCollapsed || isMobile) && (
+                      <motion.span 
+                        className="relative z-10 font-medium"
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: "auto" }}
+                        exit={{ opacity: 0, width: 0 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        {t(item.labelKey)}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
                   {item.badge && (
                     <motion.span 
                       className="ml-auto px-2 py-1 text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full font-medium relative z-10"
@@ -298,9 +402,12 @@ export function Sidebar() {
           className="mt-6 pt-6 border-t border-white/10"
           variants={itemVariants}
         >
-          <Link href="/settings" data-testid="link-settings">
+          <Link href="/settings" data-testid="link-settings" onClick={closeMobileSidebar}>
             <motion.div 
-              className="flex items-center space-x-3 px-4 py-3 rounded-2xl text-muted-foreground hover:text-white hover:glass-card transition-all duration-300 group relative overflow-hidden"
+              className={cn(
+                "flex items-center space-x-3 px-4 py-3 rounded-2xl text-muted-foreground hover:text-white hover:glass-card transition-all duration-300 group relative overflow-hidden",
+                isMobile && "py-4 min-h-[48px]"
+              )}
               whileHover={{ 
                 scale: 1.02,
                 x: 4
@@ -314,11 +421,24 @@ export function Sidebar() {
               />
               
               <Settings className="w-5 h-5 relative z-10" />
-              <span className="relative z-10 font-medium">{t("navigation.settings")}</span>
+              <AnimatePresence>
+                {(!isCollapsed || isMobile) && (
+                  <motion.span 
+                    className="relative z-10 font-medium"
+                    initial={{ opacity: 0, width: 0 }}
+                    animate={{ opacity: 1, width: "auto" }}
+                    exit={{ opacity: 0, width: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {t("navigation.settings")}
+                  </motion.span>
+                )}
+              </AnimatePresence>
             </motion.div>
           </Link>
         </motion.div>
       </nav>
-    </motion.aside>
+      </motion.aside>
+    </>
   );
 }

@@ -1,6 +1,11 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLanguage } from "@/hooks/use-language";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { MoreHorizontal } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
 
 const languages = [
   { code: "en", flag: "🇺🇸", name: "English" },
@@ -15,50 +20,122 @@ export function Header() {
   const { language, setLanguage, t } = useLanguage();
 
   const currentLanguage = languages.find(lang => lang.code === language) || languages[0];
+  
+  // Fetch real portfolio data
+  const { data: portfolio } = useQuery<{
+    totalValue: string;
+  }>({
+    queryKey: ['/api/portfolio', 'default'],
+    refetchInterval: 30000,
+  });
+
+  const portfolioValue = portfolio?.totalValue ? 
+    new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(parseFloat(portfolio.totalValue)) : 
+    '$0.00';
 
   return (
-    <header className="bg-card border-b border-border px-6 py-4" data-testid="header-main">
+    <header className="bg-card border-b border-border px-4 md:px-6 py-3 md:py-4" data-testid="header-main">
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <h2 className="text-2xl font-semibold" data-testid="text-page-title">{t("dashboard.title")}</h2>
-          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" data-testid="indicator-live-data" />
-            <span>{t("dashboard.liveData")}</span>
+        {/* Left section - Title and status */}
+        <div className="flex items-center space-x-2 md:space-x-4 flex-1 min-w-0">
+          {/* Add left padding on mobile to account for menu button */}
+          <div className="ml-12 md:ml-0">
+            <h2 className="text-lg md:text-2xl font-semibold truncate" data-testid="text-page-title">
+              {t("dashboard.title")}
+            </h2>
+            <div className="flex items-center space-x-2 text-xs md:text-sm text-muted-foreground">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" data-testid="indicator-live-data" />
+              <span className="hidden xs:inline">{t("dashboard.liveData")}</span>
+              <span className="xs:hidden">Live</span>
+            </div>
           </div>
         </div>
         
-        <div className="flex items-center space-x-4">
-          {/* Language Switcher */}
-          <Select value={language} onValueChange={setLanguage} data-testid="select-language">
-            <SelectTrigger className="w-36">
-              <SelectValue>
-                <span className="flex items-center space-x-2">
-                  <span>{currentLanguage.flag}</span>
-                  <span>{currentLanguage.name}</span>
-                </span>
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {languages.map((lang) => (
-                <SelectItem key={lang.code} value={lang.code} data-testid={`option-lang-${lang.code}`}>
-                  <span className="flex items-center space-x-2">
-                    <span>{lang.flag}</span>
-                    <span>{lang.name}</span>
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          {/* Portfolio Value */}
-          <div className="text-right">
+        {/* Right section - Controls */}
+        <div className="flex items-center space-x-2 md:space-x-4">
+          {/* Portfolio Value - Desktop */}
+          <div className="hidden md:block text-right">
             <p className="text-sm text-muted-foreground">{t("portfolio.totalValue")}</p>
-            <p className="text-lg font-semibold price-up" data-testid="text-portfolio-value">$12,847.32</p>
+            <p className="text-lg font-semibold price-up" data-testid="text-portfolio-value">
+              {portfolioValue}
+            </p>
+          </div>
+          
+          {/* Portfolio Value - Mobile (compact) */}
+          <div className="md:hidden text-right">
+            <p className="text-sm font-semibold price-up" data-testid="text-portfolio-value-mobile">
+              {portfolioValue}
+            </p>
+          </div>
+          
+          {/* Language Switcher - Desktop */}
+          <div className="hidden md:block">
+            <Select value={language} onValueChange={setLanguage} data-testid="select-language">
+              <SelectTrigger className="w-36">
+                <SelectValue>
+                  <span className="flex items-center space-x-2">
+                    <span>{currentLanguage.flag}</span>
+                    <span>{currentLanguage.name}</span>
+                  </span>
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {languages.map((lang) => (
+                  <SelectItem key={lang.code} value={lang.code} data-testid={`option-lang-${lang.code}`}>
+                    <span className="flex items-center space-x-2">
+                      <span>{lang.flag}</span>
+                      <span>{lang.name}</span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Mobile Menu - Language and other options */}
+          <div className="md:hidden">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="w-10 h-10 p-0" data-testid="button-mobile-menu">
+                  <MoreHorizontal className="w-4 h-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-48 p-3" align="end">
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm font-medium mb-2">Language</p>
+                    <Select value={language} onValueChange={setLanguage}>
+                      <SelectTrigger className="w-full h-9">
+                        <SelectValue>
+                          <span className="flex items-center space-x-2 text-sm">
+                            <span>{currentLanguage.flag}</span>
+                            <span>{currentLanguage.name}</span>
+                          </span>
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {languages.map((lang) => (
+                          <SelectItem key={lang.code} value={lang.code}>
+                            <span className="flex items-center space-x-2">
+                              <span>{lang.flag}</span>
+                              <span>{lang.name}</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
           
           {/* User Avatar */}
-          <Avatar data-testid="avatar-user">
-            <AvatarFallback className="bg-primary text-primary-foreground">JD</AvatarFallback>
+          <Avatar className="w-8 h-8 md:w-10 md:h-10" data-testid="avatar-user">
+            <AvatarFallback className="bg-primary text-primary-foreground text-sm">JD</AvatarFallback>
           </Avatar>
         </div>
       </div>

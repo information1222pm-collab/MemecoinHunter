@@ -63,19 +63,20 @@ export default function Portfolio() {
   const tradeData = trades || [];
 
   const formatCurrency = (value: string | number) => {
+    const numValue = typeof value === 'string' ? parseFloat(value) || 0 : (value || 0);
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-    }).format(typeof value === 'string' ? parseFloat(value) : value);
+    }).format(numValue);
   };
 
   const formatPercentage = (value: string | number) => {
-    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    const numValue = typeof value === 'string' ? parseFloat(value) || 0 : (value || 0);
     return `${numValue >= 0 ? '+' : ''}${numValue.toFixed(2)}%`;
   };
 
   const getPnLColor = (value: string | number) => {
-    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    const numValue = typeof value === 'string' ? parseFloat(value) || 0 : (value || 0);
     return numValue >= 0 ? 'price-up' : 'price-down';
   };
 
