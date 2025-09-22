@@ -4,7 +4,9 @@ import { riskManager } from './risk-manager';
 import { scanner } from './scanner';
 import { mlAnalyzer } from './ml-analyzer';
 import { patternPerformanceAnalyzer } from './pattern-performance-analyzer';
+import { exchangeService } from './exchange-service';
 import type { Token, Pattern, InsertTrade } from '@shared/schema';
+import type { ExchangeTradingSignal } from './exchange-service';
 
 interface TradingSignal {
   tokenId: string;
@@ -42,7 +44,7 @@ class AutoTrader extends EventEmitter {
     if (this.isActive) return;
     
     this.isActive = true;
-    console.log('🤖 Auto-Trader started - Paper trading mode with ML learning');
+    console.log('🤖 Auto-Trader started - Multi-mode (Paper + Real money trading with exchange integration)');
     
     await this.initializePortfolio();
     
@@ -272,7 +274,16 @@ class AutoTrader extends EventEmitter {
     if (!this.defaultPortfolioId) return;
     
     try {
-      // Handle sell signals differently from buy signals
+      // Check if real money trading is enabled for this portfolio
+      const isRealTradingEnabled = await exchangeService.isRealTradingEnabled(this.defaultPortfolioId);
+      
+      if (isRealTradingEnabled) {
+        // Execute real money trade via exchange service
+        await this.executeRealMoneyTrade(signal, patternId);
+        return;
+      }
+      
+      // Handle sell signals differently from buy signals (paper trading)
       if (signal.type === 'sell') {
         await this.executeSellSignal(signal, patternId);
         return;
@@ -828,6 +839,61 @@ class AutoTrader extends EventEmitter {
     } catch (error) {
       console.error('Error getting detailed stats:', error);
       return null;
+    }
+  }
+
+  private async executeRealMoneyTrade(signal: TradingSignal, patternId?: string): Promise<void> {
+    try {
+      // Get token details
+      const token = await storage.getToken(signal.tokenId);
+      if (!token) {
+        console.error(`❌ Token ${signal.tokenId} not found for real money trade`);
+        return;
+      }
+
+      // Calculate conservative position size ($500 position)
+      const positionSize = 500 / signal.price;
+
+      // Convert to exchange trading signal with all required fields
+      const exchangeSignal: ExchangeTradingSignal = {
+        tokenId: signal.tokenId,
+        symbol: token.symbol,
+        type: signal.type,
+        amount: positionSize,
+        price: signal.price,
+        confidence: signal.confidence,
+        source: signal.source,
+        patternId: patternId,
+        portfolioId: this.defaultPortfolioId!
+      };
+
+      console.log(`💱 🔴 REAL MONEY ${signal.type.toUpperCase()}: ${token.symbol} at $${signal.price} (${signal.confidence}% confidence)`);
+      
+      // Execute through exchange service
+      const exchangeTrade = await exchangeService.executeTradeSignal(exchangeSignal);
+      
+      if (exchangeTrade) {
+        console.log(`✅ Real money trade executed: ${exchangeTrade.id}`);
+        
+        // Update trading stats
+        this.tradingStats.totalTrades++;
+        this.tradingStats.todayTrades++;
+        
+        // Emit trading event for real-time dashboard updates
+        this.emit('tradeExecuted', {
+          exchangeTrade,
+          signal,
+          token,
+          timestamp: new Date().toISOString(),
+          stats: this.getStats(),
+          mode: 'real_money'
+        });
+      } else {
+        console.log(`❌ Real money trade execution failed or skipped`);
+      }
+      
+    } catch (error) {
+      console.error('❌ Real money trade execution failed:', error);
     }
   }
 

@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { storage } from '../storage';
+import { decryptSensitiveData, logSecurityEvent } from '../utils/security';
 import type { 
   ExchangeConfig, InsertExchangeConfig, 
   ExchangeTrade, InsertExchangeTrade,
@@ -93,7 +94,7 @@ class ExchangeService extends EventEmitter {
     await this.performHealthChecks();
   }
 
-  stop() {
+  async stop() {
     if (!this.isActive) return;
     
     this.isActive = false;
@@ -102,9 +103,10 @@ class ExchangeService extends EventEmitter {
     }
     
     // Disconnect from all exchanges
-    this.exchanges.forEach(async (exchange) => {
+    const exchanges = Array.from(this.exchanges.values());
+    for (const exchange of exchanges) {
       await exchange.disconnect();
-    });
+    }
     this.exchanges.clear();
     
     console.log('💱 Exchange Service stopped');
@@ -137,20 +139,50 @@ class ExchangeService extends EventEmitter {
         throw new Error(`API key not found: ${config.apiKeyId}`);
       }
 
+      // SECURITY: Decrypt API keys before use
+      const decryptedApiKey = decryptSensitiveData(apiKey.encryptedApiKey);
+      const decryptedApiSecret = decryptSensitiveData(apiKey.encryptedApiSecret);
+      
+      // AUDIT: Log exchange connection attempt
+      await logSecurityEvent({
+        action: 'exchange_connect_attempt',
+        resource: 'exchange_service',
+        resourceId: config.exchangeName,
+        details: { exchangeName: config.exchangeName, testMode: config.testMode },
+        success: true
+      });
+
       // Create appropriate exchange API instance
       const exchange = this.createExchangeAPI(config.exchangeName);
       
       // Connect to exchange
       const connected = await exchange.connect(
-        apiKey.encryptedApiKey,
-        apiKey.encryptedApiSecret,
+        decryptedApiKey,
+        decryptedApiSecret,
         config.testMode || false
       );
       
       if (connected) {
         this.exchanges.set(config.exchangeName, exchange);
         console.log(`✅ Connected to ${config.exchangeName} (${config.testMode ? 'testnet' : 'live'})`);
+        
+        // AUDIT: Log successful exchange connection  
+        await logSecurityEvent({
+          action: 'exchange_connected',
+          resource: 'exchange_service', 
+          resourceId: config.exchangeName,
+          details: { exchangeName: config.exchangeName, testMode: config.testMode },
+          success: true
+        });
       } else {
+        // AUDIT: Log failed connection
+        await logSecurityEvent({
+          action: 'exchange_connect_failed',
+          resource: 'exchange_service',
+          resourceId: config.exchangeName, 
+          details: { exchangeName: config.exchangeName, error: 'Connection failed' },
+          success: false
+        });
         throw new Error('Connection failed');
       }
     } catch (error) {
@@ -175,10 +207,35 @@ class ExchangeService extends EventEmitter {
   // Main trading execution method - transforms paper trades to real money trades
   async executeTradeSignal(signal: ExchangeTradingSignal): Promise<ExchangeTrade | null> {
     try {
+      // AUDIT: Log incoming trading signal
+      await logSecurityEvent({
+        action: 'trade_signal_received',
+        resource: 'exchange_service',
+        resourceId: signal.tokenId,
+        details: { 
+          symbol: signal.symbol, 
+          type: signal.type, 
+          amount: signal.amount, 
+          price: signal.price,
+          confidence: signal.confidence,
+          source: signal.source 
+        },
+        success: true
+      });
+      
       // Get user's trading configuration
       const tradingConfig = await storage.getTradingConfigByPortfolio(signal.portfolioId);
       if (!tradingConfig || tradingConfig.tradingMode !== 'real' || !tradingConfig.autoTradingEnabled) {
         console.log(`📄 Trade skipped - Portfolio in paper trading mode`);
+        
+        // AUDIT: Log trade skipped
+        await logSecurityEvent({
+          action: 'trade_skipped_paper_mode',
+          resource: 'exchange_service',
+          resourceId: signal.portfolioId,
+          details: { reason: 'Paper trading mode or auto-trading disabled' },
+          success: true
+        });
         return null;
       }
 
@@ -211,6 +268,28 @@ class ExchangeService extends EventEmitter {
         feeCurrency: orderResponse.feeCurrency,
         executionTime: orderResponse.status === 'filled' ? new Date() : undefined,
       });
+
+      // AUDIT: Log successful order placement
+      await logSecurityEvent({
+        action: `real_money_${signal.type}_order_placed`,
+        resource: 'exchange_service',
+        resourceId: exchangeTrade.id,
+        details: {
+          exchangeName: exchange.name,
+          orderId: orderResponse.orderId,
+          symbol: signal.symbol,
+          amount: signal.amount,
+          price: signal.price,
+          status: orderResponse.status,
+          portfolioId: signal.portfolioId
+        },
+        success: true
+      });
+
+      // Start order lifecycle monitoring for non-filled orders
+      if (orderResponse.status !== 'filled') {
+        this.startOrderMonitoring(exchangeTrade.id, exchange, orderResponse.orderId);
+      }
 
       // Emit success event
       this.emit('tradeExecuted', {
@@ -256,7 +335,8 @@ class ExchangeService extends EventEmitter {
   }
 
   private async performHealthChecks() {
-    for (const [name, exchange] of this.exchanges) {
+    const exchanges = Array.from(this.exchanges.entries());
+    for (const [name, exchange] of exchanges) {
       try {
         const isHealthy = await exchange.testConnection();
         await storage.updateExchangeHealth(name, isHealthy ? 'healthy' : 'degraded');
@@ -273,7 +353,8 @@ class ExchangeService extends EventEmitter {
 
   // Balance synchronization for real money accounts
   async syncExchangeBalances(): Promise<void> {
-    for (const [name, exchange] of this.exchanges) {
+    const exchanges = Array.from(this.exchanges.entries());
+    for (const [name, exchange] of exchanges) {
       try {
         const balances = await exchange.getBalances();
         
@@ -337,6 +418,20 @@ class ExchangeService extends EventEmitter {
       status[name] = 'connected';
     });
     return status;
+  }
+
+  // Check if real money trading is enabled and properly configured (CRITICAL FIX)
+  async isRealTradingEnabled(portfolioId: string): Promise<boolean> {
+    try {
+      const config = await storage.getTradingConfigByPortfolio(portfolioId);
+      return config?.tradingMode === 'real' && 
+             config.autoTradingEnabled && 
+             config.realMoneyConfirmed &&
+             this.exchanges.size > 0;
+    } catch (error) {
+      console.error('Error checking real trading status:', error);
+      return false;
+    }
   }
 }
 
@@ -532,5 +627,96 @@ class CoinbaseAPI implements ExchangeAPI {
     return Date.now();
   }
 }
+
+  // Order lifecycle monitoring for real money trades  
+  private orderMonitors = new Map<string, NodeJS.Timeout>();
+
+  private async startOrderMonitoring(exchangeTradeId: string, exchange: ExchangeAPI, orderId: string) {
+    const monitor = async () => {
+      try {
+        const orderStatus = await exchange.getOrderStatus(orderId);
+        
+        // Update exchange trade status
+        await storage.updateExchangeTrade(exchangeTradeId, {
+          status: orderStatus.status,
+          executedPrice: orderStatus.executedPrice?.toString(),
+          executedAmount: orderStatus.executedAmount?.toString(),
+          fees: orderStatus.fees?.toString(),
+          executionTime: orderStatus.status === 'filled' ? new Date() : undefined,
+        });
+
+        // AUDIT: Log order status update
+        await logSecurityEvent({
+          action: 'order_status_updated',
+          resource: 'exchange_service',
+          resourceId: exchangeTradeId,
+          details: {
+            orderId,
+            exchangeName: exchange.name,
+            status: orderStatus.status,
+            executedPrice: orderStatus.executedPrice,
+            executedAmount: orderStatus.executedAmount
+          },
+          success: true
+        });
+
+        // If order completed, stop monitoring and reconcile
+        if (orderStatus.status === 'filled' || orderStatus.status === 'cancelled' || orderStatus.status === 'failed') {
+          this.stopOrderMonitoring(exchangeTradeId);
+          
+          if (orderStatus.status === 'filled') {
+            // TODO: Update portfolio balances and positions
+            await this.reconcileCompletedOrder(exchangeTradeId, orderStatus);
+          }
+        }
+        
+      } catch (error) {
+        console.error(`❌ Order monitoring failed for ${orderId}:`, error);
+        
+        // AUDIT: Log monitoring error
+        await logSecurityEvent({
+          action: 'order_monitoring_error',
+          resource: 'exchange_service',
+          resourceId: exchangeTradeId,
+          details: { orderId, error: error instanceof Error ? error.message : 'Unknown error' },
+          success: false
+        });
+      }
+    };
+
+    // Monitor every 30 seconds
+    const intervalId = setInterval(monitor, 30000);
+    this.orderMonitors.set(exchangeTradeId, intervalId);
+    
+    // Initial check immediately
+    await monitor();
+  }
+
+  private stopOrderMonitoring(exchangeTradeId: string) {
+    const intervalId = this.orderMonitors.get(exchangeTradeId);
+    if (intervalId) {
+      clearInterval(intervalId);
+      this.orderMonitors.delete(exchangeTradeId);
+    }
+  }
+
+  private async reconcileCompletedOrder(exchangeTradeId: string, orderStatus: ExchangeOrderStatus) {
+    try {
+      // TODO: Implement portfolio balance reconciliation
+      // This should update portfolio positions and cash balances based on filled orders
+      console.log(`💰 Order reconciliation needed for ${exchangeTradeId}`);
+      
+      // AUDIT: Log reconciliation event
+      await logSecurityEvent({
+        action: 'order_reconciliation_needed',
+        resource: 'exchange_service', 
+        resourceId: exchangeTradeId,
+        details: { orderStatus },
+        success: true
+      });
+    } catch (error) {
+      console.error(`❌ Order reconciliation failed for ${exchangeTradeId}:`, error);
+    }
+  }
 
 export const exchangeService = new ExchangeService();

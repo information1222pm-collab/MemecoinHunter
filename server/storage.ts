@@ -103,6 +103,7 @@ export interface IStorage {
   updateExchangeHealth(exchangeName: string, status: string): Promise<void>;
   upsertExchangeBalance(balance: any): Promise<any>; // InsertExchangeBalance -> ExchangeBalance
   getAllExchangeBalances(): Promise<any[]>; // ExchangeBalance[]
+  updateExchangeTrade(id: string, updates: any): Promise<any>; // CRITICAL FIX: Missing interface declaration
 }
 
 export class DatabaseStorage implements IStorage {
@@ -534,6 +535,19 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error('Error getting all exchange balances:', error);
       return [];
+    }
+  }
+
+  async updateExchangeTrade(id: string, updates: any): Promise<any> {
+    try {
+      const [updated] = await db.update(exchangeTrades)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(exchangeTrades.id, id))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error('Error updating exchange trade:', error);
+      throw error;
     }
   }
 }

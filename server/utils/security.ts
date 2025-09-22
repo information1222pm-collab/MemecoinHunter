@@ -9,6 +9,7 @@ if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 64) {
   console.error('[CRITICAL] ENCRYPTION_KEY must be set to 64-char hex in all environments');
   process.exit(1);
 }
+const ENCRYPTION_KEY_BUFFER = Buffer.from(ENCRYPTION_KEY, 'hex');
 const ALGORITHM = 'aes-256-gcm';
 
 /**
@@ -16,7 +17,7 @@ const ALGORITHM = 'aes-256-gcm';
  */
 export function encryptSensitiveData(text: string): string {
   const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY, 'hex'), iv);
+  const cipher = crypto.createCipheriv(ALGORITHM, ENCRYPTION_KEY_BUFFER, iv);
   
   let encrypted = cipher.update(text, 'utf8', 'hex');
   encrypted += cipher.final('hex');
@@ -40,7 +41,7 @@ export function decryptSensitiveData(encryptedText: string): string {
   const iv = Buffer.from(ivHex, 'hex');
   const authTag = Buffer.from(authTagHex, 'hex');
   
-  const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY, 'hex'), iv);
+  const decipher = crypto.createDecipheriv(ALGORITHM, ENCRYPTION_KEY_BUFFER, iv);
   decipher.setAuthTag(authTag);
   
   let decrypted = decipher.update(encrypted, 'hex', 'utf8');
@@ -136,3 +137,5 @@ export function verifySensitiveData(data: string, hashedData: string): boolean {
   const verifyHash = crypto.pbkdf2Sync(data, salt, 10000, 64, 'sha512');
   return hash === verifyHash.toString('hex');
 }
+
+// logSecurityEvent is already exported above - no need for duplicate export
