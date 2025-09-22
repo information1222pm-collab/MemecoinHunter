@@ -12,12 +12,23 @@ export default function Terminal() {
   const { t } = useLanguage();
   const { isConnected } = useWebSocket();
   
-  const { data: scannerStatus } = useQuery({
+  const { data: scannerStatus } = useQuery<{
+    isRunning: boolean;
+    scannedTokensCount: number;
+    lastScanTime?: string;
+  }>({
     queryKey: ['/api/scanner/status'],
     refetchInterval: 5000,
   });
 
-  const { data: alerts } = useQuery({
+  const { data: alerts } = useQuery<Array<{
+    id: string;
+    tokenId: string;
+    alertType: string;
+    message: string;
+    confidence?: number;
+    createdAt: string;
+  }>>({
     queryKey: ['/api/alerts'],
     refetchInterval: 30000,
   });
