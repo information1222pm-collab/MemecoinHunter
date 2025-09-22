@@ -58,6 +58,18 @@ interface TopGainer {
   total_volume: number;
 }
 
+interface NewlyLaunchedCoin {
+  id: string;
+  symbol: string;
+  name: string;
+  current_price: number;
+  market_cap: number;
+  total_volume: number;
+  ath_date?: string;
+  genesis_date?: string;
+  price_change_percentage_24h: number;
+}
+
 class PriceFeedService extends EventEmitter {
   private isRunning = false;
   private updateInterval?: NodeJS.Timeout;
@@ -430,11 +442,16 @@ class PriceFeedService extends EventEmitter {
 
   async discoverNewMemecoins(): Promise<void> {
     try {
-      console.log('🔍 Discovering trending memecoins...');
+      console.log('🔍 Discovering trending memecoins and newly launched coins...');
       
       // Fetch trending coins
       const trendingCoins = await this.fetchTrendingCoins();
       const topGainers = await this.fetchTopGainers(30);
+      
+      // NEW: Fetch newly launched coins
+      const newlyLaunched = await this.fetchNewlyLaunchedCoins();
+      const recentlyAdded = await this.fetchRecentlyAddedCoins();
+      const lowCapGems = await this.fetchLowCapGems();
       
       // Process trending coins
       for (const trendingCoin of trendingCoins) {
@@ -448,9 +465,211 @@ class PriceFeedService extends EventEmitter {
         }
       }
       
-      console.log(`🎯 Discovered and processed ${trendingCoins.length + topGainers.length} potential coins`);
+      // NEW: Process newly launched coins (lower thresholds for new launches)
+      for (const newCoin of newlyLaunched) {
+        await this.processNewLaunch(newCoin.id, newCoin.name, newCoin.symbol, newCoin.market_cap);
+      }
+      
+      // NEW: Process recently added coins to CoinGecko
+      for (const recentCoin of recentlyAdded) {
+        await this.processNewLaunch(recentCoin.id, recentCoin.name, recentCoin.symbol, recentCoin.market_cap);
+      }
+      
+      // NEW: Process low cap gems (potential early launches)
+      for (const gem of lowCapGems) {
+        if (gem.price_change_percentage_24h > 50) { // High growth potential
+          await this.processNewLaunch(gem.id, gem.name, gem.symbol, gem.market_cap);
+        }
+      }
+      
+      const totalProcessed = trendingCoins.length + topGainers.length + newlyLaunched.length + recentlyAdded.length + lowCapGems.length;
+      console.log(`🎯 Discovered and processed ${totalProcessed} potential coins (including ${newlyLaunched.length + recentlyAdded.length + lowCapGems.length} newly launched)`);
     } catch (error) {
       console.error('Error in coin discovery:', error);
+    }
+  }
+
+  // NEW: Fetch newly launched coins with recent ATH dates
+  async fetchNewlyLaunchedCoins(): Promise<NewlyLaunchedCoin[]> {
+    await this.respectRateLimit();
+    
+    // Get coins sorted by market cap with recent ATH dates (indicating new launches)
+    const url = `${this.API_BASE}/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h`;
+    
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`CoinGecko API error: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Filter for coins that appear to be recently launched
+      return data
+        .filter((coin: any) => {
+          // Look for signs of new launches: low market cap but high price change
+          const marketCap = coin.market_cap || 0;
+          const priceChange24h = coin.price_change_percentage_24h || 0;
+          
+          return marketCap > 100000 && marketCap < 50000000 && // $100K - $50M range
+                 Math.abs(priceChange24h) > 10; // Significant price movement
+        })
+        .slice(0, 20) // Limit to top 20 candidates
+        .map((coin: any) => ({
+          id: coin.id,
+          symbol: coin.symbol,
+          name: coin.name,
+          current_price: coin.current_price || 0,
+          market_cap: coin.market_cap || 0,
+          total_volume: coin.total_volume || 0,
+          ath_date: coin.ath_date,
+          price_change_percentage_24h: coin.price_change_percentage_24h || 0,
+        }));
+    } catch (error) {
+      console.error('Error fetching newly launched coins:', error);
+      return [];
+    }
+  }
+
+  // NEW: Fetch recently added coins to CoinGecko platform
+  async fetchRecentlyAddedCoins(): Promise<NewlyLaunchedCoin[]> {
+    await this.respectRateLimit();
+    
+    // Get coins with very low market cap rank (indicating recent additions)
+    const url = `${this.API_BASE}/coins/markets?vs_currency=usd&order=gecko_desc&per_page=50&page=1&sparkline=false&price_change_percentage=24h`;
+    
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`CoinGecko API error: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Filter for coins that appear to be recent additions
+      return data
+        .filter((coin: any) => {
+          const marketCap = coin.market_cap || 0;
+          const volume = coin.total_volume || 0;
+          
+          return marketCap > 50000 && marketCap < 10000000 && // $50K - $10M range
+                 volume > 5000; // Some trading activity
+        })
+        .slice(0, 15) // Limit to top 15 candidates
+        .map((coin: any) => ({
+          id: coin.id,
+          symbol: coin.symbol,
+          name: coin.name,
+          current_price: coin.current_price || 0,
+          market_cap: coin.market_cap || 0,
+          total_volume: coin.total_volume || 0,
+          price_change_percentage_24h: coin.price_change_percentage_24h || 0,
+        }));
+    } catch (error) {
+      console.error('Error fetching recently added coins:', error);
+      return [];
+    }
+  }
+
+  // NEW: Fetch low cap gems with high growth potential
+  async fetchLowCapGems(): Promise<NewlyLaunchedCoin[]> {
+    await this.respectRateLimit();
+    
+    // Search for low cap coins with high percentage gains
+    const url = `${this.API_BASE}/coins/markets?vs_currency=usd&order=percent_change_24h_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h`;
+    
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`CoinGecko API error: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Filter for low cap gems with explosive growth
+      return data
+        .filter((coin: any) => {
+          const marketCap = coin.market_cap || 0;
+          const priceChange24h = coin.price_change_percentage_24h || 0;
+          const volume = coin.total_volume || 0;
+          
+          return marketCap > 25000 && marketCap < 5000000 && // $25K - $5M range
+                 priceChange24h > 30 && // 30%+ gain in 24h
+                 volume > 1000; // Some liquidity
+        })
+        .slice(0, 10) // Limit to top 10 gems
+        .map((coin: any) => ({
+          id: coin.id,
+          symbol: coin.symbol,
+          name: coin.name,
+          current_price: coin.current_price || 0,
+          market_cap: coin.market_cap || 0,
+          total_volume: coin.total_volume || 0,
+          price_change_percentage_24h: coin.price_change_percentage_24h || 0,
+        }));
+    } catch (error) {
+      console.error('Error fetching low cap gems:', error);
+      return [];
+    }
+  }
+
+  // NEW: Process newly launched coins with lower thresholds
+  private async processNewLaunch(coinId: string, name: string, symbol: string, marketCap: number): Promise<void> {
+    try {
+      // Check if token already exists
+      const existing = await storage.getTokenBySymbol(symbol.toUpperCase());
+      if (existing) return;
+      
+      // Fetch detailed data for the new coin
+      await this.respectRateLimit();
+      const url = `${this.API_BASE}/coins/${coinId}?localization=false&tickers=false&market_data=true&community_data=true&developer_data=true&sparkline=false`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
+      
+      if (!response.ok) return;
+      
+      const coinData = await response.json();
+      const marketData = coinData.market_data;
+      
+      // Lower thresholds for newly launched coins
+      const coinMarketCap = marketData?.market_cap?.usd || 0;
+      const volume = marketData?.total_volume?.usd || 0;
+      
+      // More lenient criteria for new launches: $25k market cap, $1k volume
+      if (coinMarketCap > 25000 && volume > 1000) {
+        await storage.createToken({
+          symbol: symbol.toUpperCase(),
+          name: name,
+          currentPrice: (marketData?.current_price?.usd || 0).toString(),
+          marketCap: coinMarketCap.toString(),
+          volume24h: volume.toString(),
+          priceChange24h: (marketData?.price_change_percentage_24h || 0).toString(),
+          contractAddress: coinData.contract_address || `coingecko:${coinId}`,
+        });
+        
+        console.log(`🚀 New launch detected: ${symbol.toUpperCase()} (${name}) - ${(coinMarketCap / 1000000).toFixed(3)}M cap`);
+      }
+    } catch (error) {
+      console.error(`Error processing new launch ${symbol}:`, error);
     }
   }
 
