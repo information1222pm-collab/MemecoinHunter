@@ -285,10 +285,32 @@ class AutoTrader extends EventEmitter {
       const tradeValue = 500;
       const availableCash = parseFloat(portfolio.cashBalance || '0');
       
-      // Strict cash balance validation - no negative balance allowed
+      // If insufficient funds, try to rebalance by selling stagnant positions at break-even or above
       if (availableCash < tradeValue) {
         console.log(`💸 Insufficient funds: Available $${availableCash.toFixed(2)}, Need $${tradeValue}`);
-        return;
+        console.log(`🔄 Attempting to rebalance portfolio by selling stagnant positions...`);
+        
+        const freedCapital = await this.rebalancePortfolioForNewOpportunity(signal, tradeValue);
+        if (freedCapital >= tradeValue) {
+          console.log(`✅ Successfully freed $${freedCapital.toFixed(2)} from stagnant positions`);
+          
+          // Re-fetch portfolio to get updated cash balance after rebalancing
+          const updatedPortfolio = await storage.getPortfolio(this.defaultPortfolioId);
+          if (!updatedPortfolio) return;
+          
+          const newAvailableCash = parseFloat(updatedPortfolio.cashBalance || '0');
+          console.log(`💰 Updated cash balance after rebalancing: $${newAvailableCash.toFixed(2)}`);
+          
+          if (newAvailableCash < tradeValue) {
+            console.log(`❌ Still insufficient funds after rebalancing: $${newAvailableCash.toFixed(2)} < $${tradeValue}`);
+            return;
+          }
+          
+          // Continue with the buy after successful rebalancing
+        } else {
+          console.log(`❌ Could not free enough capital ($${freedCapital.toFixed(2)} < $${tradeValue})`);
+          return;
+        }
       }
       
       // Check if we already have a position in this token
@@ -299,7 +321,7 @@ class AutoTrader extends EventEmitter {
       
       if (existingPosition && parseFloat(existingPosition.amount) > 0) {
         console.log(`📋 Position already exists for ${signal.tokenId}, skipping duplicate buy`);
-        return; // Skip if we already have a position
+        return; // Skip if we already have an active position
       }
       
       // Calculate trade amount ($500 per trade)
@@ -320,16 +342,32 @@ class AutoTrader extends EventEmitter {
       // Execute trade
       const trade = await storage.createTrade(tradeData);
       
-      // Create position (first time buying this token)
-      await storage.createPosition({
-        portfolioId: this.defaultPortfolioId,
-        tokenId: signal.tokenId,
-        amount: tradeAmount,
-        avgBuyPrice: signal.price.toString(),
-      });
+      // Create or update position (prevent duplicates)
+      if (existingPosition && parseFloat(existingPosition.amount) <= 0) {
+        // Update existing zero-amount position to prevent duplicates
+        await storage.updatePosition(existingPosition.id, {
+          amount: tradeAmount,
+          avgBuyPrice: signal.price.toString(),
+        });
+        console.log(`📝 Updated existing zero-amount position for ${signal.tokenId}`);
+      } else {
+        // Create new position (first time buying this token)
+        await storage.createPosition({
+          portfolioId: this.defaultPortfolioId,
+          tokenId: signal.tokenId,
+          amount: tradeAmount,
+          avgBuyPrice: signal.price.toString(),
+        });
+      }
       
-      // Update portfolio cash balance atomically
-      const newCashBalance = (availableCash - tradeValue).toString();
+      // Re-fetch current cash balance to ensure accuracy after potential rebalancing
+      const currentPortfolio = await storage.getPortfolio(this.defaultPortfolioId);
+      if (!currentPortfolio) return;
+      
+      const currentCashBalance = parseFloat(currentPortfolio.cashBalance || '0');
+      
+      // Update portfolio cash balance atomically using current balance
+      const newCashBalance = (currentCashBalance - tradeValue).toString();
       await storage.updatePortfolio(this.defaultPortfolioId, {
         cashBalance: newCashBalance,
       });
@@ -538,8 +576,8 @@ class AutoTrader extends EventEmitter {
       const realizedPnL = totalSellValue - totalBuyValue;
       const totalValue = (amount * currentPrice).toString();
       
-      // CRITICAL: Delete position first to prevent concurrent sells (atomic operation)
-      await storage.deletePosition(currentPosition.id);
+      // CRITICAL: Set position amount to 0 to prevent concurrent sells (atomic operation)
+      await storage.updatePosition(currentPosition.id, { amount: '0' });
       
       // Find the original buy trade to get pattern linkage
       const buyTrades = await storage.getTradesByPortfolio(this.defaultPortfolioId);
@@ -627,6 +665,103 @@ class AutoTrader extends EventEmitter {
       // Always remove position from selling set to prevent deadlock
       this.sellingPositions.delete(position.id);
     }
+  }
+
+  /**
+   * Rebalance portfolio by selling stagnant positions at break-even or above
+   * to free up capital for new opportunities
+   */
+  private async rebalancePortfolioForNewOpportunity(newSignal: TradingSignal, targetAmount: number): Promise<number> {
+    if (!this.defaultPortfolioId) return 0;
+    
+    let totalFreedCapital = 0;
+    
+    try {
+      // Get all current positions
+      const positions = await storage.getPositionsByPortfolio(this.defaultPortfolioId);
+      const activePositions = positions.filter(p => parseFloat(p.amount) > 0);
+      
+      if (activePositions.length === 0) {
+        console.log(`📊 No active positions to rebalance`);
+        return 0;
+      }
+      
+      // Evaluate each position for stagnancy and break-even potential
+      const rebalanceCandidates = [];
+      
+      for (const position of activePositions) {
+        const token = await storage.getToken(position.tokenId);
+        if (!token) continue;
+        
+        const currentPrice = parseFloat(token.currentPrice || '0');
+        const avgBuyPrice = parseFloat(position.avgBuyPrice);
+        const amount = parseFloat(position.amount);
+        
+        if (currentPrice <= 0) continue;
+        
+        const profitPercent = ((currentPrice - avgBuyPrice) / avgBuyPrice) * 100;
+        const currentValue = amount * currentPrice;
+        
+        // Consider a position "stagnant" if:
+        // 1. It's at break-even or slightly profitable (0% to 3% gain)
+        // 2. It's been flat for a while (could add time-based logic later)
+        // 3. It's not the same token as our new signal
+        const isStagnant = profitPercent >= 0 && profitPercent <= 3 && position.tokenId !== newSignal.tokenId;
+        const isBreakEvenOrAbove = profitPercent >= 0;
+        
+        if (isStagnant && isBreakEvenOrAbove) {
+          rebalanceCandidates.push({
+            position,
+            token,
+            profitPercent,
+            currentValue,
+            stagnancyScore: 3 - profitPercent // Lower profit = higher stagnancy
+          });
+        }
+      }
+      
+      if (rebalanceCandidates.length === 0) {
+        console.log(`📊 No stagnant break-even positions available for rebalancing`);
+        return 0;
+      }
+      
+      // Sort by stagnancy score (most stagnant first)
+      rebalanceCandidates.sort((a, b) => b.stagnancyScore - a.stagnancyScore);
+      
+      console.log(`🔍 Found ${rebalanceCandidates.length} stagnant positions eligible for rebalancing:`);
+      rebalanceCandidates.forEach(candidate => {
+        console.log(`   • ${candidate.token.symbol}: ${candidate.profitPercent.toFixed(2)}% gain, $${candidate.currentValue.toFixed(2)} value`);
+      });
+      
+      // Sell stagnant positions until we have enough capital
+      for (const candidate of rebalanceCandidates) {
+        if (totalFreedCapital >= targetAmount) break;
+        
+        const { position, token, profitPercent } = candidate;
+        
+        console.log(`🔄 Rebalancing: Selling stagnant ${token.symbol} at ${profitPercent.toFixed(2)}% for new opportunity`);
+        
+        // Calculate expected proceeds before selling
+        const amount = parseFloat(position.amount);
+        const currentPrice = parseFloat(token.currentPrice || '0');
+        const expectedProceeds = amount * currentPrice;
+        
+        // Execute the sell to free up capital
+        await this.executeSell(position, token, 'rebalance', `Portfolio rebalancing: Selling stagnant position (${profitPercent.toFixed(1)}% gain) for new opportunity`);
+        
+        // Track freed capital (actual sell proceeds)
+        totalFreedCapital += expectedProceeds;
+        
+        console.log(`   💰 Freed $${expectedProceeds.toFixed(2)} from ${token.symbol}, Total freed: $${totalFreedCapital.toFixed(2)}`);
+      }
+      
+      console.log(`🎯 Portfolio rebalancing complete: Freed $${totalFreedCapital.toFixed(2)} for new opportunity`);
+      
+    } catch (error) {
+      console.error('Error during portfolio rebalancing:', error);
+    }
+    
+    return totalFreedCapital;
   }
 
   async getDetailedStats() {
