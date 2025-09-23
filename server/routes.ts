@@ -10,6 +10,7 @@ import { priceFeed } from "./services/price-feed";
 import { riskManager } from "./services/risk-manager";
 import { autoTrader } from "./services/auto-trader";
 import { stakeholderReportUpdater } from "./services/stakeholder-report-updater";
+import { positionTracker } from "./services/position-tracker";
 import { insertUserSchema, insertTradeSchema, insertTokenSchema } from "@shared/schema";
 import { z } from "zod";
 import * as bcrypt from "bcrypt";
@@ -267,6 +268,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   riskManager.start();
   stakeholderReportUpdater.startAutoUpdater();
+  
+  // Start position tracker for real-time holdings updates
+  console.log('📊 Starting Position Tracker...');
+  positionTracker.start();
 
   // Set up real-time broadcasts with user scoping (CRITICAL SECURITY FIX)
   scanner.on('tokenScanned', (token) => {
@@ -302,6 +307,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     broadcastMarketData({ type: 'pattern_detected', data: pattern });
   });
 
+  // Position tracker real-time events - SECURE: Send only to portfolio owner
+  positionTracker.on('portfolioUpdated', (portfolioData) => {
+    if (portfolioData?.userId) {
+      broadcastToUser(portfolioData.userId, { type: 'portfolio_updated', data: portfolioData });
+    }
+  });
+
+  positionTracker.on('positionsUpdated', (positionsData) => {
+    // Get the portfolio to find the owner
+    if (positionsData?.portfolioId) {
+      storage.getPortfolio(positionsData.portfolioId).then(portfolio => {
+        if (portfolio?.userId) {
+          broadcastToUser(portfolio.userId, { type: 'positions_updated', data: positionsData });
+        }
+      }).catch(err => console.error('Error getting portfolio for position updates:', err));
+    }
+  });
+
   // Risk management events (CRITICAL SECURITY FIX)
   riskManager.on('stopLossTriggered', (data) => {
     // Risk events are sensitive - broadcast to all for now
@@ -311,6 +334,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   riskManager.on('riskLimitExceeded', (data) => {
     broadcastMarketData({ type: 'risk_limit_exceeded', data });
+  });
+
+  // Enhanced Portfolio Analytics Routes
+  app.get("/api/portfolio/:portfolioId/analytics", requireAuth, async (req, res) => {
+    try {
+      // Check portfolio ownership
+      const portfolio = await storage.getPortfolio(req.params.portfolioId);
+      if (!portfolio) {
+        return res.status(404).json({ message: "Portfolio not found" });
+      }
+      if (portfolio.userId !== (req as any).user.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const analytics = await positionTracker.getPortfolioAnalytics(req.params.portfolioId);
+      if (!analytics) {
+        return res.status(404).json({ message: "Portfolio analytics not found" });
+      }
+      res.json(analytics);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch portfolio analytics", error });
+    }
+  });
+
+  app.get("/api/portfolio/:portfolioId/positions/analytics", requireAuth, async (req, res) => {
+    try {
+      // Check portfolio ownership
+      const portfolio = await storage.getPortfolio(req.params.portfolioId);
+      if (!portfolio) {
+        return res.status(404).json({ message: "Portfolio not found" });
+      }
+      if (portfolio.userId !== (req as any).user.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const analytics = await positionTracker.getPositionAnalytics(req.params.portfolioId);
+      res.json(analytics);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch position analytics", error });
+    }
   });
 
   // API Routes
@@ -496,7 +559,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const positions = await storage.getPositionsByPortfolio(portfolio.id);
-      res.json({ ...portfolio, positions });
+      
+      // Get enhanced analytics from position tracker
+      const portfolioAnalytics = await positionTracker.getPortfolioAnalytics(portfolio.id);
+      const positionAnalytics = await positionTracker.getPositionAnalytics(portfolio.id);
+      
+      // Merge position data with analytics
+      const enhancedPositions = await Promise.all(positions.map(async position => {
+        const analytics = positionAnalytics.find(a => a.positionId === position.id);
+        const token = await storage.getToken(position.tokenId);
+        
+        return {
+          ...position,
+          analytics: analytics || null,
+          token: { 
+            symbol: token?.symbol || analytics?.tokenSymbol || 'Unknown',
+            name: token?.name || `${analytics?.tokenSymbol || 'Unknown'} Token`,
+            currentPrice: token?.currentPrice || '0'
+          }
+        };
+      }));
+      
+      res.json({ 
+        ...portfolio, 
+        positions: enhancedPositions,
+        analytics: portfolioAnalytics
+      });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch portfolio", error });
     }

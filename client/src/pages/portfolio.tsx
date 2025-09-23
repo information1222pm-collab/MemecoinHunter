@@ -6,14 +6,16 @@ import { Badge } from "@/components/ui/badge";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "@/hooks/use-language";
 import { useWebSocket } from "@/hooks/use-websocket";
-import { useEffect } from "react";
-import { TrendingUp, TrendingDown, DollarSign, Percent, Clock, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { useEffect, useState } from "react";
+import { TrendingUp, TrendingDown, DollarSign, Percent, Clock, ArrowUpRight, ArrowDownRight, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PositionAnalytics } from "@/components/portfolio/position-analytics";
 
 export default function Portfolio() {
   const { t } = useLanguage();
   const { isConnected, lastMessage } = useWebSocket();
   const queryClient = useQueryClient();
+  const [showAnalytics, setShowAnalytics] = useState(false);
   
   const { data: portfolio, error: portfolioError } = useQuery<{
     id: string;
@@ -29,12 +31,44 @@ export default function Portfolio() {
       avgBuyPrice: string;
       currentValue: string;
       unrealizedPnL: string;
+      analytics: {
+        positionId: string;
+        tokenSymbol: string;
+        currentValue: string;
+        unrealizedPnL: string;
+        unrealizedPnLPercent: number;
+        costBasis: string;
+        allocation: number;
+        dayChange: number;
+        dayChangeValue: string;
+        holdingPeriod: number;
+      } | null;
       token: {
         symbol: string;
         name: string;
         currentPrice: string;
       };
     }>;
+    analytics?: {
+      portfolioId: string;
+      userId: string;
+      totalValue: string;
+      totalPnL: string;
+      totalPnLPercent: number;
+      dayChange: number;
+      dayChangeValue: string;
+      positionsCount: number;
+      topPerformers: Array<{
+        symbol: string;
+        pnlPercent: number;
+        value: string;
+      }>;
+      riskMetrics: {
+        concentration: number;
+        diversification: number;
+        volatility: number;
+      };
+    };
   }>({
     queryKey: ['/api/portfolio', 'default'],
     retry: false, // Don't retry on 401 errors
@@ -86,12 +120,18 @@ export default function Portfolio() {
         break;
       
       case 'portfolio_update':
+      case 'portfolio_updated':
         // Update portfolio data in real-time
         if (data) {
           queryClient.setQueryData(['/api/portfolio', 'default'], (oldData: any) => 
             oldData ? { ...oldData, ...data } : data
           );
         }
+        break;
+      
+      case 'positions_updated':
+        // Real-time position value updates from position tracker
+        queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default'] });
         break;
       
       case 'price_update':
@@ -210,6 +250,32 @@ export default function Portfolio() {
             </div>
           )}
           
+          {/* Page Header with Controls */}
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold tracking-tight">{t('portfolio.title')}</h1>
+            <div className="flex items-center space-x-4">
+              <Button
+                variant={showAnalytics ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowAnalytics(!showAnalytics)}
+                data-testid="button-toggle-analytics"
+                className="flex items-center space-x-2"
+              >
+                <BarChart3 className="w-4 h-4" />
+                <span>{showAnalytics ? 'Simple View' : 'Analytics View'}</span>
+              </Button>
+              <div className="flex items-center space-x-2">
+                <div className={cn(
+                  "w-2 h-2 rounded-full transition-colors",
+                  isConnected ? "bg-green-500" : "bg-red-500"
+                )} />
+                <span className="text-sm text-muted-foreground">
+                  {isConnected ? t('common.connected') : t('common.disconnected')}
+                </span>
+              </div>
+            </div>
+          </div>
+
           {/* Portfolio Overview */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
             <Card data-testid="card-total-value">
