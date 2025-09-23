@@ -71,6 +71,8 @@ export default function Portfolio() {
     };
   }>({
     queryKey: ['/api/portfolio', 'default'],
+    refetchInterval: 30000, // Refetch every 30 seconds instead of constant requests
+    staleTime: 15000, // Data stays fresh for 15 seconds
     retry: false, // Don't retry on 401 errors
   });
 
@@ -88,6 +90,8 @@ export default function Portfolio() {
     };
   }>>({
     queryKey: ['/api/portfolio', 'default', 'trades'],
+    refetchInterval: 60000, // Refetch every 60 seconds - trades change less frequently
+    staleTime: 30000, // Data stays fresh for 30 seconds
     retry: false, // Don't retry on 401 errors
   });
 

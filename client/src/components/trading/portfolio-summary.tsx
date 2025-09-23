@@ -16,6 +16,9 @@ export function PortfolioSummary() {
   
   const { data: portfolio } = useQuery({
     queryKey: ['/api/portfolio', 'default'],
+    refetchInterval: 30000, // Refetch every 30 seconds to match main portfolio page
+    staleTime: 15000, // Data stays fresh for 15 seconds
+    retry: false, // Don't retry on 401 errors
   });
 
   // Mock data for demonstration
