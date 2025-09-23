@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -16,6 +16,18 @@ import Subscription from "@/pages/subscription";
 import Settings from "@/pages/settings";
 import SignIn from "@/pages/signin";
 import NotFound from "@/pages/not-found";
+import { useEffect } from "react";
+
+function AuthenticatedSignInRedirect() {
+  const [, setLocation] = useLocation();
+  
+  useEffect(() => {
+    // Redirect authenticated users visiting /signin to home page
+    setLocation('/');
+  }, [setLocation]);
+  
+  return null; // Redirect happens immediately
+}
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -49,6 +61,7 @@ function Router() {
       <Route path="/terminal" component={Terminal} />
       <Route path="/subscription" component={Subscription} />
       <Route path="/settings" component={Settings} />
+      <Route path="/signin" component={AuthenticatedSignInRedirect} />
       <Route component={NotFound} />
     </Switch>
   );
