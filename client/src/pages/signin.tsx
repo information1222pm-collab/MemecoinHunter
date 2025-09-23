@@ -131,7 +131,7 @@ export default function SignIn() {
           <div className="flex items-center justify-center mb-4">
             <TrendingUp className="h-10 w-10 text-emerald-400 mr-3" />
             <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-400 to-purple-400 bg-clip-text text-transparent">
-              CryptoHobby
+              Memecoin Hunter
             </h1>
           </div>
           <p className="text-slate-400 text-sm">
