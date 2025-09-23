@@ -404,6 +404,42 @@ export default function Portfolio() {
               </CardContent>
             </Card>
 
+            {/* Analytics View */}
+            {showAnalytics && (
+              <PositionAnalytics
+                positions={portfolioData.positions ? portfolioData.positions
+                  .map(p => ({
+                    symbol: p.token?.symbol || 'Unknown',
+                    currentPrice: Number(p.token?.currentPrice) || 0,
+                    quantity: Number(p.amount) || 0,
+                    value: Number(p.currentValue) || 0,
+                    pnl: Number(p.unrealizedPnL) || 0,
+                    pnlPercent: Number(p.analytics?.unrealizedPnLPercent) || 0,
+                    allocationPercent: Number(p.analytics?.allocation) || 0
+                  }))
+                  .filter(p => p.symbol !== 'Unknown') : []}
+                portfolioAnalytics={portfolioData.analytics ? {
+                  totalValue: Number(portfolioData.analytics.totalValue) || 0,
+                  totalPnL: Number(portfolioData.analytics.totalPnL) || 0,
+                  totalPnLPercent: Number(portfolioData.analytics.totalPnLPercent) || 0,
+                  dayChange: Number(portfolioData.analytics.dayChange) || 0,
+                  positionsCount: Number(portfolioData.analytics.positionsCount) || 0,
+                  topPerformers: portfolioData.analytics.topPerformers?.map(p => ({
+                    symbol: p.symbol || 'Unknown',
+                    value: Number(p.value) || 0,
+                    pnlPercent: Number(p.pnlPercent) || 0
+                  })) || [],
+                  riskMetrics: {
+                    concentration: Number(portfolioData.analytics.riskMetrics?.concentration) || 0,
+                    diversification: Number(portfolioData.analytics.riskMetrics?.diversification) || 0,
+                    volatility: Number(portfolioData.analytics.riskMetrics?.volatility) || 0
+                  }
+                } : null}
+                isLoading={!portfolio && !portfolioError}
+                error={portfolioError}
+              />
+            )}
+
             {/* Recent Trades */}
             <Card data-testid="card-recent-trades">
               <CardHeader>
