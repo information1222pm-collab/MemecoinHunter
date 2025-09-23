@@ -206,33 +206,36 @@ export default function Analytics() {
   };
 
   // Calculate top performers from real positions (convert PnL to percentage return)
-  const topPerformers = portfolio?.positions
+  const topPerformers = currentAutoTraderStats?.positions
     ?.map(position => {
-      const currentValue = parseFloat(position.currentValue || '0');
-      const unrealizedPnL = parseFloat(position.unrealizedPnL || '0');
-      const costBasis = currentValue - unrealizedPnL;
-      const returnPercent = costBasis ? (unrealizedPnL / costBasis) * 100 : 0;
+      const positionValue = position.positionValue || 0;
+      const profitLoss = position.profitLoss || 0;
+      const costBasis = positionValue - profitLoss;
+      const returnPercent = costBasis ? (profitLoss / costBasis) * 100 : 0;
       
       return {
-        symbol: position.token?.symbol || 'Unknown',
+        symbol: position.symbol || 'Unknown',
         return: returnPercent, // Now correctly as percentage
-        allocation: (currentValue / parseFloat(portfolio?.totalValue || '1')) * 100,
+        allocation: (positionValue / (currentAutoTraderStats?.totalPositionValue || 1)) * 100,
       };
     })
     .sort((a, b) => b.return - a.return)
-    .slice(0, 5) || [
-      { symbol: "BTC", return: 12.5, allocation: 42.3 },
-      { symbol: "ETH", return: 8.7, allocation: 28.9 },
-      { symbol: "SOL", return: 15.2, allocation: 15.1 },
-      { symbol: "DOGE", return: -3.2, allocation: 8.4 },
-      { symbol: "PEPE", return: 22.8, allocation: 5.3 }
-    ];
+    .slice(0, 5) || [];
+
+  // Calculate correlation risk based on portfolio diversification
+  const positionCount = currentAutoTraderStats?.positions?.length || 0;
+  const correlationRisk = positionCount >= 8 ? "Low" : positionCount >= 4 ? "Medium" : "High";
+  
+  // Calculate liquidity risk based on position values (as proxy for market liquidity)
+  const totalPositionValue = currentAutoTraderStats?.totalPositionValue || 0;
+  const avgPositionSize = positionCount ? totalPositionValue / positionCount : 0;
+  const liquidityRisk = avgPositionSize > 50000 ? "High" : avgPositionSize > 10000 ? "Medium" : "Low";
 
   const riskMetrics = {
     portfolioRisk: currentRiskAnalysis?.portfolioRisk || "Unknown",
     concentrationRisk: currentRiskAnalysis?.concentrationRisk || "Unknown",
-    correlationRisk: "Low", // Placeholder - needs additional endpoint
-    liquidityRisk: "Medium", // Placeholder - needs additional endpoint
+    correlationRisk,
+    liquidityRisk,
   };
 
   const formatPercentage = (value: number) => {
@@ -256,6 +259,76 @@ export default function Analytics() {
       default: return 'outline';
     }
   };
+
+  // Generate dynamic AI insights based on actual portfolio data
+  const generateAIInsights = () => {
+    const insights = [];
+    
+    // Diversification insight
+    const largestPosition = topPerformers[0];
+    if (largestPosition && largestPosition.allocation > 25) {
+      insights.push({
+        type: "diversification",
+        icon: "primary",
+        title: "Portfolio Diversification",
+        message: `Consider reducing ${largestPosition.symbol} allocation (${largestPosition.allocation.toFixed(1)}%) to improve diversification. Recommended max allocation: 25%.`
+      });
+    } else if (positionCount < 5) {
+      insights.push({
+        type: "diversification",
+        icon: "primary",
+        title: "Portfolio Diversification",
+        message: `Portfolio has ${positionCount} positions. Consider adding more positions to improve diversification and reduce risk.`
+      });
+    }
+    
+    // Rebalancing insight
+    const worstPerformer = topPerformers.find(p => p.return < -5);
+    const bestPerformer = topPerformers.find(p => p.return > 15);
+    if (worstPerformer) {
+      insights.push({
+        type: "rebalancing",
+        icon: "accent",
+        title: "Rebalancing Opportunity",
+        message: `${worstPerformer.symbol} showing ${worstPerformer.return.toFixed(1)}% loss. Consider dollar-cost averaging if fundamentals remain strong, or reducing position size.`
+      });
+    } else if (bestPerformer) {
+      insights.push({
+        type: "rebalancing",
+        icon: "accent",
+        title: "Profit Taking Opportunity",
+        message: `${bestPerformer.symbol} up ${bestPerformer.return.toFixed(1)}%. Consider taking some profits to lock in gains and reduce position risk.`
+      });
+    }
+    
+    // Performance insight
+    if (performanceMetrics.totalReturn > 10) {
+      insights.push({
+        type: "performance",
+        icon: "green-400",
+        title: "Strong Performance",
+        message: `Portfolio up ${performanceMetrics.totalReturn.toFixed(1)}% overall. Current strategy showing effectiveness with ${performanceMetrics.winRate.toFixed(0)}% win rate.`
+      });
+    } else if (performanceMetrics.totalReturn < -5) {
+      insights.push({
+        type: "performance",
+        icon: "red-400",
+        title: "Performance Review",
+        message: `Portfolio down ${Math.abs(performanceMetrics.totalReturn).toFixed(1)}%. Consider reviewing strategy and risk management approach.`
+      });
+    } else {
+      insights.push({
+        type: "performance",
+        icon: "blue-400",
+        title: "Steady Performance",
+        message: `Portfolio showing steady performance with ${performanceMetrics.winRate.toFixed(0)}% win rate. Focus on consistent execution of your strategy.`
+      });
+    }
+    
+    return insights.slice(0, 3); // Limit to 3 insights
+  };
+
+  const aiInsights = generateAIInsights();
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -515,35 +588,46 @@ export default function Analytics() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="p-4 bg-primary/10 border border-primary/20 rounded-lg" data-testid="insight-diversification">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span className="text-sm font-medium text-primary">Portfolio Diversification</span>
+                {aiInsights.map((insight, index) => (
+                  <div 
+                    key={index}
+                    className={`p-4 rounded-lg ${
+                      insight.icon === 'primary' ? 'bg-primary/10 border border-primary/20' :
+                      insight.icon === 'accent' ? 'bg-accent/10 border border-accent/20' :
+                      insight.icon === 'green-400' ? 'bg-green-400/10 border border-green-400/20' :
+                      insight.icon === 'red-400' ? 'bg-red-400/10 border border-red-400/20' :
+                      'bg-blue-400/10 border border-blue-400/20'
+                    }`}
+                    data-testid={`insight-${insight.type}`}
+                  >
+                    <div className="flex items-center space-x-2 mb-2">
+                      <div className={`w-2 h-2 rounded-full ${
+                        insight.icon === 'primary' ? 'bg-primary' :
+                        insight.icon === 'accent' ? 'bg-accent' :
+                        insight.icon === 'green-400' ? 'bg-green-400' :
+                        insight.icon === 'red-400' ? 'bg-red-400' :
+                        'bg-blue-400'
+                      }`}></div>
+                      <span className={`text-sm font-medium ${
+                        insight.icon === 'primary' ? 'text-primary' :
+                        insight.icon === 'accent' ? 'text-accent' :
+                        insight.icon === 'green-400' ? 'text-green-400' :
+                        insight.icon === 'red-400' ? 'text-red-400' :
+                        'text-blue-400'
+                      }`}>
+                        {insight.title}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {insight.message}
+                    </p>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    Consider reducing PEPE allocation (32.9%) to improve diversification. Recommended max allocation: 25%.
-                  </p>
-                </div>
-                
-                <div className="p-4 bg-accent/10 border border-accent/20 rounded-lg" data-testid="insight-rebalancing">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <div className="w-2 h-2 bg-accent rounded-full"></div>
-                    <span className="text-sm font-medium text-accent">Rebalancing Opportunity</span>
+                ))}
+                {aiInsights.length === 0 && (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground">No insights available. Start trading to receive AI-powered recommendations.</p>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    WIF showing oversold conditions. Consider dollar-cost averaging into position over next 7 days.
-                  </p>
-                </div>
-                
-                <div className="p-4 bg-green-400/10 border border-green-400/20 rounded-lg" data-testid="insight-performance">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                    <span className="text-sm font-medium text-green-400">Strong Performance</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Portfolio outperforming memecoin index by 12.3% this month. Current strategy showing effectiveness.
-                  </p>
-                </div>
+                )}
               </div>
             </CardContent>
           </Card>

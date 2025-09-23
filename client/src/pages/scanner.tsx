@@ -27,7 +27,15 @@ export default function Scanner() {
     refetchInterval: 30000,
   });
 
-  const { data: tokens } = useQuery({
+  const { data: tokens } = useQuery<Array<{
+    id: string;
+    symbol: string;
+    name: string;
+    currentPrice: string;
+    priceChange24h: string;
+    volume24h: string;
+    marketCap: string;
+  }>>({
     queryKey: ['/api/tokens'],
     refetchInterval: 30000,
   });
@@ -67,6 +75,16 @@ export default function Scanner() {
     queryClient.invalidateQueries({ queryKey: ['/api/scanner/status'] });
     queryClient.invalidateQueries({ queryKey: ['/api/tokens'] });
     toast({ title: "Refreshed", description: "Scanner data refreshed" });
+  };
+
+  // Calculate scanner analytics from actual token data
+  const scannerAnalytics = {
+    totalVolume: tokens ? tokens.reduce((sum, token) => sum + parseFloat(token.volume24h || '0'), 0) : 0,
+    activeTokens: tokens?.length || 0, // Show actual tokens being tracked
+    bullishSignals: tokens ? tokens.filter(token => parseFloat(token.priceChange24h || '0') > 5).length : 0,
+    patternsDetected: tokens ? tokens.filter(token => Math.abs(parseFloat(token.priceChange24h || '0')) > 10).length : 0, // Significant movements only
+    avgVolumeChange: tokens && tokens.length > 0 ? tokens.reduce((sum, token) => sum + Math.abs(parseFloat(token.priceChange24h || '0')), 0) / tokens.length : 0,
+    majorMovements: tokens ? tokens.filter(token => Math.abs(parseFloat(token.priceChange24h || '0')) > 15).length : 0 // Very significant price movements
   };
 
   return (
@@ -266,9 +284,15 @@ export default function Scanner() {
             <Card data-testid="card-scan-analytics-volume">
               <CardContent className="p-6">
                 <div className="text-center">
-                  <div className="text-2xl font-bold">2.4B</div>
+                  <div className="text-2xl font-bold">
+                    {scannerAnalytics.totalVolume > 1000000000 ? 
+                      `${(scannerAnalytics.totalVolume / 1000000000).toFixed(1)}B` :
+                      `${(scannerAnalytics.totalVolume / 1000000).toFixed(1)}M`}
+                  </div>
                   <div className="text-sm text-muted-foreground">Total Volume Scanned</div>
-                  <div className="text-sm text-price-up mt-1">+15% vs yesterday</div>
+                  <div className="text-sm text-blue-400 mt-1">
+                    Avg {scannerAnalytics.avgVolumeChange.toFixed(1)}% movement
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -276,9 +300,11 @@ export default function Scanner() {
             <Card data-testid="card-scan-analytics-new">
               <CardContent className="p-6">
                 <div className="text-center">
-                  <div className="text-2xl font-bold">47</div>
-                  <div className="text-sm text-muted-foreground">New Tokens Today</div>
-                  <div className="text-sm text-accent mt-1">3 with high volume</div>
+                  <div className="text-2xl font-bold">{scannerAnalytics.activeTokens}</div>
+                  <div className="text-sm text-muted-foreground">Active Tokens</div>
+                  <div className="text-sm text-accent mt-1">
+                    {scannerAnalytics.majorMovements} major movements
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -286,9 +312,9 @@ export default function Scanner() {
             <Card data-testid="card-scan-analytics-signals">
               <CardContent className="p-6">
                 <div className="text-center">
-                  <div className="text-2xl font-bold">23</div>
+                  <div className="text-2xl font-bold">{scannerAnalytics.bullishSignals}</div>
                   <div className="text-sm text-muted-foreground">Bullish Signals</div>
-                  <div className="text-sm text-price-up mt-1">87% accuracy</div>
+                  <div className="text-sm text-price-up mt-1">{((scannerAnalytics.bullishSignals / Math.max(1, scannerAnalytics.activeTokens)) * 100).toFixed(0)}% bullish</div>
                 </div>
               </CardContent>
             </Card>
@@ -296,9 +322,11 @@ export default function Scanner() {
             <Card data-testid="card-scan-analytics-patterns">
               <CardContent className="p-6">
                 <div className="text-center">
-                  <div className="text-2xl font-bold">156</div>
+                  <div className="text-2xl font-bold">{scannerAnalytics.patternsDetected}</div>
                   <div className="text-sm text-muted-foreground">Patterns Detected</div>
-                  <div className="text-sm text-primary mt-1">73% confidence avg</div>
+                  <div className="text-sm text-primary mt-1">
+                    {Math.round((scannerAnalytics.bullishSignals / Math.max(1, scannerAnalytics.patternsDetected)) * 100)}% confidence avg
+                  </div>
                 </div>
               </CardContent>
             </Card>

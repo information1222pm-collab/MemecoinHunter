@@ -292,7 +292,13 @@ export default function Portfolio() {
                   </div>
                 </div>
                 <div className="mt-4 flex items-center text-sm">
-                  <span className="text-price-up">↗ +5.2% all time</span>
+                  <span className={portfolioData.analytics?.totalPnLPercent !== undefined ? 
+                    (portfolioData.analytics.totalPnLPercent >= 0 ? "text-price-up" : "text-price-down") : 
+                    "text-muted-foreground"}>
+                    {portfolioData.analytics?.totalPnLPercent !== undefined ? 
+                      `${portfolioData.analytics.totalPnLPercent >= 0 ? '↗ +' : '↘ '}${Math.abs(portfolioData.analytics.totalPnLPercent).toFixed(1)}% all time` :
+                      "Portfolio return tracking"}
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -311,7 +317,13 @@ export default function Portfolio() {
                   </div>
                 </div>
                 <div className="mt-4 flex items-center text-sm">
-                  <span className="text-price-up">+2.84% today</span>
+                  <span className={portfolioData.analytics?.dayChange !== undefined ? 
+                    (portfolioData.analytics.dayChange >= 0 ? "text-price-up" : "text-price-down") : 
+                    "text-muted-foreground"}>
+                    {portfolioData.analytics?.dayChange !== undefined ? 
+                      `${portfolioData.analytics.dayChange >= 0 ? '+' : ''}${portfolioData.analytics.dayChange.toFixed(2)}% today` :
+                      "Daily change tracking"}
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -349,7 +361,9 @@ export default function Portfolio() {
                   </div>
                 </div>
                 <div className="mt-4 flex items-center text-sm">
-                  <span className="text-price-up">+1.2% this week</span>
+                  <span className="text-muted-foreground">
+                    Trading performance since inception
+                  </span>
                 </div>
               </CardContent>
             </Card>
