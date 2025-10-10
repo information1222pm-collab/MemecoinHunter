@@ -18,12 +18,23 @@ interface TradingSignal {
   patternId?: string; // Link to originating pattern
 }
 
+interface PortfolioState {
+  portfolioId: string;
+  sellOnlyMode: boolean;
+  sellingPositions: Set<string>;
+  tradingStats: {
+    totalTrades: number;
+    successfulTrades: number;
+    todayTrades: number;
+    totalValue: number;
+  };
+}
+
 class AutoTrader extends EventEmitter {
   private isActive = false;
-  private defaultPortfolioId: string | null = null;
+  private enabledPortfolios = new Map<string, PortfolioState>(); // Track multiple portfolios
   private monitoringInterval?: NodeJS.Timeout;
-  private sellOnlyMode = false; // Track when portfolio can no longer buy
-  private sellingPositions = new Set<string>(); // Track positions currently being sold to prevent concurrent sells
+  private syncInterval?: NodeJS.Timeout;
   
   private strategy = {
     minConfidence: 75, // Dynamic minimum confidence
@@ -33,31 +44,20 @@ class AutoTrader extends EventEmitter {
     sellOnlyTakeProfit: 5, // More aggressive take profit when in sell-only mode
   };
 
-  private tradingStats = {
-    totalTrades: 0,
-    successfulTrades: 0,
-    todayTrades: 0,
-    totalValue: 10000, // Starting with $10k
-  };
-
   async start() {
     if (this.isActive) return;
     
     this.isActive = true;
-    console.log('🤖 Auto-Trader started - Multi-mode (Paper + Real money trading with exchange integration)');
+    console.log('🤖 Auto-Trader started - Multi-portfolio support enabled');
     
     try {
-      // Step 1: Initialize portfolio with timeout protection
-      console.log('📊 Step 1/3: Initializing portfolio...');
-      await this.withTimeout(
-        this.initializePortfolio(),
-        10000,
-        'Portfolio initialization timed out after 10s'
-      );
-      console.log(`✅ Portfolio initialized successfully (ID: ${this.defaultPortfolioId})`);
+      // Step 1: Load all portfolios with auto-trading enabled
+      console.log('📊 Step 1/4: Loading enabled portfolios...');
+      await this.syncEnabledPortfolios();
+      console.log(`✅ Loaded ${this.enabledPortfolios.size} portfolios with auto-trading enabled`);
       
       // Step 2: Start pattern performance analyzer with timeout protection
-      console.log('🧠 Step 2/3: Starting pattern performance analyzer...');
+      console.log('🧠 Step 2/4: Starting pattern performance analyzer...');
       await this.withTimeout(
         patternPerformanceAnalyzer.start(),
         15000,
@@ -66,7 +66,7 @@ class AutoTrader extends EventEmitter {
       console.log('✅ Pattern performance analyzer started successfully');
       
       // Step 3: Set up event listeners
-      console.log('🔌 Step 3/3: Setting up event listeners...');
+      console.log('🔌 Step 3/4: Setting up event listeners...');
       
       // Listen to ML pattern events
       mlAnalyzer.on('patternDetected', (pattern) => {
@@ -91,21 +91,28 @@ class AutoTrader extends EventEmitter {
       console.error('⚠️ Continuing with reduced functionality...');
     }
     
-    // CRITICAL: Always set up monitoring interval, even if other steps failed
-    // This ensures positions are monitored for stop-loss/take-profit
-    console.log('⏰ Setting up position monitoring interval (30s)...');
+    // Step 4: Set up monitoring and sync intervals
+    console.log('⏰ Step 4/4: Setting up monitoring intervals...');
+    
+    // Monitor positions every 30s
     this.monitoringInterval = setInterval(() => {
-      this.monitorPositions();
+      this.monitorAllPortfolios();
     }, 30000);
-    console.log('✅ Position monitoring interval active');
+    
+    // Sync enabled portfolios every 60s to detect changes
+    this.syncInterval = setInterval(() => {
+      this.syncEnabledPortfolios();
+    }, 60000);
+    
+    console.log('✅ Monitoring intervals active');
     
     // Run initial position check immediately
     console.log('🔍 Running initial position check...');
-    this.monitorPositions().catch(error => {
+    this.monitorAllPortfolios().catch(error => {
       console.error('Error in initial position check:', error);
     });
     
-    console.log('🤖 Auto-Trader initialization complete - listening for ML patterns');
+    console.log('🤖 Auto-Trader initialization complete - monitoring portfolios');
   }
   
   private async withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
@@ -124,42 +131,89 @@ class AutoTrader extends EventEmitter {
     if (this.monitoringInterval) {
       clearInterval(this.monitoringInterval);
     }
+    if (this.syncInterval) {
+      clearInterval(this.syncInterval);
+    }
     
     mlAnalyzer.removeAllListeners('patternDetected');
     scanner.removeAllListeners('alertTriggered');
     
+    this.enabledPortfolios.clear();
+    
     console.log('🛑 Auto-Trader stopped');
   }
 
-  private async initializePortfolio() {
+  async enableAutoTrading(portfolioId: string) {
     try {
-      const portfolios = await storage.getAllPortfolios();
-      let autoPortfolio = portfolios.find(p => p.userId === 'auto-trader');
+      // Update database
+      await storage.updatePortfolio(portfolioId, { autoTradingEnabled: true });
       
-      if (!autoPortfolio) {
-        autoPortfolio = await storage.createPortfolio({
-          userId: 'auto-trader',
-          totalValue: '10000',
-          startingCapital: '10000',
-          cashBalance: '10000',
-          realizedPnL: '0',
-          dailyPnL: '0',
-          totalPnL: '0',
+      // Add to tracking if not already present
+      if (!this.enabledPortfolios.has(portfolioId)) {
+        this.enabledPortfolios.set(portfolioId, {
+          portfolioId,
+          sellOnlyMode: false,
+          sellingPositions: new Set(),
+          tradingStats: {
+            totalTrades: 0,
+            successfulTrades: 0,
+            todayTrades: 0,
+            totalValue: 10000,
+          },
         });
-        console.log('📊 Created auto-trading portfolio with $10,000 capital (Cash: $10,000)');
-      } else if (!autoPortfolio.startingCapital || !autoPortfolio.cashBalance) {
-        // Update existing portfolio to have proper cash tracking fields
-        await storage.updatePortfolio(autoPortfolio.id, {
-          startingCapital: autoPortfolio.startingCapital || '10000',
-          cashBalance: autoPortfolio.cashBalance || '10000',
-          realizedPnL: autoPortfolio.realizedPnL || '0',
-        });
-        console.log('📊 Updated auto-trading portfolio with cash tracking fields');
+        console.log(`✅ Auto-trading enabled for portfolio ${portfolioId}`);
+      }
+    } catch (error) {
+      console.error(`Error enabling auto-trading for portfolio ${portfolioId}:`, error);
+    }
+  }
+
+  async disableAutoTrading(portfolioId: string) {
+    try {
+      // Update database
+      await storage.updatePortfolio(portfolioId, { autoTradingEnabled: false });
+      
+      // Remove from tracking
+      this.enabledPortfolios.delete(portfolioId);
+      console.log(`🛑 Auto-trading disabled for portfolio ${portfolioId}`);
+    } catch (error) {
+      console.error(`Error disabling auto-trading for portfolio ${portfolioId}:`, error);
+    }
+  }
+
+  private async syncEnabledPortfolios() {
+    try {
+      const allPortfolios = await storage.getAllPortfolios();
+      const enabledInDb = allPortfolios.filter(p => p.autoTradingEnabled);
+      
+      // Remove portfolios that are no longer enabled
+      const portfolioIds = Array.from(this.enabledPortfolios.keys());
+      for (const portfolioId of portfolioIds) {
+        if (!enabledInDb.find(p => p.id === portfolioId)) {
+          this.enabledPortfolios.delete(portfolioId);
+          console.log(`🔄 Removed portfolio ${portfolioId} from auto-trading (disabled in DB)`);
+        }
       }
       
-      this.defaultPortfolioId = autoPortfolio.id;
+      // Add new portfolios that are enabled
+      for (const portfolio of enabledInDb) {
+        if (!this.enabledPortfolios.has(portfolio.id)) {
+          this.enabledPortfolios.set(portfolio.id, {
+            portfolioId: portfolio.id,
+            sellOnlyMode: false,
+            sellingPositions: new Set(),
+            tradingStats: {
+              totalTrades: 0,
+              successfulTrades: 0,
+              todayTrades: 0,
+              totalValue: parseFloat(portfolio.totalValue || '10000'),
+            },
+          });
+          console.log(`🔄 Added portfolio ${portfolio.id} to auto-trading`);
+        }
+      }
     } catch (error) {
-      console.error('Error initializing auto-trading portfolio:', error);
+      console.error('Error syncing enabled portfolios:', error);
     }
   }
 
@@ -171,8 +225,8 @@ class AutoTrader extends EventEmitter {
       return;
     }
     
-    if (!this.defaultPortfolioId) {
-      console.log(`🔍 AUTO-TRADER: No portfolio ID - skipping pattern ${pattern.patternType}`);
+    if (this.enabledPortfolios.size === 0) {
+      console.log(`🔍 AUTO-TRADER: No enabled portfolios - skipping pattern ${pattern.patternType}`);
       return;
     }
     
@@ -201,10 +255,14 @@ class AutoTrader extends EventEmitter {
       const token = await storage.getToken(pattern.tokenId);
       if (!token) return;
       
-      const signal = await this.evaluatePattern(pattern, token, adjustedConfidence);
-      if (signal) {
-        signal.patternId = pattern.id; // Link signal to pattern
-        await this.executeTradeSignal(signal, pattern.id);
+      // Execute on ALL enabled portfolios
+      const portfolioIds = Array.from(this.enabledPortfolios.keys());
+      for (const portfolioId of portfolioIds) {
+        const signal = await this.evaluatePattern(pattern, token, adjustedConfidence, portfolioId);
+        if (signal) {
+          signal.patternId = pattern.id; // Link signal to pattern
+          await this.executeTradeSignal(signal, pattern.id, portfolioId);
+        }
       }
     } catch (error) {
       console.error('Error handling ML pattern:', error);
@@ -212,7 +270,7 @@ class AutoTrader extends EventEmitter {
   }
 
   private async handleScannerAlert(alert: any) {
-    if (!this.isActive || !this.defaultPortfolioId) return;
+    if (!this.isActive || this.enabledPortfolios.size === 0) return;
     
     try {
       if (alert.confidence < this.strategy.minConfidence) return;
@@ -222,9 +280,13 @@ class AutoTrader extends EventEmitter {
       
       // Only trade on significant price movements with volume
       if (alert.alertType === 'volume_surge' || alert.alertType === 'price_spike') {
-        const signal = this.evaluateAlert(alert, token);
-        if (signal) {
-          await this.executeTradeSignal(signal);
+        // Execute on ALL enabled portfolios
+        const portfolioIds = Array.from(this.enabledPortfolios.keys());
+        for (const portfolioId of portfolioIds) {
+          const signal = this.evaluateAlert(alert, token, portfolioId);
+          if (signal) {
+            await this.executeTradeSignal(signal, undefined, portfolioId);
+          }
         }
       }
     } catch (error) {
@@ -232,9 +294,12 @@ class AutoTrader extends EventEmitter {
     }
   }
 
-  private async evaluatePattern(pattern: Pattern, token: Token, confidence: number): Promise<TradingSignal | null> {
+  private async evaluatePattern(pattern: Pattern, token: Token, confidence: number, portfolioId: string): Promise<TradingSignal | null> {
     const currentPrice = parseFloat(token.currentPrice || '0');
     if (currentPrice <= 0) return null;
+    
+    const portfolioState = this.enabledPortfolios.get(portfolioId);
+    if (!portfolioState) return null;
     
     // Strong bullish patterns - BUY signals (only when not in sell-only mode)
     const bullishPatterns = [
@@ -255,11 +320,10 @@ class AutoTrader extends EventEmitter {
     ];
     
     // Check if we have an existing position in this token
-    const existingPosition = this.defaultPortfolioId ? 
-      await storage.getPositionByPortfolioAndToken(this.defaultPortfolioId, token.id) : null;
+    const existingPosition = await storage.getPositionByPortfolioAndToken(portfolioId, token.id);
     
     // In sell-only mode, prioritize sell signals for positions we hold
-    if (this.sellOnlyMode && existingPosition && parseFloat(existingPosition.amount) > 0) {
+    if (portfolioState.sellOnlyMode && existingPosition && parseFloat(existingPosition.amount) > 0) {
       // Generate sell signal for bearish patterns on held positions
       if (bearishPatterns.includes(pattern.patternType)) {
         return {
@@ -268,7 +332,7 @@ class AutoTrader extends EventEmitter {
           confidence,
           source: `ML Pattern: ${pattern.patternType}`,
           price: currentPrice,
-          reason: `🔴 ${pattern.patternType} detected - Sell-only mode active (${confidence.toFixed(1)}% confidence)`
+          reason: `🔴 [Portfolio ${portfolioId}] ${pattern.patternType} detected - Sell-only mode active (${confidence.toFixed(1)}% confidence)`
         };
       }
       
@@ -284,67 +348,73 @@ class AutoTrader extends EventEmitter {
             confidence: confidence * 0.8, // Reduce confidence for profit-taking
             source: `ML Pattern: ${pattern.patternType} (Profit Taking)`,
             price: currentPrice,
-            reason: `📈 Taking profit on ${pattern.patternType} - ${profitPercent.toFixed(1)}% gain (Sell-only mode)`
+            reason: `📈 [Portfolio ${portfolioId}] Taking profit on ${pattern.patternType} - ${profitPercent.toFixed(1)}% gain (Sell-only mode)`
           };
         }
       }
     }
     
     // Regular buy signals when not in sell-only mode
-    if (!this.sellOnlyMode && bullishPatterns.includes(pattern.patternType)) {
+    if (!portfolioState.sellOnlyMode && bullishPatterns.includes(pattern.patternType)) {
       return {
         tokenId: token.id,
         type: 'buy',
         confidence,
         source: `ML Pattern: ${pattern.patternType}`,
         price: currentPrice,
-        reason: `🤖 ${pattern.patternType} detected (${confidence.toFixed(1)}% confidence)`
+        reason: `🤖 [Portfolio ${portfolioId}] ${pattern.patternType} detected (${confidence.toFixed(1)}% confidence)`
       };
     }
     
     return null;
   }
 
-  private evaluateAlert(alert: any, token: Token): TradingSignal | null {
+  private evaluateAlert(alert: any, token: Token, portfolioId: string): TradingSignal | null {
     const currentPrice = parseFloat(token.currentPrice || '0');
     if (currentPrice <= 0) return null;
     
+    const portfolioState = this.enabledPortfolios.get(portfolioId);
+    if (!portfolioState) return null;
+    
     // Only generate buy signals when not in sell-only mode
-    if (!this.sellOnlyMode && (alert.alertType === 'volume_surge' || alert.alertType === 'price_spike')) {
+    if (!portfolioState.sellOnlyMode && (alert.alertType === 'volume_surge' || alert.alertType === 'price_spike')) {
       return {
         tokenId: token.id,
         type: 'buy',
         confidence: alert.confidence,
         source: `Scanner: ${alert.alertType}`,
         price: currentPrice,
-        reason: `📊 ${alert.alertType} detected (${alert.confidence}% confidence)`
+        reason: `📊 [Portfolio ${portfolioId}] ${alert.alertType} detected (${alert.confidence}% confidence)`
       };
     }
     
     return null;
   }
 
-  private async executeTradeSignal(signal: TradingSignal, patternId?: string) {
-    if (!this.defaultPortfolioId) return;
+  private async executeTradeSignal(signal: TradingSignal, patternId?: string, portfolioId?: string) {
+    if (!portfolioId) return;
+    
+    const portfolioState = this.enabledPortfolios.get(portfolioId);
+    if (!portfolioState) return;
     
     try {
       // Check if real money trading is enabled for this portfolio
-      const isRealTradingEnabled = await exchangeService.isRealTradingEnabled(this.defaultPortfolioId);
+      const isRealTradingEnabled = await exchangeService.isRealTradingEnabled(portfolioId);
       
       if (isRealTradingEnabled) {
         // Execute real money trade via exchange service
-        await this.executeRealMoneyTrade(signal, patternId);
+        await this.executeRealMoneyTrade(signal, patternId, portfolioId);
         return;
       }
       
       // Handle sell signals differently from buy signals (paper trading)
       if (signal.type === 'sell') {
-        await this.executeSellSignal(signal, patternId);
+        await this.executeSellSignal(signal, patternId, portfolioId);
         return;
       }
       
       // Buy signal handling - check cash balance
-      const portfolio = await storage.getPortfolio(this.defaultPortfolioId);
+      const portfolio = await storage.getPortfolio(portfolioId);
       if (!portfolio) return;
       
       const tradeValue = 500;
@@ -352,40 +422,40 @@ class AutoTrader extends EventEmitter {
       
       // If insufficient funds, try to rebalance by selling stagnant positions at break-even or above
       if (availableCash < tradeValue) {
-        console.log(`💸 Insufficient funds: Available $${availableCash.toFixed(2)}, Need $${tradeValue}`);
-        console.log(`🔄 Attempting to rebalance portfolio by selling stagnant positions...`);
+        console.log(`💸 [Portfolio ${portfolioId}] Insufficient funds: Available $${availableCash.toFixed(2)}, Need $${tradeValue}`);
+        console.log(`🔄 [Portfolio ${portfolioId}] Attempting to rebalance portfolio by selling stagnant positions...`);
         
-        const freedCapital = await this.rebalancePortfolioForNewOpportunity(signal, tradeValue);
+        const freedCapital = await this.rebalancePortfolioForNewOpportunity(signal, tradeValue, portfolioId);
         if (freedCapital >= tradeValue) {
-          console.log(`✅ Successfully freed $${freedCapital.toFixed(2)} from stagnant positions`);
+          console.log(`✅ [Portfolio ${portfolioId}] Successfully freed $${freedCapital.toFixed(2)} from stagnant positions`);
           
           // Re-fetch portfolio to get updated cash balance after rebalancing
-          const updatedPortfolio = await storage.getPortfolio(this.defaultPortfolioId);
+          const updatedPortfolio = await storage.getPortfolio(portfolioId);
           if (!updatedPortfolio) return;
           
           const newAvailableCash = parseFloat(updatedPortfolio.cashBalance || '0');
-          console.log(`💰 Updated cash balance after rebalancing: $${newAvailableCash.toFixed(2)}`);
+          console.log(`💰 [Portfolio ${portfolioId}] Updated cash balance after rebalancing: $${newAvailableCash.toFixed(2)}`);
           
           if (newAvailableCash < tradeValue) {
-            console.log(`❌ Still insufficient funds after rebalancing: $${newAvailableCash.toFixed(2)} < $${tradeValue}`);
+            console.log(`❌ [Portfolio ${portfolioId}] Still insufficient funds after rebalancing: $${newAvailableCash.toFixed(2)} < $${tradeValue}`);
             return;
           }
           
           // Continue with the buy after successful rebalancing
         } else {
-          console.log(`❌ Could not free enough capital ($${freedCapital.toFixed(2)} < $${tradeValue})`);
+          console.log(`❌ [Portfolio ${portfolioId}] Could not free enough capital ($${freedCapital.toFixed(2)} < $${tradeValue})`);
           return;
         }
       }
       
       // Check if we already have a position in this token
       const existingPosition = await storage.getPositionByPortfolioAndToken(
-        this.defaultPortfolioId,
+        portfolioId,
         signal.tokenId
       );
       
       if (existingPosition && parseFloat(existingPosition.amount) > 0) {
-        console.log(`📋 Position already exists for ${signal.tokenId}, skipping duplicate buy`);
+        console.log(`📋 [Portfolio ${portfolioId}] Position already exists for ${signal.tokenId}, skipping duplicate buy`);
         return; // Skip if we already have an active position
       }
       
@@ -395,7 +465,7 @@ class AutoTrader extends EventEmitter {
       
       // Create trade record with pattern linkage
       const tradeData: InsertTrade = {
-        portfolioId: this.defaultPortfolioId,
+        portfolioId: portfolioId,
         tokenId: signal.tokenId,
         patternId: patternId || null, // Link to originating pattern
         type: signal.type,
@@ -414,11 +484,11 @@ class AutoTrader extends EventEmitter {
           amount: tradeAmount,
           avgBuyPrice: signal.price.toString(),
         });
-        console.log(`📝 Updated existing zero-amount position for ${signal.tokenId}`);
+        console.log(`📝 [Portfolio ${portfolioId}] Updated existing zero-amount position for ${signal.tokenId}`);
       } else {
         // Create new position (first time buying this token)
         await storage.createPosition({
-          portfolioId: this.defaultPortfolioId,
+          portfolioId: portfolioId,
           tokenId: signal.tokenId,
           amount: tradeAmount,
           avgBuyPrice: signal.price.toString(),
@@ -426,28 +496,28 @@ class AutoTrader extends EventEmitter {
       }
       
       // Re-fetch current cash balance to ensure accuracy after potential rebalancing
-      const currentPortfolio = await storage.getPortfolio(this.defaultPortfolioId);
+      const currentPortfolio = await storage.getPortfolio(portfolioId);
       if (!currentPortfolio) return;
       
       const currentCashBalance = parseFloat(currentPortfolio.cashBalance || '0');
       
       // Update portfolio cash balance atomically using current balance
       const newCashBalance = (currentCashBalance - tradeValue).toString();
-      await storage.updatePortfolio(this.defaultPortfolioId, {
+      await storage.updatePortfolio(portfolioId, {
         cashBalance: newCashBalance,
       });
       
       // Update sell-only mode immediately after cash change
-      await this.updateSellOnlyModeState();
+      await this.updateSellOnlyModeState(portfolioId);
       
       // Update stats
-      this.tradingStats.totalTrades++;
-      this.tradingStats.todayTrades++;
+      portfolioState.tradingStats.totalTrades++;
+      portfolioState.tradingStats.todayTrades++;
       
       // Get token info for logging
       const token = await storage.getToken(signal.tokenId);
       
-      console.log(`🚀 TRADE EXECUTED: BUY ${parseFloat(tradeAmount).toFixed(6)} ${token?.symbol} at $${signal.price.toFixed(6)}`);
+      console.log(`🚀 [Portfolio ${portfolioId}] TRADE EXECUTED: BUY ${parseFloat(tradeAmount).toFixed(6)} ${token?.symbol} at $${signal.price.toFixed(6)}`);
       console.log(`   💡 ${signal.reason}`);
       console.log(`   💰 Value: $${tradeValue}`);
       if (patternId) {
@@ -459,27 +529,28 @@ class AutoTrader extends EventEmitter {
         trade,
         signal,
         token,
+        portfolioId,
         timestamp: new Date().toISOString(),
-        stats: this.getStats()
+        stats: this.getStatsForPortfolio(portfolioId)
       });
       
     } catch (error) {
-      console.error('Error executing trade signal:', error);
+      console.error(`[Portfolio ${portfolioId}] Error executing trade signal:`, error);
     }
   }
 
-  private async executeSellSignal(signal: TradingSignal, patternId?: string) {
-    if (!this.defaultPortfolioId) return;
+  private async executeSellSignal(signal: TradingSignal, patternId?: string, portfolioId?: string) {
+    if (!portfolioId) return;
     
     try {
       // Find the existing position for this token
       const position = await storage.getPositionByPortfolioAndToken(
-        this.defaultPortfolioId,
+        portfolioId,
         signal.tokenId
       );
       
       if (!position || parseFloat(position.amount) <= 0) {
-        console.log(`⚠️ No position found for ${signal.tokenId}, skipping sell signal`);
+        console.log(`⚠️ [Portfolio ${portfolioId}] No position found for ${signal.tokenId}, skipping sell signal`);
         return;
       }
       
@@ -487,57 +558,69 @@ class AutoTrader extends EventEmitter {
       if (!token) return;
       
       // Execute the sell using the existing executeSell method
-      await this.executeSell(position, token, 'ml_pattern', signal.reason);
+      await this.executeSell(position, token, 'ml_pattern', signal.reason, portfolioId);
       
     } catch (error) {
-      console.error('Error executing sell signal:', error);
+      console.error(`[Portfolio ${portfolioId}] Error executing sell signal:`, error);
     }
   }
 
-  private async updateSellOnlyModeState() {
-    if (!this.defaultPortfolioId) return;
+  private async updateSellOnlyModeState(portfolioId: string) {
+    const portfolioState = this.enabledPortfolios.get(portfolioId);
+    if (!portfolioState) return;
     
     try {
-      const portfolio = await storage.getPortfolio(this.defaultPortfolioId);
+      const portfolio = await storage.getPortfolio(portfolioId);
       if (!portfolio) return;
       
       const availableCash = parseFloat(portfolio.cashBalance || '0');
       const tradeValue = 500;
-      const previousMode = this.sellOnlyMode;
+      const previousMode = portfolioState.sellOnlyMode;
       
       // Update sell-only mode based on cash balance
       if (availableCash < tradeValue) {
-        this.sellOnlyMode = true;
+        portfolioState.sellOnlyMode = true;
         if (!previousMode) {
-          console.log(`🔴 SELL-ONLY MODE ACTIVATED: Portfolio switching to exit-focused strategy`);
-          console.log(`💰 Available cash: $${availableCash.toFixed(2)}, Required: $${tradeValue}`);
+          console.log(`🔴 [Portfolio ${portfolioId}] SELL-ONLY MODE ACTIVATED: Portfolio switching to exit-focused strategy`);
+          console.log(`💰 [Portfolio ${portfolioId}] Available cash: $${availableCash.toFixed(2)}, Required: $${tradeValue}`);
         }
       } else if (availableCash >= tradeValue * 2) {
-        this.sellOnlyMode = false;
+        portfolioState.sellOnlyMode = false;
         if (previousMode) {
-          console.log(`🟢 BUY MODE REACTIVATED: Sufficient cash restored for new positions`);
-          console.log(`💰 Available cash: $${availableCash.toFixed(2)}, Required: $${tradeValue}`);
+          console.log(`🟢 [Portfolio ${portfolioId}] BUY MODE REACTIVATED: Sufficient cash restored for new positions`);
+          console.log(`💰 [Portfolio ${portfolioId}] Available cash: $${availableCash.toFixed(2)}, Required: $${tradeValue}`);
         }
       }
     } catch (error) {
-      console.error('Error updating sell-only mode state:', error);
+      console.error(`[Portfolio ${portfolioId}] Error updating sell-only mode state:`, error);
     }
   }
 
-  private async monitorPositions() {
-    if (!this.isActive || !this.defaultPortfolioId) {
-      console.log('⚠️ Position monitoring skipped: Auto-trader inactive or no portfolio ID');
+  private async monitorAllPortfolios() {
+    if (!this.isActive) {
+      console.log('⚠️ Position monitoring skipped: Auto-trader inactive');
       return;
     }
     
+    console.log(`🔍 Monitoring ${this.enabledPortfolios.size} enabled portfolios for stop-loss/take-profit...`);
+    
+    // Monitor each enabled portfolio
+    const portfolioIds = Array.from(this.enabledPortfolios.keys());
+    for (const portfolioId of portfolioIds) {
+      await this.monitorPositions(portfolioId);
+    }
+  }
+
+  private async monitorPositions(portfolioId: string) {
+    const portfolioState = this.enabledPortfolios.get(portfolioId);
+    if (!portfolioState) return;
+    
     try {
-      console.log('🔍 Monitoring positions for stop-loss/take-profit...');
-      
       // Update sell-only mode state based on current cash balance
-      await this.updateSellOnlyModeState();
+      await this.updateSellOnlyModeState(portfolioId);
       
-      const positions = await storage.getPositionsByPortfolio(this.defaultPortfolioId);
-      console.log(`📊 Checking ${positions.length} positions (${positions.filter(p => parseFloat(p.amount) > 0).length} active)`);
+      const positions = await storage.getPositionsByPortfolio(portfolioId);
+      console.log(`📊 [Portfolio ${portfolioId}] Checking ${positions.length} positions (${positions.filter(p => parseFloat(p.amount) > 0).length} active)`);
       
       let totalPortfolioValue = 0;
       const positionsSold = new Set<string>(); // Track positions sold in this cycle
@@ -564,27 +647,27 @@ class AutoTrader extends EventEmitter {
             sellTrigger = 'stop_loss';
           }
           // Use more aggressive take-profit when in sell-only mode
-          else if (profitLoss >= (this.sellOnlyMode ? this.strategy.sellOnlyTakeProfit : this.strategy.takeProfitPercentage)) {
-            const mode = this.sellOnlyMode ? 'SELL-ONLY' : 'NORMAL';
+          else if (profitLoss >= (portfolioState.sellOnlyMode ? this.strategy.sellOnlyTakeProfit : this.strategy.takeProfitPercentage)) {
+            const mode = portfolioState.sellOnlyMode ? 'SELL-ONLY' : 'NORMAL';
             sellReason = `${mode} take-profit triggered at ${profitLoss.toFixed(1)}% gain`;
             sellTrigger = 'take_profit';
           }
           // In sell-only mode, also monitor for any meaningful profit to exit positions
-          else if (this.sellOnlyMode && profitLoss > 2) {
+          else if (portfolioState.sellOnlyMode && profitLoss > 2) {
             sellReason = `Sell-only mode: Exiting profitable position (${profitLoss.toFixed(1)}% gain)`;
             sellTrigger = 'cash_generation';
           }
           
           // Execute sell only once per position per cycle
           if (sellReason && sellTrigger && !positionsSold.has(position.id)) {
-            await this.executeSell(position, token, sellTrigger, sellReason);
+            await this.executeSell(position, token, sellTrigger, sellReason, portfolioId);
             positionsSold.add(position.id);
           }
         }
       }
       
       // Update portfolio value based on current positions + cash balance
-      const portfolio = await storage.getPortfolio(this.defaultPortfolioId);
+      const portfolio = await storage.getPortfolio(portfolioId);
       if (portfolio) {
         const startingCapital = parseFloat(portfolio.startingCapital || '10000');
         const currentCashBalance = parseFloat(portfolio.cashBalance || '0');
@@ -593,48 +676,50 @@ class AutoTrader extends EventEmitter {
         const newTotalValue = totalPortfolioValue + currentCashBalance;
         const totalPnL = newTotalValue - startingCapital;
         
-        console.log(`💰 Portfolio Update: Positions $${totalPortfolioValue.toFixed(2)}, Cash $${currentCashBalance.toFixed(2)}, Total $${newTotalValue.toFixed(2)}`);
+        console.log(`💰 [Portfolio ${portfolioId}] Portfolio Update: Positions $${totalPortfolioValue.toFixed(2)}, Cash $${currentCashBalance.toFixed(2)}, Total $${newTotalValue.toFixed(2)}`);
         
         await storage.updatePortfolio(portfolio.id, {
           totalValue: newTotalValue.toString(),
           totalPnL: totalPnL.toString(),
         });
         
-        this.tradingStats.totalValue = newTotalValue;
+        portfolioState.tradingStats.totalValue = newTotalValue;
         
         // Emit stats update for dashboard
         this.emit('statsUpdate', {
+          portfolioId,
           totalValue: newTotalValue,
           totalPnL,
-          totalTrades: this.tradingStats.totalTrades,
-          todayTrades: this.tradingStats.todayTrades,
+          totalTrades: portfolioState.tradingStats.totalTrades,
+          todayTrades: portfolioState.tradingStats.todayTrades,
           activePositions: positions.filter(p => parseFloat(p.amount) > 0).length,
           timestamp: new Date().toISOString()
         });
       }
       
     } catch (error) {
-      console.error('Error monitoring positions:', error);
+      console.error(`[Portfolio ${portfolioId}] Error monitoring positions:`, error);
     }
   }
 
-  private async executeSell(position: any, token: Token, trigger: string, reason: string) {
-    if (!this.defaultPortfolioId) return;
+  private async executeSell(position: any, token: Token, trigger: string, reason: string, portfolioId: string) {
+    const portfolioState = this.enabledPortfolios.get(portfolioId);
+    if (!portfolioState) return;
     
     // Check if this position is already being sold (prevent concurrent sells)
-    if (this.sellingPositions.has(position.id)) {
-      console.log(`❌ Cannot sell ${token.symbol}: position is already being sold`);
+    if (portfolioState.sellingPositions.has(position.id)) {
+      console.log(`❌ [Portfolio ${portfolioId}] Cannot sell ${token.symbol}: position is already being sold`);
       return;
     }
     
     // Mark position as being sold
-    this.sellingPositions.add(position.id);
+    portfolioState.sellingPositions.add(position.id);
     
     try {
       // Re-fetch position to ensure it still exists and has non-zero amount (prevent double sells)
       const currentPosition = await storage.getPosition(position.id);
       if (!currentPosition || parseFloat(currentPosition.amount) <= 0) {
-        console.log(`❌ Cannot sell ${token.symbol}: position no longer exists or has zero amount`);
+        console.log(`❌ [Portfolio ${portfolioId}] Cannot sell ${token.symbol}: position no longer exists or has zero amount`);
         return;
       }
       
@@ -652,7 +737,7 @@ class AutoTrader extends EventEmitter {
       await storage.updatePosition(currentPosition.id, { amount: '0' });
       
       // Find the original buy trade to get pattern linkage
-      const buyTrades = await storage.getTradesByPortfolio(this.defaultPortfolioId);
+      const buyTrades = await storage.getTradesByPortfolio(portfolioId);
       const originalBuyTrade = buyTrades.find(t => 
         t.tokenId === currentPosition.tokenId && 
         t.type === 'buy' && 
@@ -660,7 +745,7 @@ class AutoTrader extends EventEmitter {
       );
       
       const tradeData: InsertTrade = {
-        portfolioId: this.defaultPortfolioId,
+        portfolioId: portfolioId,
         tokenId: currentPosition.tokenId,
         patternId: originalBuyTrade?.patternId || null, // Link to same pattern as buy trade
         type: 'sell',
@@ -684,38 +769,36 @@ class AutoTrader extends EventEmitter {
       }
       
       // CRITICAL: Credit cash balance with sell proceeds
-      if (this.defaultPortfolioId) {
-        const portfolio = await storage.getPortfolio(this.defaultPortfolioId);
-        if (portfolio) {
-          const currentCash = parseFloat(portfolio.cashBalance || '0');
-          const newCashBalance = (currentCash + totalSellValue).toString();
-          const currentRealizedPnL = parseFloat(portfolio.realizedPnL || '0');
-          const newRealizedPnL = (currentRealizedPnL + realizedPnL).toString();
-          
-          await storage.updatePortfolio(this.defaultPortfolioId, {
-            cashBalance: newCashBalance,
-            realizedPnL: newRealizedPnL,
-          });
-          
-          console.log(`   💰 Cash credited: +$${totalSellValue.toFixed(2)}, New balance: $${(currentCash + totalSellValue).toFixed(2)}`);
-          
-          // Update sell-only mode immediately after cash change
-          await this.updateSellOnlyModeState();
-        }
+      const portfolio = await storage.getPortfolio(portfolioId);
+      if (portfolio) {
+        const currentCash = parseFloat(portfolio.cashBalance || '0');
+        const newCashBalance = (currentCash + totalSellValue).toString();
+        const currentRealizedPnL = parseFloat(portfolio.realizedPnL || '0');
+        const newRealizedPnL = (currentRealizedPnL + realizedPnL).toString();
+        
+        await storage.updatePortfolio(portfolioId, {
+          cashBalance: newCashBalance,
+          realizedPnL: newRealizedPnL,
+        });
+        
+        console.log(`   💰 [Portfolio ${portfolioId}] Cash credited: +$${totalSellValue.toFixed(2)}, New balance: $${(currentCash + totalSellValue).toFixed(2)}`);
+        
+        // Update sell-only mode immediately after cash change
+        await this.updateSellOnlyModeState(portfolioId);
       }
       
       // Update success stats
       if (realizedPnL > 0) {
-        this.tradingStats.successfulTrades++;
+        portfolioState.tradingStats.successfulTrades++;
       }
       
-      this.tradingStats.totalTrades++;
-      this.tradingStats.todayTrades++;
+      portfolioState.tradingStats.totalTrades++;
+      portfolioState.tradingStats.todayTrades++;
       
       const pnlSymbol = realizedPnL >= 0 ? '💚' : '❌';
       const pnlText = realizedPnL >= 0 ? `+$${realizedPnL.toFixed(2)}` : `-$${Math.abs(realizedPnL).toFixed(2)}`;
       
-      console.log(`🎯 ${trigger.toUpperCase()}: Sold ${position.amount} ${token.symbol} at $${currentPrice.toFixed(6)}`);
+      console.log(`🎯 [Portfolio ${portfolioId}] ${trigger.toUpperCase()}: Sold ${position.amount} ${token.symbol} at $${currentPrice.toFixed(6)}`);
       console.log(`   📝 ${reason}`);
       console.log(`   ${pnlSymbol} P&L: ${pnlText}`);
       if (originalBuyTrade?.patternId) {
@@ -726,16 +809,17 @@ class AutoTrader extends EventEmitter {
         trade,
         signal: { type: 'sell', source: trigger, reason },
         token,
+        portfolioId,
         realizedPnL,
         timestamp: new Date().toISOString(),
-        stats: this.getStats()
+        stats: this.getStatsForPortfolio(portfolioId)
       });
       
     } catch (error) {
-      console.error('Error executing sell:', error);
+      console.error(`[Portfolio ${portfolioId}] Error executing sell:`, error);
     } finally {
       // Always remove position from selling set to prevent deadlock
-      this.sellingPositions.delete(position.id);
+      portfolioState.sellingPositions.delete(position.id);
     }
   }
 
@@ -743,18 +827,16 @@ class AutoTrader extends EventEmitter {
    * Rebalance portfolio by selling stagnant positions at break-even or above
    * to free up capital for new opportunities
    */
-  private async rebalancePortfolioForNewOpportunity(newSignal: TradingSignal, targetAmount: number): Promise<number> {
-    if (!this.defaultPortfolioId) return 0;
-    
+  private async rebalancePortfolioForNewOpportunity(newSignal: TradingSignal, targetAmount: number, portfolioId: string): Promise<number> {
     let totalFreedCapital = 0;
     
     try {
       // Get all current positions
-      const positions = await storage.getPositionsByPortfolio(this.defaultPortfolioId);
+      const positions = await storage.getPositionsByPortfolio(portfolioId);
       const activePositions = positions.filter(p => parseFloat(p.amount) > 0);
       
       if (activePositions.length === 0) {
-        console.log(`📊 No active positions to rebalance`);
+        console.log(`📊 [Portfolio ${portfolioId}] No active positions to rebalance`);
         return 0;
       }
       
@@ -793,14 +875,14 @@ class AutoTrader extends EventEmitter {
       }
       
       if (rebalanceCandidates.length === 0) {
-        console.log(`📊 No stagnant break-even positions available for rebalancing`);
+        console.log(`📊 [Portfolio ${portfolioId}] No stagnant break-even positions available for rebalancing`);
         return 0;
       }
       
       // Sort by stagnancy score (most stagnant first)
       rebalanceCandidates.sort((a, b) => b.stagnancyScore - a.stagnancyScore);
       
-      console.log(`🔍 Found ${rebalanceCandidates.length} stagnant positions eligible for rebalancing:`);
+      console.log(`🔍 [Portfolio ${portfolioId}] Found ${rebalanceCandidates.length} stagnant positions eligible for rebalancing:`);
       rebalanceCandidates.forEach(candidate => {
         console.log(`   • ${candidate.token.symbol}: ${candidate.profitPercent.toFixed(2)}% gain, $${candidate.currentValue.toFixed(2)} value`);
       });
@@ -811,7 +893,7 @@ class AutoTrader extends EventEmitter {
         
         const { position, token, profitPercent } = candidate;
         
-        console.log(`🔄 Rebalancing: Selling stagnant ${token.symbol} at ${profitPercent.toFixed(2)}% for new opportunity`);
+        console.log(`🔄 [Portfolio ${portfolioId}] Rebalancing: Selling stagnant ${token.symbol} at ${profitPercent.toFixed(2)}% for new opportunity`);
         
         // Calculate expected proceeds before selling
         const amount = parseFloat(position.amount);
@@ -819,30 +901,35 @@ class AutoTrader extends EventEmitter {
         const expectedProceeds = amount * currentPrice;
         
         // Execute the sell to free up capital
-        await this.executeSell(position, token, 'rebalance', `Portfolio rebalancing: Selling stagnant position (${profitPercent.toFixed(1)}% gain) for new opportunity`);
+        await this.executeSell(position, token, 'rebalance', `Portfolio rebalancing: Selling stagnant position (${profitPercent.toFixed(1)}% gain) for new opportunity`, portfolioId);
         
         // Track freed capital (actual sell proceeds)
         totalFreedCapital += expectedProceeds;
         
-        console.log(`   💰 Freed $${expectedProceeds.toFixed(2)} from ${token.symbol}, Total freed: $${totalFreedCapital.toFixed(2)}`);
+        console.log(`   💰 [Portfolio ${portfolioId}] Freed $${expectedProceeds.toFixed(2)} from ${token.symbol}, Total freed: $${totalFreedCapital.toFixed(2)}`);
       }
       
-      console.log(`🎯 Portfolio rebalancing complete: Freed $${totalFreedCapital.toFixed(2)} for new opportunity`);
+      console.log(`🎯 [Portfolio ${portfolioId}] Portfolio rebalancing complete: Freed $${totalFreedCapital.toFixed(2)} for new opportunity`);
       
     } catch (error) {
-      console.error('Error during portfolio rebalancing:', error);
+      console.error(`[Portfolio ${portfolioId}] Error during portfolio rebalancing:`, error);
     }
     
     return totalFreedCapital;
   }
 
-  async getDetailedStats() {
-    if (!this.defaultPortfolioId) return null;
+  async getDetailedStats(portfolioId?: string) {
+    // If no portfolioId provided, use the first enabled portfolio (for backward compatibility)
+    const targetPortfolioId = portfolioId || Array.from(this.enabledPortfolios.keys())[0];
+    if (!targetPortfolioId) return null;
+    
+    const portfolioState = this.enabledPortfolios.get(targetPortfolioId);
+    if (!portfolioState) return null;
     
     try {
-      const portfolio = await storage.getPortfolio(this.defaultPortfolioId);
-      const positions = await storage.getPositionsByPortfolio(this.defaultPortfolioId);
-      const trades = await storage.getTradesByPortfolio(this.defaultPortfolioId);
+      const portfolio = await storage.getPortfolio(targetPortfolioId);
+      const positions = await storage.getPositionsByPortfolio(targetPortfolioId);
+      const trades = await storage.getTradesByPortfolio(targetPortfolioId);
       
       if (!portfolio) return null;
       
@@ -883,7 +970,7 @@ class AutoTrader extends EventEmitter {
       const totalValue = availableCash + totalPositionValue;
       
       return {
-        portfolioId: this.defaultPortfolioId,
+        portfolioId: targetPortfolioId,
         totalValue,
         totalPositionValue,
         availableCash,
@@ -894,22 +981,27 @@ class AutoTrader extends EventEmitter {
         sellTrades: trades.filter(t => t.type === 'sell').length,
         activePositions: activePositions.length,
         positions: activePositions,
-        winRate: this.tradingStats.totalTrades > 0 
-          ? (this.tradingStats.successfulTrades / this.tradingStats.totalTrades * 100).toFixed(1)
+        winRate: portfolioState.tradingStats.totalTrades > 0 
+          ? (portfolioState.tradingStats.successfulTrades / portfolioState.tradingStats.totalTrades * 100).toFixed(1)
           : '0'
       };
     } catch (error) {
-      console.error('Error getting detailed stats:', error);
+      console.error(`[Portfolio ${targetPortfolioId}] Error getting detailed stats:`, error);
       return null;
     }
   }
 
-  private async executeRealMoneyTrade(signal: TradingSignal, patternId?: string): Promise<void> {
+  private async executeRealMoneyTrade(signal: TradingSignal, patternId?: string, portfolioId?: string): Promise<void> {
+    if (!portfolioId) return;
+    
+    const portfolioState = this.enabledPortfolios.get(portfolioId);
+    if (!portfolioState) return;
+    
     try {
       // Get token details
       const token = await storage.getToken(signal.tokenId);
       if (!token) {
-        console.error(`❌ Token ${signal.tokenId} not found for real money trade`);
+        console.error(`❌ [Portfolio ${portfolioId}] Token ${signal.tokenId} not found for real money trade`);
         return;
       }
 
@@ -926,45 +1018,66 @@ class AutoTrader extends EventEmitter {
         confidence: signal.confidence,
         source: signal.source,
         patternId: patternId,
-        portfolioId: this.defaultPortfolioId!
+        portfolioId: portfolioId
       };
 
-      console.log(`💱 🔴 REAL MONEY ${signal.type.toUpperCase()}: ${token.symbol} at $${signal.price} (${signal.confidence}% confidence)`);
+      console.log(`💱 🔴 [Portfolio ${portfolioId}] REAL MONEY ${signal.type.toUpperCase()}: ${token.symbol} at $${signal.price} (${signal.confidence}% confidence)`);
       
       // Execute through exchange service
       const exchangeTrade = await exchangeService.executeTradeSignal(exchangeSignal);
       
       if (exchangeTrade) {
-        console.log(`✅ Real money trade executed: ${exchangeTrade.id}`);
+        console.log(`✅ [Portfolio ${portfolioId}] Real money trade executed: ${exchangeTrade.id}`);
         
         // Update trading stats
-        this.tradingStats.totalTrades++;
-        this.tradingStats.todayTrades++;
+        portfolioState.tradingStats.totalTrades++;
+        portfolioState.tradingStats.todayTrades++;
         
         // Emit trading event for real-time dashboard updates
         this.emit('tradeExecuted', {
           exchangeTrade,
           signal,
           token,
+          portfolioId,
           timestamp: new Date().toISOString(),
-          stats: this.getStats(),
+          stats: this.getStatsForPortfolio(portfolioId),
           mode: 'real_money'
         });
       } else {
-        console.log(`❌ Real money trade execution failed or skipped`);
+        console.log(`❌ [Portfolio ${portfolioId}] Real money trade execution failed or skipped`);
       }
       
     } catch (error) {
-      console.error('❌ Real money trade execution failed:', error);
+      console.error(`❌ [Portfolio ${portfolioId}] Real money trade execution failed:`, error);
     }
   }
 
-  getStats() {
+  getStatsForPortfolio(portfolioId: string) {
+    const portfolioState = this.enabledPortfolios.get(portfolioId);
+    if (!portfolioState) return null;
+    
     return {
       isActive: this.isActive,
-      ...this.tradingStats,
+      portfolioId,
+      ...portfolioState.tradingStats,
       strategy: this.strategy,
     };
+  }
+
+  getStats() {
+    // Return stats for first enabled portfolio (for backward compatibility)
+    const firstPortfolioId = Array.from(this.enabledPortfolios.keys())[0];
+    if (!firstPortfolioId) {
+      return {
+        isActive: this.isActive,
+        totalTrades: 0,
+        successfulTrades: 0,
+        todayTrades: 0,
+        totalValue: 0,
+        strategy: this.strategy,
+      };
+    }
+    return this.getStatsForPortfolio(firstPortfolioId);
   }
 }
 
