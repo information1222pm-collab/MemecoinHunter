@@ -189,7 +189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sessionCookie = cookies['cryptohobby.sid'];
       
       if (sessionCookie) {
-        // Unsign the session cookie
+        // Unsign the session cookie - remove "s:" prefix first
         const sessionId = signature.unsign(sessionCookie.slice(2), sessionSecret);
         
         if (sessionId) {
