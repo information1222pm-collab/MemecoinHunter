@@ -40,7 +40,7 @@ export function PortfolioSummary() {
   const { t } = useLanguage();
   
   const { data: portfolio, isLoading } = useQuery<PortfolioData>({
-    queryKey: ['/api/portfolio/default'],
+    queryKey: ['/api/portfolio', 'default'],
     refetchInterval: 30000,
     staleTime: 15000,
     retry: false,
