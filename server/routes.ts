@@ -136,12 +136,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
   };
   
-  // Apply RBAC to sensitive endpoints (CRITICAL SECURITY FIX)
+  // Apply authentication to endpoints (subscription restrictions removed for free access)
   app.use('/api/auto-trader', requireAuth);
   app.use('/api/portfolio', requireAuth);
   app.use('/api/trades', requireAuth);
-  app.use('/api/api-keys', requireAuth, requireRole(['premium', 'pro']));
-  app.use('/api/audit-logs', requireAuth, requireRole(['pro']));
+  app.use('/api/api-keys', requireAuth); // Full access for all users
+  app.use('/api/audit-logs', requireAuth); // Full access for all users
 
   // Properly Authenticated WebSocket server (CRITICAL SECURITY FIX)
   const wss = new WebSocketServer({ noServer: true, perMessageDeflate: false });

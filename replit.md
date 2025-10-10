@@ -41,9 +41,9 @@ The backend uses **Express.js** with **TypeScript** in an ESM configuration. The
 **Migration Management**: Drizzle Kit handles schema migrations and database versioning, with migrations stored in the `/migrations` directory.
 
 ### Authentication and Authorization
-The application implements session-based authentication with subscription tier-based access control. Different features are gated based on user subscription levels (basic, premium, pro).
+The application implements session-based authentication. **All features are currently available to all authenticated users regardless of subscription tier** - subscription restrictions have been removed to provide free access.
 
-**Security Measures**: Input validation using Zod schemas, CORS configuration, and secure session management with PostgreSQL session storage.
+**Security Measures**: Input validation using Zod schemas, CORS configuration, CSRF protection, and secure session management with PostgreSQL session storage.
 
 ### External Dependencies
 
@@ -74,6 +74,12 @@ The application implements session-based authentication with subscription tier-b
 The architecture prioritizes real-time performance, type safety, and scalable subscription management, making it well-suited for high-frequency trading applications with multiple user tiers.
 
 ## Recent Changes
+
+### October 10, 2025 - Free Access Update
+- **Subscription Restrictions Removed**: All features are now available to all authenticated users free of charge
+- Users no longer need premium or pro subscriptions to access API keys, audit logs, or any other features
+- Authentication is still required for security, but subscription tiers no longer limit functionality
+- Updated documentation to reflect free access model
 
 ### September 19, 2025 - Scanner Expansion & Comprehensive Coverage
 - **Massive Scanner Expansion**: Expanded from 8 to 47+ tokens actively tracked
