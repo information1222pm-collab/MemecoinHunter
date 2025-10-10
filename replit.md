@@ -49,15 +49,16 @@ The application supports **dual authentication methods**:
 
 **Paper Trading Capital**: Every new user automatically receives **$10,000 in virtual trading money** to audit and test the platform's capabilities without any financial risk.
 
-**Google Login Setup** (Optional):
-To enable "Continue with Google" authentication:
-1. Ensure these environment variables are set:
-   - `REPLIT_DOMAINS`: Comma-separated list of domains (e.g., `your-app.replit.app`)
-   - `REPL_ID`: Your Repl ID from Replit
-   - `SESSION_SECRET`: Secure random string for session encryption
-   - `ISSUER_URL`: OAuth issuer URL (default: `https://replit.com/oidc`)
-2. Database requirements: PostgreSQL with `sessions` table (already created)
-3. The Google login button will appear automatically once environment variables are configured
+**Google Login Setup**:
+The Google OAuth login is now fully functional and available on the sign-in page:
+1. Environment variables configured:
+   - `REPLIT_DOMAINS`: ✅ Configured
+   - `REPL_ID`: ✅ Configured  
+   - `SESSION_SECRET`: ✅ Configured
+   - `ISSUER_URL`: Uses default `https://replit.com/oidc`
+2. Database requirements: PostgreSQL with `sessions` table ✅ Created
+3. Google login buttons now visible on both login and signup tabs
+4. OAuth endpoints active: `/api/login` (initiate), `/api/callback` (handle response), `/api/logout` (sign out)
 
 **Account Linking**: Users who sign up with email/password can later link their Google account - the system automatically matches accounts by email address.
 
@@ -92,6 +93,14 @@ To enable "Continue with Google" authentication:
 The architecture prioritizes real-time performance, type safety, and scalable subscription management, making it well-suited for high-frequency trading applications with multiple user tiers.
 
 ## Recent Changes
+
+### October 10, 2025 - Google Login UI Implementation
+- **Frontend Integration Complete**: Added Google login buttons to sign-in page (both login and signup tabs)
+- **Visual Design**: Integrated Google icon from react-icons/si with glassmorphism styling matching platform theme
+- **User Experience**: Added "Or continue with" divider separating traditional login from OAuth options
+- **OAuth Flow Verified**: Tested and confirmed /api/login endpoint correctly initiates OAuth flow with redirect to Replit consent page
+- **Test IDs Added**: button-google-login and button-google-signup for automated testing
+- **Documentation Updated**: Marked all OAuth environment variables as configured and functional
 
 ### October 10, 2025 - Google Login Infrastructure
 - **OAuth Integration**: Implemented OpenID Connect authentication via Replit Auth for seamless Google sign-in

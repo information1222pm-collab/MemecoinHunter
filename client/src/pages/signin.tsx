@@ -13,6 +13,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { getCsrfToken } from "@/lib/auth-utils";
 import { useAuth } from "@/hooks/use-auth";
 import { Eye, EyeOff, LogIn, UserPlus, TrendingUp } from "lucide-react";
+import { SiGoogle } from "react-icons/si";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -202,7 +203,7 @@ export default function SignIn() {
                     )}
                   </div>
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="flex flex-col gap-3">
                   <Button 
                     type="submit" 
                     className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
@@ -210,6 +211,26 @@ export default function SignIn() {
                     data-testid="button-login"
                   >
                     {loginMutation.isPending ? "Signing in..." : "Sign In"}
+                  </Button>
+                  
+                  <div className="relative w-full">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-slate-600/50" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-slate-800/40 px-2 text-slate-400">Or continue with</span>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full bg-slate-700/30 border-slate-600/50 text-slate-100 hover:bg-slate-600/50"
+                    onClick={() => window.location.href = '/api/login'}
+                    data-testid="button-google-login"
+                  >
+                    <SiGoogle className="mr-2 h-4 w-4" />
+                    Continue with Google
                   </Button>
                 </CardFooter>
               </form>
@@ -293,7 +314,7 @@ export default function SignIn() {
                     )}
                   </div>
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="flex flex-col gap-3">
                   <Button 
                     type="submit" 
                     className="w-full bg-purple-600 hover:bg-purple-700 text-white"
@@ -301,6 +322,26 @@ export default function SignIn() {
                     data-testid="button-register"
                   >
                     {registerMutation.isPending ? "Creating Account..." : "Create Account"}
+                  </Button>
+                  
+                  <div className="relative w-full">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-slate-600/50" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-slate-800/40 px-2 text-slate-400">Or continue with</span>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full bg-slate-700/30 border-slate-600/50 text-slate-100 hover:bg-slate-600/50"
+                    onClick={() => window.location.href = '/api/login'}
+                    data-testid="button-google-signup"
+                  >
+                    <SiGoogle className="mr-2 h-4 w-4" />
+                    Sign up with Google
                   </Button>
                 </CardFooter>
               </form>
