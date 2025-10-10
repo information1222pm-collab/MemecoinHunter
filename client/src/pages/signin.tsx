@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -38,6 +38,29 @@ export default function SignIn() {
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const { toast } = useToast();
   const { refetch } = useAuth();
+
+  // Check for OAuth errors in URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const error = params.get('error');
+    
+    if (error) {
+      const errorMessages: Record<string, string> = {
+        'auth_failed': 'Google authentication failed. Please try again.',
+        'no_user': 'Unable to retrieve user information. Please try again.',
+        'login_failed': 'Failed to log you in. Please try again.',
+      };
+      
+      toast({
+        title: "Authentication Error",
+        description: errorMessages[error] || 'An unknown error occurred during login.',
+        variant: "destructive",
+      });
+      
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [toast]);
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
