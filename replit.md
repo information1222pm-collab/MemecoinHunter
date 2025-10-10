@@ -8,6 +8,36 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### October 10, 2025 - EXPANDED Coin Search for More Investment Opportunities
+- **Feature Enhancement**: Massively expanded token discovery to find more potential investments
+- **Tracked Coins Increased**: From ~80 to 200+ coins across multiple categories:
+  - Solana ecosystem (20 coins): JTO, JUP, RAY, ORCA, SABER, etc.
+  - Polygon & BSC (16 coins): CAKE, BIFI, ALPACA, VENUS, etc.
+  - Base Chain memecoins: TOSHI, BRETT, HIGHER, KEYCAT, etc.
+  - Cat-themed: POPCAT, CATS, MOG, SMOG, etc.
+  - Dog-themed: Baby BONK, CORGIBNB, SHIH-TZU, etc.
+  - Frog/Amphibian: APU, PEPE 2.0, GROYPER, KEK, etc.
+  - AI & Tech: TURBO, GROK, AIDOGE, etc.
+  - Gaming & Metaverse: GALA, SANDBOX, AXIE, etc.
+  - Celebrity coins: ELON, TRUMP, BIDEN, KANYE, etc.
+  - New Layer 1/2: ARB, OP, ZKSYNC, BLAST, SEI, etc.
+  - DeFi: YFI, CVX, CRV, AAVE, COMP, etc.
+  - NFT: APE, LOOKS, X2Y2, RARE, etc.
+- **Discovery Thresholds Lowered**:
+  - Top gainers: 10%+ gain (was 20%), $100k+ market cap (was $1M)
+  - Newly launched: $50K-$100M range (was $100K-$50M), 5%+ movement (was 10%)
+  - Recently added: $25K-$25M range (was $50K-$10M), $1k volume (was $5k)
+  - Low cap gems: $10K-$10M range (was $25K-$5M), 15%+ gain (was 30%), $500 volume (was $1k)
+  - New launch processing: $10k market cap (was $25k), $500 volume (was $1k)
+  - Trending coins: $100k market cap (was $500k), $2k volume (was $10k)
+- **Discovery Limits Increased**:
+  - Top gainers: 100 coins (was 30)
+  - Newly launched: 50 candidates (was 20)
+  - Recently added: 30 candidates (was 15)
+  - Low cap gems: 25 coins (was 10)
+- **Impact**: Platform now discovers and tracks significantly more investment opportunities across multiple chains and categories, including early-stage launches and trending tokens
+- **Auto-Discovery**: Still runs every 5 minutes to find new trending memecoins and market opportunities
+
 ### October 10, 2025 - Portfolio Position Display Fix
 - **Critical Bug Fixed**: Portfolio was displaying closed positions and showing small token amounts as "0 tokens"
 - **Root Causes Identified**:

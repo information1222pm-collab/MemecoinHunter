@@ -77,7 +77,7 @@ class PriceFeedService extends EventEmitter {
   private readonly RATE_LIMIT_DELAY = 2500; // 2.5 seconds between requests to avoid rate limits
   private lastRequestTime = 0;
   
-  // Comprehensive list of memecoins and trending tokens to track
+  // EXPANDED: Comprehensive list of memecoins and trending tokens to track (200+ coins)
   private readonly TRACKED_COINS = [
     // Top Tier Memecoins
     'dogecoin',
@@ -137,7 +137,7 @@ class PriceFeedService extends EventEmitter {
     'diamond-hands',
     'stonks',
     
-    // Recent Trends & Solana Ecosystem
+    // Solana Ecosystem (EXPANDED)
     'jito',
     'jupiter-exchange-token',
     'raydium',
@@ -148,18 +148,184 @@ class PriceFeedService extends EventEmitter {
     'ninja-protocol',
     'star-atlas',
     'solape-token',
+    'orca',
+    'saber',
+    'marinade-staked-sol',
+    'step-finance',
+    'media-network',
+    'solanium',
+    'rope-token',
+    'sunny-aggregator',
+    'grape-2',
+    'gofx',
     
-    // Polygon & BSC Memecoins
+    // Polygon & BSC Ecosystem (EXPANDED)
     'polygon-ecosystem-token',
     'matic-network',
     'pancakeswap-token',
     'biswap',
     'baby-cake',
     'safemars',
-    'elongate',
     'pig-finance',
     'refinable',
-    'mooncake'
+    'mooncake',
+    'bakerytoken',
+    'autofarm',
+    'beefy-finance',
+    'alpaca-finance',
+    'venus',
+    'bunny-token',
+    'apeswap-finance',
+    
+    // Base Chain Memecoins
+    'toshi',
+    'normie',
+    'based-brett',
+    'higher',
+    'keycat',
+    'mochi-the-cat',
+    'tybg',
+    
+    // New Cat-themed Coins
+    'popcat',
+    'cats',
+    'mog-coin',
+    'smog',
+    'hobbes',
+    'cat-token',
+    'cheshire-grin',
+    'felix-the-cat',
+    
+    // New Dog-themed Coins
+    'baby-bonk',
+    'corgibnb',
+    'shih-tzu',
+    'malamute',
+    'golden-inu',
+    'saint-bernard',
+    'beagle-inu',
+    'pomeranian',
+    
+    // Frog/Amphibian Theme
+    'apu-apustaja',
+    'pepe-2-0',
+    'pepecoin-2',
+    'groyper',
+    'kek',
+    'ribbit',
+    'hoppy',
+    
+    // AI & Tech Memecoins
+    'turbo',
+    'grok',
+    'aidoge',
+    'chatai',
+    'agix-token',
+    'worldcoin-wld',
+    'singularitynet',
+    
+    // Gaming & Metaverse Memecoins
+    'gala',
+    'sandbox',
+    'axie-infinity',
+    'illuvium',
+    'my-neighbor-alice',
+    'ufo-gaming',
+    'sidus',
+    'bloktopia',
+    
+    // Celebrity & Culture Coins
+    'elon-musk',
+    'donald-trump',
+    'joe-biden',
+    'kanye-west',
+    'kim-kardashian',
+    'bezos',
+    'zuckerberg',
+    
+    // Food & Drink Themed
+    'sushi',
+    'burger-swap',
+    'pizza-game',
+    'sake-token',
+    'tacos',
+    'beer-money',
+    'wine',
+    
+    // Sports & Fan Tokens
+    'santos-fc-fan-token',
+    'barcelona-fan-token',
+    'juventus-fan-token',
+    'paris-saint-germain-fan-token',
+    'manchester-city-fan-token',
+    'ufc-fan-token',
+    
+    // Emoji & Symbol Coins
+    'moon',
+    'rocket-raccoon',
+    'fire-protocol',
+    'heart-protocol',
+    'star-coin',
+    'diamond-token',
+    'thunder-token',
+    
+    // New Layer 1/2 Ecosystem Tokens
+    'arbitrum',
+    'optimism',
+    'zkSync',
+    'linea',
+    'scroll',
+    'blast',
+    'mantle',
+    'manta-network',
+    'sei-network',
+    'celestia',
+    'berachain',
+    
+    // DeFi Yield Farmers
+    'yearn-finance',
+    'convex-finance',
+    'curve-dao-token',
+    'aave',
+    'compound-governance-token',
+    'synthetix-network-token',
+    'maker',
+    
+    // NFT & Creator Coins
+    'apecoin',
+    'looks-rare',
+    'x2y2',
+    'rarible',
+    'superrare',
+    'doodles',
+    'pudgy-penguins',
+    
+    // Experimental & New Launches
+    'friend-tech',
+    'blur',
+    'paraswap',
+    'maverick-protocol',
+    'velocore',
+    'traderjoe',
+    'camelot-token',
+    
+    // Asian Market Memecoins
+    'babydoge-2',
+    'floki-ceo',
+    'saitama-v2',
+    'luffy',
+    'zoro-inu',
+    'naruto',
+    'goku',
+    
+    // Utility Memecoins
+    'shiba-predator',
+    'bone-shibaswap',
+    'leash-token',
+    'treat-token',
+    'cheems',
+    'doge-killer',
+    'shib-army',
   ];
 
   start() {
@@ -438,9 +604,10 @@ class PriceFeedService extends EventEmitter {
     }
   }
 
-  async fetchTopGainers(limit: number = 50): Promise<TopGainer[]> {
+  async fetchTopGainers(limit: number = 100): Promise<TopGainer[]> {
     await this.respectRateLimit();
     
+    // EXPANDED: Get top 100 gainers from meme-token category
     const url = `${this.API_BASE}/coins/markets?vs_currency=usd&order=percent_change_24h_desc&per_page=${limit}&page=1&sparkline=false&price_change_percentage=24h&category=meme-token`;
     
     try {
@@ -472,48 +639,48 @@ class PriceFeedService extends EventEmitter {
 
   async discoverNewMemecoins(): Promise<void> {
     try {
-      console.log('🔍 Discovering trending memecoins and newly launched coins...');
+      console.log('🔍 EXPANDED SEARCH: Discovering trending memecoins and newly launched coins...');
       
       // Fetch trending coins
       const trendingCoins = await this.fetchTrendingCoins();
-      const topGainers = await this.fetchTopGainers(30);
+      const topGainers = await this.fetchTopGainers(100); // EXPANDED: Get top 100 instead of 30
       
-      // NEW: Fetch newly launched coins
+      // Fetch newly launched coins
       const newlyLaunched = await this.fetchNewlyLaunchedCoins();
       const recentlyAdded = await this.fetchRecentlyAddedCoins();
       const lowCapGems = await this.fetchLowCapGems();
       
-      // Process trending coins
+      // Process trending coins (all of them)
       for (const trendingCoin of trendingCoins) {
         await this.processDiscoveredCoin(trendingCoin.id, trendingCoin.name, trendingCoin.symbol);
       }
       
-      // Process top gainers (focus on memecoins)
+      // EXPANDED: Process top gainers with lower threshold (10% instead of 20%, $100k instead of $1M)
       for (const gainer of topGainers) {
-        if (gainer.price_change_percentage_24h > 20 && gainer.market_cap > 1000000) {
+        if (gainer.price_change_percentage_24h > 10 && gainer.market_cap > 100000) {
           await this.processDiscoveredCoin(gainer.id, gainer.name, gainer.symbol);
         }
       }
       
-      // NEW: Process newly launched coins (lower thresholds for new launches)
+      // Process newly launched coins (all of them - threshold check in processNewLaunch)
       for (const newCoin of newlyLaunched) {
         await this.processNewLaunch(newCoin.id, newCoin.name, newCoin.symbol, newCoin.market_cap);
       }
       
-      // NEW: Process recently added coins to CoinGecko
+      // Process recently added coins to CoinGecko (all of them)
       for (const recentCoin of recentlyAdded) {
         await this.processNewLaunch(recentCoin.id, recentCoin.name, recentCoin.symbol, recentCoin.market_cap);
       }
       
-      // NEW: Process low cap gems (potential early launches)
+      // EXPANDED: Process low cap gems with lower threshold (20% instead of 50%)
       for (const gem of lowCapGems) {
-        if (gem.price_change_percentage_24h > 50) { // High growth potential
+        if (gem.price_change_percentage_24h > 20) { // Lower threshold for more opportunities
           await this.processNewLaunch(gem.id, gem.name, gem.symbol, gem.market_cap);
         }
       }
       
       const totalProcessed = trendingCoins.length + topGainers.length + newlyLaunched.length + recentlyAdded.length + lowCapGems.length;
-      console.log(`🎯 Discovered and processed ${totalProcessed} potential coins (including ${newlyLaunched.length + recentlyAdded.length + lowCapGems.length} newly launched)`);
+      console.log(`🎯 EXPANDED SEARCH: Discovered ${totalProcessed} potential coins (${newlyLaunched.length + recentlyAdded.length + lowCapGems.length} newly launched)`);
     } catch (error) {
       console.error('Error in coin discovery:', error);
     }
@@ -539,17 +706,17 @@ class PriceFeedService extends EventEmitter {
       
       const data = await response.json();
       
-      // Filter for coins that appear to be recently launched
+      // EXPANDED: Filter for more recently launched coins
       return data
         .filter((coin: any) => {
           // Look for signs of new launches: low market cap but high price change
           const marketCap = coin.market_cap || 0;
           const priceChange24h = coin.price_change_percentage_24h || 0;
           
-          return marketCap > 100000 && marketCap < 50000000 && // $100K - $50M range
-                 Math.abs(priceChange24h) > 10; // Significant price movement
+          return marketCap > 50000 && marketCap < 100000000 && // EXPANDED: $50K - $100M range
+                 Math.abs(priceChange24h) > 5; // EXPANDED: Lower threshold (5% instead of 10%)
         })
-        .slice(0, 20) // Limit to top 20 candidates
+        .slice(0, 50) // EXPANDED: Top 50 candidates instead of 20
         .map((coin: any) => ({
           id: coin.id,
           symbol: coin.symbol,
@@ -586,16 +753,16 @@ class PriceFeedService extends EventEmitter {
       
       const data = await response.json();
       
-      // Filter for coins that appear to be recent additions
+      // EXPANDED: Filter for more recent additions
       return data
         .filter((coin: any) => {
           const marketCap = coin.market_cap || 0;
           const volume = coin.total_volume || 0;
           
-          return marketCap > 50000 && marketCap < 10000000 && // $50K - $10M range
-                 volume > 5000; // Some trading activity
+          return marketCap > 25000 && marketCap < 25000000 && // EXPANDED: $25K - $25M range
+                 volume > 1000; // EXPANDED: Lower volume threshold
         })
-        .slice(0, 15) // Limit to top 15 candidates
+        .slice(0, 30) // EXPANDED: Top 30 candidates instead of 15
         .map((coin: any) => ({
           id: coin.id,
           symbol: coin.symbol,
@@ -631,18 +798,18 @@ class PriceFeedService extends EventEmitter {
       
       const data = await response.json();
       
-      // Filter for low cap gems with explosive growth
+      // EXPANDED: Filter for more low cap gems
       return data
         .filter((coin: any) => {
           const marketCap = coin.market_cap || 0;
           const priceChange24h = coin.price_change_percentage_24h || 0;
           const volume = coin.total_volume || 0;
           
-          return marketCap > 25000 && marketCap < 5000000 && // $25K - $5M range
-                 priceChange24h > 30 && // 30%+ gain in 24h
-                 volume > 1000; // Some liquidity
+          return marketCap > 10000 && marketCap < 10000000 && // EXPANDED: $10K - $10M range
+                 priceChange24h > 15 && // EXPANDED: 15%+ gain (instead of 30%)
+                 volume > 500; // EXPANDED: Lower liquidity threshold
         })
-        .slice(0, 10) // Limit to top 10 gems
+        .slice(0, 25) // EXPANDED: Top 25 gems instead of 10
         .map((coin: any) => ({
           id: coin.id,
           symbol: coin.symbol,
@@ -680,12 +847,12 @@ class PriceFeedService extends EventEmitter {
       const coinData = await response.json();
       const marketData = coinData.market_data;
       
-      // Lower thresholds for newly launched coins
+      // EXPANDED: Lower thresholds for newly launched coins
       const coinMarketCap = marketData?.market_cap?.usd || 0;
       const volume = marketData?.total_volume?.usd || 0;
       
-      // More lenient criteria for new launches: $25k market cap, $1k volume
-      if (coinMarketCap > 25000 && volume > 1000) {
+      // EXPANDED: More lenient criteria for new launches: $10k market cap, $500 volume
+      if (coinMarketCap > 10000 && volume > 500) {
         await storage.createToken({
           symbol: symbol.toUpperCase(),
           name: name,
@@ -724,11 +891,11 @@ class PriceFeedService extends EventEmitter {
       const coinData = await response.json();
       const marketData = coinData.market_data;
       
-      // Only add coins that meet memecoin criteria
+      // EXPANDED: Accept more coins with lower criteria
       const marketCap = marketData?.market_cap?.usd || 0;
       const volume = marketData?.total_volume?.usd || 0;
       
-      if (marketCap > 500000 && volume > 10000) { // Min $500k market cap and $10k volume
+      if (marketCap > 100000 && volume > 2000) { // EXPANDED: Min $100k market cap and $2k volume
         await storage.createToken({
           symbol: symbol.toUpperCase(),
           name: name,
