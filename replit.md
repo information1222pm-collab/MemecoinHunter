@@ -8,6 +8,19 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### October 10, 2025 - Portfolio Position Display Fix
+- **Critical Bug Fixed**: Portfolio was displaying closed positions and showing small token amounts as "0 tokens"
+- **Root Causes Identified**:
+  1. Backend returned ALL positions including closed ones (amount = 0)
+  2. Frontend used `toLocaleString()` which rounded very small numbers to "0"
+- **Solution Implemented**:
+  - Backend filters out closed positions: `positions.filter(p => parseFloat(p.amount) > 0)`
+  - Frontend `formatTokenAmount()` function properly handles small numbers:
+    - Very small (< 0.000001): Scientific notation (e.g., "8.66e-5")
+    - Small (< 1): Up to 8 decimals with trailing zeros stripped (e.g., "0.00008657")
+    - Regular (>= 1): Standard formatting with max 2 decimals
+- **Impact**: Portfolio now shows only active positions with accurate token amounts. Positions like BTC with 0.00008657 tokens display correctly instead of "0 tokens"
+
 ### October 10, 2025 - Portfolio Analytics Calculation Fix
 - **Critical Bug Fixed**: Portfolio calculations were inaccurate, showing contradictory metrics (negative dollar amount with positive percentage)
 - **Root Causes Identified**:
