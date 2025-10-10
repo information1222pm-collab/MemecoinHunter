@@ -38,10 +38,15 @@ class AutoTrader extends EventEmitter {
   
   private strategy = {
     minConfidence: 75, // Dynamic minimum confidence
-    maxPositionSize: 1000, // $1000 max per position
-    stopLossPercentage: 8, // 8% stop loss
-    takeProfitPercentage: 15, // 15% take profit
+    maxPositionSize: 1000, // $1000 max per position (will use dynamic sizing from RiskManager)
+    stopLossPercentage: 5, // IMPROVED: Tighter 5% stop loss for better risk-reward
+    takeProfitPercentage: 15, // 15% final take profit
+    takeProfitStages: [6, 10, 15], // IMPROVED: Multi-stage take-profit (sell portions at each level)
     sellOnlyTakeProfit: 5, // More aggressive take profit when in sell-only mode
+    minCashPercentage: 10, // IMPROVED: Minimum 10% cash buffer required
+    maxDailyLossPercentage: 5, // IMPROVED: Pause trading if daily loss exceeds 5%
+    minPatternWinRate: 0.5, // IMPROVED: Require 50%+ win rate for pattern
+    minPatternExpectancy: 0.5, // IMPROVED: Require positive expectancy (avg gain > avg loss)
   };
 
   async start() {
@@ -233,11 +238,33 @@ class AutoTrader extends EventEmitter {
     try {
       const baseConfidence = parseFloat(pattern.confidence.toString());
       
-      // Get pattern performance for confidence adjustment
+      // IMPROVED: Get pattern performance for comprehensive validation
       const performance = await patternPerformanceAnalyzer.getPatternPerformance(
         pattern.patternType, 
         pattern.timeframe
       );
+      
+      // IMPROVED: Gate trade on proven pattern performance (win rate + expectancy)
+      if (performance) {
+        // Check if pattern has sufficient profitable track record
+        if (performance.winRate < this.strategy.minPatternWinRate) {
+          console.log(`🚫 Pattern ${pattern.patternType} REJECTED: Win rate ${(performance.winRate * 100).toFixed(1)}% < ${(this.strategy.minPatternWinRate * 100).toFixed(0)}% required`);
+          return;
+        }
+        
+        // Calculate expectancy: (avgReturn * winRate) - assumes averageReturn is already decimal
+        const expectancy = performance.averageReturn * performance.winRate;
+        
+        if (expectancy < this.strategy.minPatternExpectancy) {
+          console.log(`🚫 Pattern ${pattern.patternType} REJECTED: Expectancy ${expectancy.toFixed(2)} < ${this.strategy.minPatternExpectancy} required`);
+          return;
+        }
+        
+        console.log(`✅ Pattern ${pattern.patternType} APPROVED: Win rate ${(performance.winRate * 100).toFixed(1)}%, Expectancy ${expectancy.toFixed(2)}`);
+      } else {
+        // New pattern with no history - allow but log it
+        console.log(`⚠️ Pattern ${pattern.patternType} has no performance history - executing with caution`);
+      }
       
       // Apply confidence multiplier based on historical performance
       const adjustedConfidence = performance 
@@ -417,12 +444,44 @@ class AutoTrader extends EventEmitter {
       const portfolio = await storage.getPortfolio(portfolioId);
       if (!portfolio) return;
       
-      const tradeValue = 500;
       const availableCash = parseFloat(portfolio.cashBalance || '0');
+      const totalValue = parseFloat(portfolio.totalValue || '10000');
+      const startingCapital = parseFloat(portfolio.startingCapital || '10000');
+      const totalPnL = parseFloat(portfolio.totalPnL || '0');
+      const dailyPnL = parseFloat(portfolio.dailyPnL || '0');
+      
+      // IMPROVED: Check daily loss threshold (5% of starting capital)
+      const dailyLossThreshold = startingCapital * (this.strategy.maxDailyLossPercentage / 100);
+      if (dailyPnL < -dailyLossThreshold) {
+        console.log(`🛑 [Portfolio ${portfolioId}] DAILY LOSS LIMIT EXCEEDED: ${dailyPnL.toFixed(2)} < -$${dailyLossThreshold.toFixed(2)}`);
+        console.log(`🔴 [Portfolio ${portfolioId}] Trading paused for today to prevent further losses`);
+        return;
+      }
+      
+      // IMPROVED: Dynamic position sizing from RiskManager
+      const positionSizing = await riskManager.calculatePositionSizing(
+        portfolioId,
+        signal.tokenId,
+        signal.price,
+        signal.confidence / 100
+      );
+      
+      const tradeValue = Math.min(positionSizing.recommendedSize, this.strategy.maxPositionSize);
+      console.log(`💡 [Portfolio ${portfolioId}] Dynamic position sizing: $${tradeValue.toFixed(2)} (${positionSizing.riskLevel} risk, ${positionSizing.reasoning})`);
+      
+      // IMPROVED: Enforce 10% minimum cash floor
+      const minCashRequired = totalValue * (this.strategy.minCashPercentage / 100);
+      const cashAfterTrade = availableCash - tradeValue;
+      
+      if (cashAfterTrade < minCashRequired) {
+        console.log(`🚫 [Portfolio ${portfolioId}] CASH FLOOR PROTECTION: Trade would leave $${cashAfterTrade.toFixed(2)} (< $${minCashRequired.toFixed(2)} required)`);
+        console.log(`💰 [Portfolio ${portfolioId}] Maintaining ${this.strategy.minCashPercentage}% cash buffer for risk management`);
+        return;
+      }
       
       // If insufficient funds, try to rebalance by selling stagnant positions at break-even or above
       if (availableCash < tradeValue) {
-        console.log(`💸 [Portfolio ${portfolioId}] Insufficient funds: Available $${availableCash.toFixed(2)}, Need $${tradeValue}`);
+        console.log(`💸 [Portfolio ${portfolioId}] Insufficient funds: Available $${availableCash.toFixed(2)}, Need $${tradeValue.toFixed(2)}`);
         console.log(`🔄 [Portfolio ${portfolioId}] Attempting to rebalance portfolio by selling stagnant positions...`);
         
         const freedCapital = await this.rebalancePortfolioForNewOpportunity(signal, tradeValue, portfolioId);
@@ -437,13 +496,13 @@ class AutoTrader extends EventEmitter {
           console.log(`💰 [Portfolio ${portfolioId}] Updated cash balance after rebalancing: $${newAvailableCash.toFixed(2)}`);
           
           if (newAvailableCash < tradeValue) {
-            console.log(`❌ [Portfolio ${portfolioId}] Still insufficient funds after rebalancing: $${newAvailableCash.toFixed(2)} < $${tradeValue}`);
+            console.log(`❌ [Portfolio ${portfolioId}] Still insufficient funds after rebalancing: $${newAvailableCash.toFixed(2)} < $${tradeValue.toFixed(2)}`);
             return;
           }
           
           // Continue with the buy after successful rebalancing
         } else {
-          console.log(`❌ [Portfolio ${portfolioId}] Could not free enough capital ($${freedCapital.toFixed(2)} < $${tradeValue})`);
+          console.log(`❌ [Portfolio ${portfolioId}] Could not free enough capital ($${freedCapital.toFixed(2)} < $${tradeValue.toFixed(2)})`);
           return;
         }
       }
