@@ -19,7 +19,9 @@ import {
   BarChart3, 
   Award 
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useWebSocket } from "@/hooks/use-websocket";
+import { useEffect } from "react";
 
 interface AnalyticsData {
   pnl: {
@@ -74,19 +76,44 @@ interface ExposureData {
 }
 
 function DashboardContent() {
+  const queryClient = useQueryClient();
+  const { isConnected, lastMessage } = useWebSocket();
+
   // Fetch analytics data with auto-refresh
   const { data: analyticsData, isLoading: analyticsLoading } = useQuery<AnalyticsData>({
     queryKey: ['/api/analytics/all'],
-    refetchInterval: 15000,
+    refetchInterval: 30000, // Reduced polling since WebSocket will handle real-time updates
   });
 
   // Fetch risk exposure data with auto-refresh
   const { data: exposureData, isLoading: exposureLoading } = useQuery<ExposureData>({
     queryKey: ['/api/risk/exposure'],
-    refetchInterval: 15000,
+    refetchInterval: 30000, // Reduced polling since WebSocket will handle real-time updates
   });
 
   const isLoading = analyticsLoading || exposureLoading;
+
+  // WebSocket real-time updates
+  useEffect(() => {
+    if (!lastMessage || !isConnected) return;
+
+    const { type } = lastMessage;
+
+    switch (type) {
+      case 'trade_executed':
+      case 'portfolio_updated':
+      case 'positions_updated':
+        // Invalidate analytics and risk data when portfolio changes
+        queryClient.invalidateQueries({ queryKey: ['/api/analytics/all'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/risk/exposure'] });
+        break;
+      
+      case 'price_update':
+        // Update risk exposure on price changes (affects position values)
+        queryClient.invalidateQueries({ queryKey: ['/api/risk/exposure'] });
+        break;
+    }
+  }, [lastMessage, isConnected, queryClient]);
 
   // Formatting utilities
   const formatCurrency = (value: number) => {

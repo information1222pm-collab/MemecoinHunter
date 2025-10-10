@@ -8,12 +8,15 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### October 10, 2025 - Portfolio Live Data Fix
-- **Critical Bug Fixed**: Portfolio page wasn't receiving live WebSocket updates
-- **Root Cause**: Demo portfolio updates were sent only to the demo user ID, but viewers might not be authenticated as that user
-- **Solution**: Demo portfolio updates now broadcast globally (like market data) so all viewers receive real-time updates
+### October 10, 2025 - Live Data Updates Fixed (Dashboard & Portfolio)
+- **Critical Bug Fixed**: Dashboard and Portfolio pages weren't receiving live WebSocket updates
+- **Dashboard Issue**: Only used polling (15s intervals) with no WebSocket listeners - now has real-time updates via WebSocket
+- **Portfolio Issue**: Demo portfolio updates were sent only to the demo user ID, but viewers might not be authenticated as that user
+- **Solution**: 
+  - Demo portfolio updates now broadcast globally (like market data) so all viewers receive real-time updates
+  - Dashboard now listens for trade_executed, portfolio_updated, positions_updated, and price_update events
 - **Security**: Authenticated user portfolios remain secure with user-scoped broadcasts
-- **Impact**: Portfolio page now shows live position values, price updates, and trade executions in real-time
+- **Impact**: Both pages now show live position values, price updates, trade executions, and analytics in real-time
 
 ## System Architecture
 
