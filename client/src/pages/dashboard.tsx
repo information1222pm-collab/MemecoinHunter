@@ -103,14 +103,17 @@ function DashboardContent() {
       case 'trade_executed':
       case 'portfolio_updated':
       case 'positions_updated':
-        // Invalidate analytics and risk data when portfolio changes
+        // Invalidate all dashboard data when portfolio changes
         queryClient.invalidateQueries({ queryKey: ['/api/analytics/all'] });
         queryClient.invalidateQueries({ queryKey: ['/api/risk/exposure'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default', 'trades'] });
         break;
       
       case 'price_update':
-        // Update risk exposure on price changes (affects position values)
+        // Update all price-dependent data on price changes
         queryClient.invalidateQueries({ queryKey: ['/api/risk/exposure'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default'] });
         break;
     }
   }, [lastMessage, isConnected, queryClient]);
