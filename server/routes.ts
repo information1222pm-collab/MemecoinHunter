@@ -14,7 +14,8 @@ import { positionTracker } from "./services/position-tracker";
 import { tradingAnalyticsService } from "./services/trading-analytics";
 import { tradeJournalService } from "./services/trade-journal";
 import { riskReportsService } from "./services/risk-reports";
-import { insertUserSchema, insertTradeSchema, insertTokenSchema } from "@shared/schema";
+import { alertService } from "./services/alert-service";
+import { insertUserSchema, insertTradeSchema, insertTokenSchema, insertAlertRuleSchema } from "@shared/schema";
 import { z } from "zod";
 import * as bcrypt from "bcrypt";
 import session from "express-session";
@@ -56,7 +57,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Comprehensive CSRF protection for ALL state-changing endpoints (CRITICAL SECURITY FIX)
   app.use([
     '/api/auth/login', '/api/auth/register', '/api/auth/logout',
-    '/api/portfolio', '/api/trades', '/api/positions', '/api/alerts', 
+    '/api/portfolio', '/api/trades', '/api/positions', '/api/alerts', '/api/price-alerts',
     '/api/api-keys', '/api/settings', '/api/auto-trader'
   ].map(path => [path, path + '/*']).flat(), csrfProtection);
   
@@ -312,6 +313,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     scanner.start();
     priceFeed.start();
     
+    // Start alert service and wire up WebSocket broadcaster
+    console.log('🔔 Starting Alert Service...');
+    alertService.start();
+    alertService.setBroadcaster(broadcastToUser);
+    
     // CRITICAL: Start auto-trader BEFORE ML analyzer so it can listen for pattern events
     console.log('🤖 Starting Auto-Trader service...');
     try {
@@ -354,6 +360,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   priceFeed.on('priceUpdate', (update) => {
     broadcastMarketData({ type: 'price_update', data: update });
+    // Forward price updates to alert service
+    alertService.handlePriceUpdate(update);
   });
 
   // Auto-trader real-time events (CRITICAL SECURITY FIX)
@@ -880,6 +888,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(alert);
     } catch (error) {
       res.status(500).json({ message: "Failed to mark alert as read", error });
+    }
+  });
+
+  // Price Alert Routes (Protected)
+  app.get("/api/price-alerts", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).user.id;
+      const alerts = await storage.getAlertsByUser(userId);
+      res.json(alerts);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch price alerts", error });
+    }
+  });
+
+  app.post("/api/price-alerts", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).user.id;
+      
+      // Validate and sanitize input using Zod (CRITICAL SECURITY FIX)
+      const validatedData = insertAlertRuleSchema.parse({
+        ...req.body,
+        userId
+      });
+      
+      const alert = await storage.createAlertRule(validatedData);
+      res.status(201).json(alert);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid input data", 
+          errors: error.errors.map(e => ({ field: e.path.join('.'), message: e.message }))
+        });
+      }
+      res.status(500).json({ message: "Failed to create price alert", error });
+    }
+  });
+
+  app.patch("/api/price-alerts/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).user.id;
+      const alertId = req.params.id;
+      
+      // Check ownership
+      const existingAlert = await storage.getAlertRule(alertId);
+      if (!existingAlert) {
+        return res.status(404).json({ message: "Alert not found" });
+      }
+      if (existingAlert.userId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      // Validate and sanitize update data using Zod (CRITICAL SECURITY FIX)
+      // Use partial schema to allow updating only specific fields
+      const updateSchema = insertAlertRuleSchema.partial().omit({ userId: true });
+      const validatedData = updateSchema.parse(req.body);
+      
+      const updatedAlert = await storage.updateAlertRule(alertId, validatedData);
+      res.json(updatedAlert);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid input data", 
+          errors: error.errors.map(e => ({ field: e.path.join('.'), message: e.message }))
+        });
+      }
+      res.status(500).json({ message: "Failed to update price alert", error });
+    }
+  });
+
+  app.delete("/api/price-alerts/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).user.id;
+      const alertId = req.params.id;
+      
+      // Check ownership
+      const existingAlert = await storage.getAlertRule(alertId);
+      if (!existingAlert) {
+        return res.status(404).json({ message: "Alert not found" });
+      }
+      if (existingAlert.userId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      await storage.deleteAlertRule(alertId);
+      res.json({ message: "Alert deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete price alert", error });
+    }
+  });
+
+  app.get("/api/price-alerts/history", requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).user.id;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const history = await storage.getAlertHistory(userId, limit);
+      res.json(history);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch alert history", error });
     }
   });
 

@@ -173,6 +173,31 @@ export const riskSettings = pgTable("risk_settings", {
   lastUpdated: timestamp("last_updated").defaultNow(),
 });
 
+// Price Alert Rules
+export const alertRules = pgTable("alert_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  tokenId: varchar("token_id").notNull().references(() => tokens.id),
+  conditionType: text("condition_type").notNull(), // 'price_above', 'price_below', 'percent_change_up', 'percent_change_down'
+  thresholdValue: decimal("threshold_value", { precision: 20, scale: 8 }).notNull(),
+  percentWindow: decimal("percent_window", { precision: 5, scale: 2 }), // For percent change alerts
+  comparisonWindow: text("comparison_window"), // '1h', '24h', '7d' for percent change
+  isEnabled: boolean("is_enabled").default(true),
+  lastTriggeredAt: timestamp("last_triggered_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Alert Events (history of triggered alerts)
+export const alertEvents = pgTable("alert_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  alertId: varchar("alert_id").notNull().references(() => alertRules.id),
+  triggeredPrice: decimal("triggered_price", { precision: 20, scale: 8 }).notNull(),
+  triggeredPercent: decimal("triggered_percent", { precision: 8, scale: 4 }),
+  payload: jsonb("payload"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   portfolio: one(portfolios),
@@ -233,6 +258,16 @@ export const riskSettingsRelations = relations(riskSettings, ({ one }) => ({
   user: one(users, { fields: [riskSettings.userId], references: [users.id] }),
 }));
 
+export const alertRulesRelations = relations(alertRules, ({ one, many }) => ({
+  user: one(users, { fields: [alertRules.userId], references: [users.id] }),
+  token: one(tokens, { fields: [alertRules.tokenId], references: [tokens.id] }),
+  events: many(alertEvents),
+}));
+
+export const alertEventsRelations = relations(alertEvents, ({ one }) => ({
+  alert: one(alertRules, { fields: [alertEvents.alertId], references: [alertRules.id] }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -279,6 +314,30 @@ export const insertAuditLogSchema = createInsertSchema(auditLog).omit({
 export const insertRiskSettingsSchema = createInsertSchema(riskSettings).omit({
   id: true,
   lastUpdated: true,
+});
+
+export const insertAlertRuleSchema = createInsertSchema(alertRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastTriggeredAt: true,
+}).extend({
+  // Ensure numeric fields are properly coerced and validated (CRITICAL SECURITY FIX)
+  thresholdValue: z.coerce.number().positive({ message: "Threshold value must be a positive number" }),
+  percentWindow: z.coerce.number().positive({ message: "Percent window must be a positive number" }).optional().nullable(),
+  // Ensure required string fields are not empty
+  userId: z.string().min(1, { message: "User ID is required" }),
+  tokenId: z.string().min(1, { message: "Token ID is required" }),
+  conditionType: z.enum(['price_above', 'price_below', 'percent_change_up', 'percent_change_down'], {
+    errorMap: () => ({ message: "Invalid condition type" })
+  }),
+  comparisonWindow: z.string().optional().nullable(),
+  isEnabled: z.boolean().optional(),
+});
+
+export const insertAlertEventSchema = createInsertSchema(alertEvents).omit({
+  id: true,
+  createdAt: true,
 });
 
 export const insertPositionSchema = createInsertSchema(positions).omit({
@@ -414,3 +473,9 @@ export type InsertExchangeBalance = typeof exchangeBalances.$inferInsert;
 
 export type TradingConfig = typeof tradingConfig.$inferSelect;
 export type InsertTradingConfig = typeof tradingConfig.$inferInsert;
+
+export type AlertRule = typeof alertRules.$inferSelect;
+export type InsertAlertRule = z.infer<typeof insertAlertRuleSchema>;
+
+export type AlertEvent = typeof alertEvents.$inferSelect;
+export type InsertAlertEvent = z.infer<typeof insertAlertEventSchema>;

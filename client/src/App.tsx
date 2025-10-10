@@ -13,6 +13,7 @@ import Analytics from "@/pages/analytics";
 import Activity from "@/pages/activity";
 import Journal from "@/pages/journal";
 import RiskReports from "@/pages/risk-reports";
+import Alerts from "@/pages/alerts";
 import Terminal from "@/pages/terminal";
 import Subscription from "@/pages/subscription";
 import Settings from "@/pages/settings";
@@ -62,6 +63,7 @@ function Router() {
       <Route path="/activity" component={Activity} />
       <Route path="/journal" component={Journal} />
       <Route path="/risk" component={RiskReports} />
+      <Route path="/alerts" component={Alerts} />
       <Route path="/terminal" component={Terminal} />
       <Route path="/subscription" component={Subscription} />
       <Route path="/settings" component={Settings} />

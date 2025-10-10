@@ -2,12 +2,14 @@ import {
   users, tokens, portfolios, trades, positions, scanAlerts, 
   priceHistory, patterns, subscriptions, patternPerformance, mlLearningParams, auditLog,
   exchangeConfig, exchangeTrades, exchangeBalances, tradingConfig, apiKeys,
+  alertRules, alertEvents,
   type User, type InsertUser, type Token, type InsertToken,
   type Portfolio, type InsertPortfolio, type Trade, type InsertTrade,
   type Position, type InsertPosition, type ScanAlert, type InsertScanAlert,
   type PriceHistory, type InsertPriceHistory, type Pattern, type InsertPattern,
   type Subscription, type InsertSubscription, type PatternPerformance, type InsertPatternPerformance,
-  type MLLearningParams, type InsertMLLearningParams
+  type MLLearningParams, type InsertMLLearningParams,
+  type AlertRule, type InsertAlertRule, type AlertEvent, type InsertAlertEvent
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -104,6 +106,16 @@ export interface IStorage {
   upsertExchangeBalance(balance: any): Promise<any>; // InsertExchangeBalance -> ExchangeBalance
   getAllExchangeBalances(): Promise<any[]>; // ExchangeBalance[]
   updateExchangeTrade(id: string, updates: any): Promise<any>; // CRITICAL FIX: Missing interface declaration
+
+  // Price Alert operations
+  getAlertsByUser(userId: string): Promise<AlertRule[]>;
+  createAlertRule(data: InsertAlertRule): Promise<AlertRule>;
+  updateAlertRule(id: string, data: Partial<InsertAlertRule>): Promise<AlertRule>;
+  deleteAlertRule(id: string): Promise<void>;
+  getActiveAlerts(): Promise<AlertRule[]>;
+  createAlertEvent(data: InsertAlertEvent): Promise<AlertEvent>;
+  getAlertHistory(userId: string, limit?: number): Promise<AlertEvent[]>;
+  getAlertRule(id: string): Promise<AlertRule | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -549,6 +561,62 @@ export class DatabaseStorage implements IStorage {
       console.error('Error updating exchange trade:', error);
       throw error;
     }
+  }
+
+  // Price Alert operations
+  async getAlertsByUser(userId: string): Promise<AlertRule[]> {
+    return await db.select().from(alertRules)
+      .where(eq(alertRules.userId, userId))
+      .orderBy(desc(alertRules.createdAt));
+  }
+
+  async createAlertRule(data: InsertAlertRule): Promise<AlertRule> {
+    const [alert] = await db.insert(alertRules).values(data).returning();
+    return alert;
+  }
+
+  async updateAlertRule(id: string, data: Partial<InsertAlertRule>): Promise<AlertRule> {
+    const [alert] = await db.update(alertRules)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(alertRules.id, id))
+      .returning();
+    return alert;
+  }
+
+  async deleteAlertRule(id: string): Promise<void> {
+    await db.delete(alertRules).where(eq(alertRules.id, id));
+  }
+
+  async getActiveAlerts(): Promise<AlertRule[]> {
+    return await db.select().from(alertRules)
+      .where(eq(alertRules.isEnabled, true))
+      .orderBy(desc(alertRules.createdAt));
+  }
+
+  async createAlertEvent(data: InsertAlertEvent): Promise<AlertEvent> {
+    const [event] = await db.insert(alertEvents).values(data).returning();
+    return event;
+  }
+
+  async getAlertHistory(userId: string, limit: number = 50): Promise<AlertEvent[]> {
+    const userAlerts = await db.select().from(alertRules)
+      .where(eq(alertRules.userId, userId));
+    
+    const alertIds = userAlerts.map(a => a.id);
+    
+    if (alertIds.length === 0) {
+      return [];
+    }
+    
+    return await db.select().from(alertEvents)
+      .where(sql`${alertEvents.alertId} = ANY(${alertIds})`)
+      .orderBy(desc(alertEvents.createdAt))
+      .limit(limit);
+  }
+
+  async getAlertRule(id: string): Promise<AlertRule | undefined> {
+    const [alert] = await db.select().from(alertRules).where(eq(alertRules.id, id));
+    return alert || undefined;
   }
 }
 
