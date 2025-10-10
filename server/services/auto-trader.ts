@@ -866,6 +866,7 @@ class AutoTrader extends EventEmitter {
             
             totalPositionValue += positionValue;
             activePositions.push({
+              id: position.id, // Add unique position ID to prevent duplicate React keys
               tokenId: position.tokenId,
               symbol: token.symbol,
               amount: parseFloat(position.amount),

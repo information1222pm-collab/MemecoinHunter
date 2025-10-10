@@ -98,6 +98,7 @@ export default function Home() {
     sellTrades: number;
     activePositions: number;
     positions: Array<{
+      id: string;
       tokenId: string;
       symbol: string;
       amount: number;
@@ -696,7 +697,7 @@ export default function Home() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {autoTraderPortfolio.positions.slice(0, 4).map((position, index) => (
                       <motion.div 
-                        key={position.tokenId}
+                        key={position.id}
                         className="flex items-center justify-between p-3 rounded-lg bg-black/20 border border-white/10"
                         whileHover={{ scale: 1.02 }}
                         initial={{ opacity: 0, x: -20 }}
