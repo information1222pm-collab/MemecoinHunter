@@ -495,10 +495,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Database defaults: startingCapital = $10,000, cashBalance = $10,000
       await storage.createPortfolio({ userId: user.id });
       
-      // Security audit log
-      console.log(`[AUDIT] User registered: ${user.email} at ${new Date().toISOString()}`);
+      // Automatically log in user after successful registration
+      req.session.userId = user.id;
+      req.session.userEmail = user.email;
       
-      res.json({ user: { id: user.id, username: user.username, email: user.email } });
+      // Save session to database to ensure persistence
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+      
+      // Security audit log
+      console.log(`[AUDIT] User registered and auto-logged in: ${user.email} at ${new Date().toISOString()}`);
+      
+      res.json({ 
+        success: true,
+        user: { id: user.id, username: user.username, email: user.email } 
+      });
     } catch (error) {
       console.error(`[SECURITY] Registration failed for ${req.body?.email}: ${error}`);
       res.status(400).json({ message: "Invalid user data", error });
@@ -532,6 +547,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create secure session (CRITICAL SECURITY FIX)
       req.session.userId = user.id;
       req.session.userEmail = user.email;
+      
+      // Save session to database to ensure persistence
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => {
+          if (err) {
+            console.error(`[SECURITY] Session save error for ${email}:`, err);
+            reject(err);
+          } else {
+            resolve();
+          }
+        });
+      });
       
       // Security audit log
       console.log(`[AUDIT] Successful login: ${user.email} from ${req.ip || 'unknown'} at ${new Date().toISOString()}`);

@@ -116,12 +116,11 @@ export default function SignIn() {
     },
     onSuccess: () => {
       toast({
-        title: "Account created!",
-        description: "Your account has been created successfully. Please log in.",
+        title: "Welcome to CryptoHobby!",
+        description: "Your account has been created and you've been logged in automatically.",
       });
-      // Switch to login tab
-      const loginTab = document.querySelector('[value="login"]') as HTMLElement;
-      loginTab?.click();
+      // Refetch auth status to update the UI
+      refetch();
     },
     onError: (error: any) => {
       toast({
