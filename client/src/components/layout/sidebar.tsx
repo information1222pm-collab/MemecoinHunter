@@ -42,12 +42,76 @@ const subscriptionItems = [
   { href: "/billing", icon: CreditCard, labelKey: "navigation.billing" },
 ];
 
+// Icon-specific animation variants
+const iconAnimations = {
+  Zap: {
+    hover: { rotate: [0, -10, 10, -10, 0], transition: { duration: 0.5 } },
+    active: { 
+      scale: [1, 1.2, 1],
+      rotate: [0, 5, -5, 0],
+      transition: { duration: 2, repeat: Infinity }
+    }
+  },
+  TrendingUp: {
+    hover: { y: [-2, 2, -2], transition: { duration: 0.6, repeat: 3 } },
+    active: { 
+      y: [0, -3, 0],
+      transition: { duration: 1.5, repeat: Infinity }
+    }
+  },
+  Activity: {
+    hover: { scale: [1, 1.1, 1], transition: { duration: 0.4, repeat: 2 } },
+    active: {
+      scale: [1, 1.15, 1],
+      transition: { duration: 1, repeat: Infinity }
+    }
+  },
+  Bell: {
+    hover: { rotate: [0, -20, 20, -20, 20, 0], transition: { duration: 0.6 } },
+    active: {
+      rotate: [0, 10, -10, 0],
+      transition: { duration: 2, repeat: Infinity }
+    }
+  },
+  Settings: {
+    hover: { rotate: 180, transition: { duration: 0.5 } },
+    active: { rotate: 360, transition: { duration: 20, repeat: Infinity, ease: "linear" } }
+  },
+  Star: {
+    hover: { 
+      scale: 1.2,
+      rotate: [0, -15, 15, -15, 15, 0],
+      transition: { duration: 0.6 }
+    },
+    active: {
+      scale: [1, 1.1, 1],
+      rotate: [0, 5, -5, 0],
+      transition: { duration: 2, repeat: Infinity }
+    }
+  },
+  Shield: {
+    hover: { scale: [1, 1.1, 0.95, 1.05, 1], transition: { duration: 0.5 } },
+    active: {
+      scale: [1, 1.05, 1],
+      transition: { duration: 1.5, repeat: Infinity }
+    }
+  },
+  Sparkles: {
+    active: {
+      rotate: [0, 10, -10, 0],
+      scale: [1, 1.1, 1],
+      transition: { duration: 2, repeat: Infinity }
+    }
+  }
+};
+
 export function Sidebar() {
   const [location] = useLocation();
   const { t } = useLanguage();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [hoveredIcon, setHoveredIcon] = useState<string | null>(null);
 
   // Check if mobile on mount and window resize
   useEffect(() => {
@@ -55,7 +119,7 @@ export function Sidebar() {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
       if (mobile) {
-        setIsCollapsed(false); // Always expanded on mobile overlay
+        setIsCollapsed(false);
       }
     };
     
@@ -104,7 +168,8 @@ export function Sidebar() {
         type: "spring",
         stiffness: 100,
         damping: 15,
-        staggerChildren: 0.1
+        staggerChildren: 0.05,
+        delayChildren: 0.1
       }
     }
   };
@@ -116,10 +181,19 @@ export function Sidebar() {
       opacity: 1,
       transition: {
         type: "spring",
-        stiffness: 100,
-        damping: 10
+        stiffness: 150,
+        damping: 12
       }
     }
+  };
+
+  const getIconAnimation = (iconName: string, isActive: boolean, isHovered: boolean) => {
+    const animation = iconAnimations[iconName as keyof typeof iconAnimations];
+    if (!animation) return {};
+    
+    if (isHovered && 'hover' in animation) return animation.hover;
+    if (isActive && 'active' in animation) return animation.active;
+    return {};
   };
 
   // Mobile overlay backdrop
@@ -142,10 +216,23 @@ export function Sidebar() {
           onClick={toggleSidebar}
           className="fixed top-4 left-4 z-50 md:hidden w-10 h-10 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white flex items-center justify-center shadow-lg"
           data-testid="button-mobile-menu"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+          whileHover={{ scale: 1.1, rotate: 90 }}
+          whileTap={{ scale: 0.9 }}
+          animate={{
+            boxShadow: [
+              "0 0 20px hsla(262, 73%, 65%, 0.4)",
+              "0 0 30px hsla(262, 73%, 65%, 0.6)",
+              "0 0 20px hsla(262, 73%, 65%, 0.4)"
+            ]
+          }}
+          transition={{ duration: 2, repeat: Infinity }}
         >
-          <Menu className="w-5 h-5" />
+          <motion.div
+            animate={{ rotate: isMobileOpen ? 90 : 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Menu className="w-5 h-5" />
+          </motion.div>
         </motion.button>
       )}
 
@@ -154,10 +241,8 @@ export function Sidebar() {
       <motion.aside 
         className={cn(
           "glass-card border-r border-white/10 backdrop-blur-xl transition-all duration-300 z-50",
-          // Desktop styles
           !isMobile && "flex-shrink-0",
           !isMobile && (isCollapsed ? "w-20" : "w-64"),
-          // Mobile styles
           isMobile && "fixed top-0 left-0 h-full w-64",
           isMobile && (isMobileOpen ? "translate-x-0" : "-translate-x-full")
         )}
@@ -192,8 +277,23 @@ export function Sidebar() {
               ]
             }}
             transition={{ duration: 2, repeat: Infinity }}
+            whileHover={{ 
+              scale: 1.1,
+              boxShadow: "0 0 40px hsla(262, 73%, 65%, 0.7)"
+            }}
           >
-            <Users className="w-7 h-7 text-white relative z-10" />
+            <motion.div
+              animate={{ 
+                rotate: 360,
+                scale: [1, 1.1, 1]
+              }}
+              transition={{ 
+                rotate: { duration: 20, repeat: Infinity, ease: "linear" },
+                scale: { duration: 3, repeat: Infinity }
+              }}
+            >
+              <Users className="w-7 h-7 text-white relative z-10" />
+            </motion.div>
             <motion.div
               className="absolute inset-0 bg-gradient-to-r from-pink-500 to-purple-500 opacity-50"
               animate={{ rotate: [0, 360] }}
@@ -208,7 +308,15 @@ export function Sidebar() {
                 exit={{ opacity: 0, width: 0 }}
                 transition={{ duration: 0.2 }}
               >
-                <h1 className="text-xl font-bold gradient-text whitespace-nowrap">MemeCoin Hunter</h1>
+                <motion.h1 
+                  className="text-xl font-bold gradient-text whitespace-nowrap"
+                  animate={{ 
+                    backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"]
+                  }}
+                  transition={{ duration: 5, repeat: Infinity }}
+                >
+                  MemeCoin Hunter
+                </motion.h1>
                 <p className="text-xs text-muted-foreground">v2.1.0 • Live</p>
               </motion.div>
             )}
@@ -223,15 +331,31 @@ export function Sidebar() {
             isMobile ? "right-4" : "-right-3"
           )}
           data-testid="button-sidebar-toggle"
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.95 }}
+          whileHover={{ 
+            scale: 1.2,
+            boxShadow: "0 0 20px hsla(262, 73%, 65%, 0.6)"
+          }}
+          whileTap={{ scale: 0.9 }}
+          animate={{
+            boxShadow: [
+              "0 4px 6px rgba(0,0,0,0.1)",
+              "0 6px 12px rgba(147, 51, 234, 0.3)",
+              "0 4px 6px rgba(0,0,0,0.1)"
+            ]
+          }}
+          transition={{ duration: 2, repeat: Infinity }}
         >
           {isMobile ? (
-            <X className="w-3 h-3" />
+            <motion.div
+              animate={{ rotate: isMobileOpen ? 180 : 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <X className="w-3 h-3" />
+            </motion.div>
           ) : (
             <motion.div
               animate={{ rotate: isCollapsed ? 0 : 180 }}
-              transition={{ duration: 0.2 }}
+              transition={{ duration: 0.3, type: "spring", stiffness: 200 }}
             >
               <ChevronLeft className="w-3 h-3" />
             </motion.div>
@@ -244,6 +368,9 @@ export function Sidebar() {
         <motion.div className="space-y-2" variants={containerVariants}>
           {navigationItems.map((item, index) => {
             const isActive = location === item.href;
+            const iconName = item.icon.name;
+            const isHovered = hoveredIcon === item.href;
+            
             return (
               <motion.div key={item.href} variants={itemVariants}>
                 <Link
@@ -254,19 +381,21 @@ export function Sidebar() {
                   <motion.div
                     className={cn(
                       "flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all duration-300 relative overflow-hidden group",
-                      // Increased touch targets for mobile
                       isMobile && "py-4 min-h-[48px]",
                       isActive
                         ? "glass-card text-white"
                         : "text-muted-foreground hover:text-white hover:glass-card"
                     )}
+                    onHoverStart={() => setHoveredIcon(item.href)}
+                    onHoverEnd={() => setHoveredIcon(null)}
                     whileHover={{ 
                       scale: 1.02,
-                      x: 4
+                      x: 6,
+                      transition: { type: "spring", stiffness: 400, damping: 20 }
                     }}
                     whileTap={{ scale: 0.98 }}
                   >
-                    {/* Active indicator */}
+                    {/* Active indicator with gradient */}
                     {isActive && (
                       <motion.div
                         className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-2xl"
@@ -275,19 +404,30 @@ export function Sidebar() {
                       />
                     )}
                     
-                    {/* Hover effect */}
+                    {/* Hover effect with shimmer */}
                     <motion.div
                       className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-2xl opacity-0 group-hover:opacity-100"
                       transition={{ duration: 0.3 }}
-                    />
+                    >
+                      <motion.div
+                        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+                        animate={isHovered ? {
+                          x: ["-100%", "100%"]
+                        } : {}}
+                        transition={{
+                          duration: 1.5,
+                          repeat: Infinity,
+                          repeatDelay: 1
+                        }}
+                      />
+                    </motion.div>
 
                     <motion.div
                       className={cn(
                         "w-6 h-6 relative z-10",
                         isActive && "text-purple-400"
                       )}
-                      animate={isActive ? { scale: [1, 1.1, 1] } : {}}
-                      transition={{ duration: 2, repeat: Infinity }}
+                      animate={getIconAnimation(iconName, isActive, isHovered)}
                     >
                       <item.icon className="w-full h-full" />
                     </motion.div>
@@ -310,10 +450,15 @@ export function Sidebar() {
                       <motion.div 
                         className="ml-auto w-2 h-2 bg-green-400 rounded-full relative z-10"
                         animate={{ 
-                          scale: [1, 1.2, 1],
-                          opacity: [1, 0.7, 1]
+                          scale: [1, 1.3, 1],
+                          opacity: [1, 0.6, 1],
+                          boxShadow: [
+                            "0 0 0px rgba(34, 197, 94, 0)",
+                            "0 0 8px rgba(34, 197, 94, 0.8)",
+                            "0 0 0px rgba(34, 197, 94, 0)"
+                          ]
                         }}
-                        transition={{ duration: 2, repeat: Infinity }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
                         data-testid="indicator-live" 
                       />
                     )}
@@ -321,8 +466,9 @@ export function Sidebar() {
                     {isActive && (
                       <motion.div
                         className="absolute right-0 top-1/2 w-1 h-8 bg-gradient-to-b from-purple-400 to-pink-400 rounded-l-full"
-                        initial={{ scaleY: 0 }}
-                        animate={{ scaleY: 1 }}
+                        initial={{ scaleY: 0, opacity: 0 }}
+                        animate={{ scaleY: 1, opacity: 1 }}
+                        exit={{ scaleY: 0, opacity: 0 }}
                         transition={{ type: "spring", stiffness: 500, damping: 30 }}
                       />
                     )}
@@ -340,67 +486,89 @@ export function Sidebar() {
         >
           <motion.div className="px-4 py-2 mb-3" variants={itemVariants}>
             <div className="flex items-center space-x-2">
-              <Sparkles className="w-4 h-4 text-purple-400" />
+              <motion.div
+                animate={{
+                  rotate: [0, 10, -10, 0],
+                  scale: [1, 1.1, 1]
+                }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                <Sparkles className="w-4 h-4 text-purple-400" />
+              </motion.div>
               <p className="text-xs font-medium text-purple-400 uppercase tracking-wide">
                 {t("navigation.subscription")}
               </p>
             </div>
           </motion.div>
           
-          {subscriptionItems.map((item, index) => (
-            <motion.div key={item.href} variants={itemVariants}>
-              <Link href={item.href} data-testid={`link-sub-${item.href.slice(1)}`} onClick={closeMobileSidebar}>
-                <motion.div 
-                  className={cn(
-                    "flex items-center space-x-3 px-4 py-3 rounded-2xl text-muted-foreground hover:text-white hover:glass-card transition-all duration-300 group relative overflow-hidden",
-                    isMobile && "py-4 min-h-[48px]"
-                  )}
-                  whileHover={{ 
-                    scale: 1.02,
-                    x: 4
-                  }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  {/* Hover effect */}
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-2xl opacity-0 group-hover:opacity-100"
-                    transition={{ duration: 0.3 }}
-                  />
-                  
-                  <item.icon className="w-5 h-5 relative z-10" />
-                  <AnimatePresence>
-                    {(!isCollapsed || isMobile) && (
+          {subscriptionItems.map((item, index) => {
+            const iconName = item.icon.name;
+            const isHovered = hoveredIcon === item.href;
+            
+            return (
+              <motion.div key={item.href} variants={itemVariants}>
+                <Link href={item.href} data-testid={`link-sub-${item.href.slice(1)}`} onClick={closeMobileSidebar}>
+                  <motion.div 
+                    className={cn(
+                      "flex items-center space-x-3 px-4 py-3 rounded-2xl text-muted-foreground hover:text-white hover:glass-card transition-all duration-300 group relative overflow-hidden",
+                      isMobile && "py-4 min-h-[48px]"
+                    )}
+                    onHoverStart={() => setHoveredIcon(item.href)}
+                    onHoverEnd={() => setHoveredIcon(null)}
+                    whileHover={{ 
+                      scale: 1.02,
+                      x: 6,
+                      transition: { type: "spring", stiffness: 400, damping: 20 }
+                    }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    {/* Hover effect */}
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-2xl opacity-0 group-hover:opacity-100"
+                      transition={{ duration: 0.3 }}
+                    />
+                    
+                    <motion.div
+                      className="w-5 h-5 relative z-10"
+                      animate={getIconAnimation(iconName, false, isHovered)}
+                    >
+                      <item.icon className="w-full h-full" />
+                    </motion.div>
+                    <AnimatePresence>
+                      {(!isCollapsed || isMobile) && (
+                        <motion.span 
+                          className="relative z-10 font-medium"
+                          initial={{ opacity: 0, width: 0 }}
+                          animate={{ opacity: 1, width: "auto" }}
+                          exit={{ opacity: 0, width: 0 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          {t(item.labelKey)}
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                    {item.badge && (
                       <motion.span 
-                        className="relative z-10 font-medium"
-                        initial={{ opacity: 0, width: 0 }}
-                        animate={{ opacity: 1, width: "auto" }}
-                        exit={{ opacity: 0, width: 0 }}
-                        transition={{ duration: 0.2 }}
+                        className="ml-auto px-2 py-1 text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full font-medium relative z-10"
+                        data-testid="badge-pro"
+                        animate={{ 
+                          boxShadow: [
+                            "0 0 10px hsla(262, 73%, 65%, 0.3)",
+                            "0 0 20px hsla(262, 73%, 65%, 0.6)",
+                            "0 0 10px hsla(262, 73%, 65%, 0.3)"
+                          ]
+                        }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                        whileHover={{ scale: 1.1 }}
                       >
-                        {t(item.labelKey)}
+                        {item.badge}
                       </motion.span>
                     )}
-                  </AnimatePresence>
-                  {item.badge && (
-                    <motion.span 
-                      className="ml-auto px-2 py-1 text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full font-medium relative z-10"
-                      data-testid="badge-pro"
-                      animate={{ 
-                        boxShadow: [
-                          "0 0 10px hsla(262, 73%, 65%, 0.3)",
-                          "0 0 20px hsla(262, 73%, 65%, 0.5)",
-                          "0 0 10px hsla(262, 73%, 65%, 0.3)"
-                        ]
-                      }}
-                      transition={{ duration: 3, repeat: Infinity }}
-                    >
-                      {item.badge}
-                    </motion.span>
-                  )}
-                </motion.div>
-              </Link>
-            </motion.div>
-          ))}
+                  </motion.div>
+                </Link>
+              </motion.div>
+            );
+          })}
         </motion.div>
 
         {/* Settings Section */}
@@ -414,9 +582,12 @@ export function Sidebar() {
                 "flex items-center space-x-3 px-4 py-3 rounded-2xl text-muted-foreground hover:text-white hover:glass-card transition-all duration-300 group relative overflow-hidden",
                 isMobile && "py-4 min-h-[48px]"
               )}
+              onHoverStart={() => setHoveredIcon('/settings')}
+              onHoverEnd={() => setHoveredIcon(null)}
               whileHover={{ 
                 scale: 1.02,
-                x: 4
+                x: 6,
+                transition: { type: "spring", stiffness: 400, damping: 20 }
               }}
               whileTap={{ scale: 0.98 }}
             >
@@ -426,7 +597,12 @@ export function Sidebar() {
                 transition={{ duration: 0.3 }}
               />
               
-              <Settings className="w-5 h-5 relative z-10" />
+              <motion.div
+                className="w-5 h-5 relative z-10"
+                animate={getIconAnimation('Settings', false, hoveredIcon === '/settings')}
+              >
+                <Settings className="w-full h-full" />
+              </motion.div>
               <AnimatePresence>
                 {(!isCollapsed || isMobile) && (
                   <motion.span 

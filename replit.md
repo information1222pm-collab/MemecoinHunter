@@ -1,153 +1,15 @@
 # CryptoHobby - Memecoin Trading Platform
 
 ## Overview
-CryptoHobby is a comprehensive memecoin trading platform offering real-time market scanning, portfolio management, and pattern analysis with integrated trading capabilities. It features a dark-themed UI, multilingual support, and aims to assist users in identifying trading opportunities in the volatile memecoin market through automated token scanning and machine learning pattern detection. The platform includes a CLI-style terminal for advanced users and utilizes WebSocket connectivity for live market data. All features are currently available to authenticated users free of charge, and new users receive $10,000 in virtual trading capital.
+CryptoHobby is a comprehensive memecoin trading platform for real-time market scanning, portfolio management, and pattern analysis with integrated trading capabilities. It features a dark-themed UI, multilingual support, and aims to assist users in identifying trading opportunities in the volatile memecoin market through automated token scanning and machine learning pattern detection. The platform includes a CLI-style terminal for advanced users and utilizes WebSocket connectivity for live market data. All features are currently available to authenticated users free of charge, and new users receive $10,000 in virtual trading capital.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
-## Recent Changes
-
-### October 10, 2025 - $0 Trade Bug FIXED
-- **Issue Reported**: System executing $0.00 trades visible to users across all portfolios
-- **Root Causes Identified**:
-  1. RiskManager's `calculatePositionSizing()` returns `recommendedSize` in TOKENS, but auto-trader treated it as DOLLARS
-  2. `getAvailableCapacity()` included zero-amount positions in calculations, causing incorrect portfolio allocation percentages
-- **Solution Implemented**:
-  1. Auto-trader now correctly converts tokens to dollars: `recommendedDollars = positionSizing.recommendedSize * signal.price`
-  2. RiskManager filters zero-amount positions before calculating capacity: `positions.filter(p => parseFloat(p.amount) > 0)`
-- **Verification**: All trades now execute with proper dollar amounts ($800-$1000 range based on 10-15% Kelly allocation)
-- **Impact**: Trading system fully operational with accurate position sizing across all 29 portfolios
-
-### October 10, 2025 - PROFITABLE Trading Strategy Improvements
-- **Major Enhancement**: Implemented comprehensive profitability improvements to auto-trading system
-- **Pattern Performance Gating**: Trades now gated on proven pattern performance
-  - Requires 50%+ win rate for pattern eligibility
-  - Requires positive expectancy (>$0.50 average profit per trade)
-  - Blocks unprofitable patterns from executing trades
-  - Uses pattern-performance-analyzer's historical data to validate signals
-- **Multi-Stage Take-Profit Strategy**: Replaced single 15% target with staged exits
-  - Stage 1: Sell 30% at 6% gain (lock in initial profit)
-  - Stage 2: Sell 40% at 10% gain (lock in more profit)
-  - Stage 3: Sell remaining at 15% gain (final exit)
-  - Per-position state tracking prevents repeated firing of same stage
-  - Maximizes profit capture while letting winners run
-- **Improved Risk Management**:
-  - Tighter stop-loss: Reduced from 8% to 5% for better risk-reward ratio (now 1.2:1 vs 0.53:1)
-  - Cash floor enforcement: Blocks trades that would drop cash below 10% of portfolio value
-  - Daily loss threshold: Pauses trading if daily loss exceeds 5% of starting capital
-  - Dynamic position sizing: Uses RiskManager's Kelly Criterion calculations instead of fixed $500
-- **Technical Implementation**:
-  - Pattern expectancy uses averageReturn directly (net per-trade profit)
-  - Position stages tracked via Map<positionId, completedStage>
-  - Stage cleanup on stop-loss, sell-only mode, and position close
-  - Partial sell support in executeSell() for staged exits
-- **Expected Impact**: Significantly improved profitability through:
-  - Only trading proven profitable patterns (no more false ML signals)
-  - Taking profits incrementally instead of waiting for 15% (captures gains earlier)
-  - Preventing catastrophic losses with tighter stops and daily limits
-  - Proper position sizing based on portfolio risk tolerance
-
-### October 10, 2025 - EXPANDED Coin Search for More Investment Opportunities
-- **Feature Enhancement**: Massively expanded token discovery to find more potential investments
-- **Tracked Coins Increased**: From ~80 to 200+ coins across multiple categories:
-  - Solana ecosystem (20 coins): JTO, JUP, RAY, ORCA, SABER, etc.
-  - Polygon & BSC (16 coins): CAKE, BIFI, ALPACA, VENUS, etc.
-  - Base Chain memecoins: TOSHI, BRETT, HIGHER, KEYCAT, etc.
-  - Cat-themed: POPCAT, CATS, MOG, SMOG, etc.
-  - Dog-themed: Baby BONK, CORGIBNB, SHIH-TZU, etc.
-  - Frog/Amphibian: APU, PEPE 2.0, GROYPER, KEK, etc.
-  - AI & Tech: TURBO, GROK, AIDOGE, etc.
-  - Gaming & Metaverse: GALA, SANDBOX, AXIE, etc.
-  - Celebrity coins: ELON, TRUMP, BIDEN, KANYE, etc.
-  - New Layer 1/2: ARB, OP, ZKSYNC, BLAST, SEI, etc.
-  - DeFi: YFI, CVX, CRV, AAVE, COMP, etc.
-  - NFT: APE, LOOKS, X2Y2, RARE, etc.
-- **Discovery Thresholds Lowered**:
-  - Top gainers: 10%+ gain (was 20%), $100k+ market cap (was $1M)
-  - Newly launched: $50K-$100M range (was $100K-$50M), 5%+ movement (was 10%)
-  - Recently added: $25K-$25M range (was $50K-$10M), $1k volume (was $5k)
-  - Low cap gems: $10K-$10M range (was $25K-$5M), 15%+ gain (was 30%), $500 volume (was $1k)
-  - New launch processing: $10k market cap (was $25k), $500 volume (was $1k)
-  - Trending coins: $100k market cap (was $500k), $2k volume (was $10k)
-- **Discovery Limits Increased**:
-  - Top gainers: 100 coins (was 30)
-  - Newly launched: 50 candidates (was 20)
-  - Recently added: 30 candidates (was 15)
-  - Low cap gems: 25 coins (was 10)
-- **Impact**: Platform now discovers and tracks significantly more investment opportunities across multiple chains and categories, including early-stage launches and trending tokens
-- **Auto-Discovery**: Still runs every 5 minutes to find new trending memecoins and market opportunities
-
-### October 10, 2025 - Portfolio Position Display Fix
-- **Critical Bug Fixed**: Portfolio was displaying closed positions and showing small token amounts as "0 tokens"
-- **Root Causes Identified**:
-  1. Backend returned ALL positions including closed ones (amount = 0)
-  2. Frontend used `toLocaleString()` which rounded very small numbers to "0"
-- **Solution Implemented**:
-  - Backend filters out closed positions: `positions.filter(p => parseFloat(p.amount) > 0)`
-  - Frontend `formatTokenAmount()` function properly handles small numbers:
-    - Very small (< 0.000001): Scientific notation (e.g., "8.66e-5")
-    - Small (< 1): Up to 8 decimals with trailing zeros stripped (e.g., "0.00008657")
-    - Regular (>= 1): Standard formatting with max 2 decimals
-- **Impact**: Portfolio now shows only active positions with accurate token amounts. Positions like BTC with 0.00008657 tokens display correctly instead of "0 tokens"
-
-### October 10, 2025 - Portfolio Analytics Calculation Fix
-- **Critical Bug Fixed**: Portfolio calculations were inaccurate, showing contradictory metrics (negative dollar amount with positive percentage)
-- **Root Causes Identified**:
-  1. Total Value excluded cash balance (only counted position values)
-  2. Total P&L calculated from positions only, not actual portfolio value
-  3. Daily P&L was never being updated in the database
-- **Solution Implemented**:
-  - Position tracker now calculates total value as positions + cash balance
-  - Total P&L now correctly calculated as (total value - starting capital)
-  - Daily P&L properly saved to database from analytics pipeline
-  - API endpoints no longer double-count cash (totalValue already includes it)
-- **Impact**: All portfolio metrics now accurate and consistent across the platform
-- **Calculation Formulas**:
-  - `totalValue = positionsValue + cashBalance`
-  - `totalPnL = totalValue - startingCapital`
-  - `dailyPnL = analytics.dayChangeValue`
-
-### October 10, 2025 - Login/Registration Flow Improvements
-- **Auto-Login After Registration**: New users are now automatically logged in after registration, eliminating the need to manually switch tabs and log in
-- **Session Persistence Enhanced**: Both login and registration endpoints now explicitly save sessions to PostgreSQL database using callback-based `req.session.save()` to ensure persistence before responding
-- **Frontend UX Improved**: Registration success handler now calls `refetch()` to automatically update auth status, providing seamless transition to dashboard
-- **Testing**: End-to-end tests confirm registration auto-login, dashboard redirect, and portfolio visibility with starting capital ($10,000)
-- **Impact**: Smoother onboarding experience - users can start trading immediately after registration
-
-### October 10, 2025 - Live Data Updates Fixed (Dashboard & Portfolio)
-- **Critical Bug Fixed**: Dashboard and Portfolio pages weren't receiving live WebSocket updates
-- **Dashboard Issue**: Only used polling (15s intervals) with no WebSocket listeners - now has real-time updates via WebSocket
-- **Portfolio Issue**: Demo portfolio updates were sent only to the demo user ID, but viewers might not be authenticated as that user
-- **Solution**: 
-  - Demo portfolio updates now broadcast globally (like market data) so all viewers receive real-time updates
-  - Dashboard now listens for trade_executed, portfolio_updated, positions_updated, and price_update events
-- **Security**: Authenticated user portfolios remain secure with user-scoped broadcasts
-- **Impact**: Both pages now show live position values, price updates, trade executions, and analytics in real-time
-
-### October 10, 2025 - Prominent Trade Alert Modal System
-- **Feature Added**: Highly visible, center-screen modal dialog system for trade notifications (replaced subtle toast notifications)
-- **Alert Types Implemented**:
-  1. **Buy Trades**: Large green-themed modal with TrendingUp icon, token symbol, amount, price, total value, and ML signal reason
-  2. **Sell Trades**: Large blue (profit) or red (loss) themed modal with complete P&L breakdown including dollar amount and percentage
-  3. **Milestone Achievements**: Yellow-themed celebratory modal with Sparkles icon for 10%, 25%, 50%, and 100% portfolio gains
-  4. **Stop Loss Triggers**: Red-themed alert modal with AlertCircle icon when risk protection activates
-- **Technical Implementation**:
-  - `TradeAlertModal` component uses shadcn Dialog for prominent center-screen display
-  - Alert queue system serializes multiple simultaneous notifications to prevent overlap
-  - Auto-dismiss timer managed via `useRef` with proper cleanup to prevent race conditions
-  - Timer automatically clears when user manually dismisses or when new alert appears
-  - Each modal auto-dismisses after 8 seconds or can be closed manually with X button
-  - Alert history maintained (last 50 alerts) for potential future features
-  - Milestone deduplication prevents notification spam for same milestone
-- **User Experience**: Impossible-to-miss center-screen modals with large fonts (2xl titles), clear visual hierarchy, and prominent icons ensure users never miss trade executions or portfolio milestones
-- **Integration**: Component mounted in `App.tsx` for authenticated users, listens to WebSocket events (`trade_executed`, `portfolio_updated`, `stop_loss_triggered`)
-- **Testing**: End-to-end tests confirm modals appear prominently center-screen with complete trade data visible
-
 ## System Architecture
 
 ### Frontend
-Built with React 18 and TypeScript, using Vite for development. Styling is handled by Tailwind CSS with a custom dark theme and shadcn/ui for consistent components. State management uses TanStack Query for server state and React hooks for local state. Wouter is used for client-side routing. WebSocket integration provides real-time updates.
+Built with React 18 and TypeScript, using Vite for development. Styling is handled by Tailwind CSS with a custom dark theme and shadcn/ui for consistent components. State management uses TanStack Query for server state and React hooks for local state. Wouter is used for client-side routing. WebSocket integration provides real-time updates. The platform features a modern glassmorphism design system with a dark theme, utilizing Framer Motion for animations and transitions. The UI is responsive and optimized for a professional trading experience, including sophisticated icon-specific animations and micro-interactions throughout the sidebar, and prominent center-screen modal dialogs for trade notifications and milestones.
 
 ### Backend
 Developed with Express.js and TypeScript (ESM configuration), providing a RESTful API and WebSocket support. Key background services include a Token Scanner, an ML Pattern Analyzer, and a Price Feed Service. The WebSocket server manages real-time client connections.
@@ -156,13 +18,10 @@ Developed with Express.js and TypeScript (ESM configuration), providing a RESTfu
 Primary database is PostgreSQL, accessed via Drizzle ORM and hosted on Neon. The schema is normalized, including tables for users, tokens, portfolios, trades, and subscriptions. Drizzle Kit manages schema migrations.
 
 ### Authentication and Authorization
-Supports dual authentication: password-based and OAuth (Google Login via Replit Auth). Every new user receives $10,000 in virtual trading money. Account linking is supported by email. Security measures include Zod validation, CORS, CSRF protection, and secure OAuth token management.
-
-### UI/UX Decisions
-The platform features a modern glassmorphism design system with a dark theme, utilizing Framer Motion for animations and transitions. The UI is responsive and optimized for a professional trading experience.
+Supports dual authentication: password-based and OAuth (Google Login via Replit Auth). Every new user receives $10,000 in virtual trading money. Account linking is supported by email. Security measures include Zod validation, CORS, CSRF protection, and secure OAuth token management. New users are automatically logged in after registration with session persistence.
 
 ### Technical Implementations
-Includes a robust token scanning system that automatically discovers and tracks trending memecoins using CoinGecko APIs. ML pattern analysis runs across numerous tokens for signal generation. Automated trading functionalities are supported.
+Includes a robust token scanning system that automatically discovers and tracks trending memecoins using CoinGecko APIs, significantly expanding tracked coins and lowering discovery thresholds for more opportunities. ML pattern analysis runs across numerous tokens for signal generation. Automated trading functionalities have comprehensive profitability improvements, including pattern performance gating (50%+ win rate, positive expectancy), a multi-stage take-profit strategy (30% at 6% gain, 40% at 10% gain, rest at 15% gain), improved risk management (5% stop-loss, cash floor enforcement, daily loss thresholds), and dynamic position sizing using Kelly Criterion calculations. Critical bug fixes include accurate portfolio position display, correct portfolio analytics calculations (total value, P&L, daily P&L), and live data updates for the dashboard and portfolio pages.
 
 ## External Dependencies
 
