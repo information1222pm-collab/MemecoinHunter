@@ -8,6 +8,13 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### October 10, 2025 - Login/Registration Flow Improvements
+- **Auto-Login After Registration**: New users are now automatically logged in after registration, eliminating the need to manually switch tabs and log in
+- **Session Persistence Enhanced**: Both login and registration endpoints now explicitly save sessions to PostgreSQL database using callback-based `req.session.save()` to ensure persistence before responding
+- **Frontend UX Improved**: Registration success handler now calls `refetch()` to automatically update auth status, providing seamless transition to dashboard
+- **Testing**: End-to-end tests confirm registration auto-login, dashboard redirect, and portfolio visibility with starting capital ($10,000)
+- **Impact**: Smoother onboarding experience - users can start trading immediately after registration
+
 ### October 10, 2025 - Live Data Updates Fixed (Dashboard & Portfolio)
 - **Critical Bug Fixed**: Dashboard and Portfolio pages weren't receiving live WebSocket updates
 - **Dashboard Issue**: Only used polling (15s intervals) with no WebSocket listeners - now has real-time updates via WebSocket
