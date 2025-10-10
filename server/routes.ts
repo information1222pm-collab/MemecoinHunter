@@ -26,13 +26,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Configure sessions with PostgreSQL store
   const PgSession = ConnectPgSimple(session);
+  const sessionSecret = process.env.SESSION_SECRET || 'crypto-hobby-dev-secret-key';
+  const sessionStore = new PgSession({
+    conString: process.env.DATABASE_URL!,
+    tableName: 'session',
+    createTableIfMissing: true
+  });
+  
   app.use(session({
-    store: new PgSession({
-      conString: process.env.DATABASE_URL!,
-      tableName: 'session',
-      createTableIfMissing: true
-    }),
-    secret: process.env.SESSION_SECRET || 'crypto-hobby-dev-secret-key',
+    store: sessionStore,
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -175,9 +178,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Handle WebSocket connections - simplified and stable  
-  wss.on('connection', (ws: WebSocket, req) => {
+  wss.on('connection', async (ws: WebSocket, req) => {
     const remoteAddress = req.socket.remoteAddress;
     console.log(`[AUDIT] WebSocket connected from ${remoteAddress}`);
+    
+    // Extract and validate session cookie
+    let userId: string | null = null;
+    try {
+      const cookies = cookie.parse(req.headers.cookie || '');
+      const sessionCookie = cookies['cryptohobby.sid'];
+      
+      if (sessionCookie) {
+        // Unsign the session cookie
+        const sessionId = signature.unsign(sessionCookie.slice(2), sessionSecret);
+        
+        if (sessionId) {
+          // Look up the session in the database
+          await new Promise<void>((resolve) => {
+            sessionStore.get(sessionId, (err: any, session: any) => {
+              if (!err && session?.userId) {
+                userId = session.userId;
+                console.log(`[AUDIT] WebSocket authenticated for user ${userId}`);
+              }
+              resolve();
+            });
+          });
+        }
+      }
+    } catch (error) {
+      console.warn(`[SECURITY] WebSocket session validation failed:`, error);
+    }
+    
+    // Associate WebSocket with user if authenticated
+    if (userId) {
+      if (!userConnections.has(userId)) {
+        userConnections.set(userId, new Set());
+      }
+      userConnections.get(userId)!.add(ws);
+      (ws as any).userId = userId;
+      console.log(`[AUDIT] WebSocket associated with user ${userId}`);
+    }
     
     // Add comprehensive error handling
     ws.on('error', (error) => {
@@ -186,6 +226,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     ws.on('close', (code, reason) => {
       console.log(`[AUDIT] WebSocket closed from ${remoteAddress} (${code})`);
+      // Clean up user connection when socket closes
+      const wsUserId = (ws as any).userId;
+      if (wsUserId && userConnections.has(wsUserId)) {
+        userConnections.get(wsUserId)!.delete(ws);
+        if (userConnections.get(wsUserId)!.size === 0) {
+          userConnections.delete(wsUserId);
+        }
+      }
     });
     
     // Handle incoming messages safely
@@ -203,6 +251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ws.send(JSON.stringify({ 
         type: 'connection_status', 
         status: 'connected',
+        authenticated: !!userId,
         timestamp: new Date().toISOString()
       }));
     } catch (error) {
