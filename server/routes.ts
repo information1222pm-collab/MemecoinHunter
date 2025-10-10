@@ -644,8 +644,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       }));
       
+      // Calculate actual total value: positions value + cash balance
+      const cashBalance = parseFloat(portfolio.cashBalance || '0');
+      const positionsValue = parseFloat(portfolio.totalValue || '0');
+      const actualTotalValue = (positionsValue + cashBalance).toFixed(2);
+      
       res.json({ 
-        ...portfolio, 
+        ...portfolio,
+        totalValue: actualTotalValue, // Override with correct total (positions + cash)
         positions: enhancedPositions,
         analytics: portfolioAnalytics
       });
@@ -683,8 +689,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       }));
       
+      // Calculate actual total value: positions value + cash balance
+      const cashBalance = parseFloat(portfolio.cashBalance || '0');
+      const positionsValue = parseFloat(portfolio.totalValue || '0');
+      const actualTotalValue = (positionsValue + cashBalance).toFixed(2);
+      
       res.json({ 
-        ...portfolio, 
+        ...portfolio,
+        totalValue: actualTotalValue, // Override with correct total (positions + cash)
         positions: enhancedPositions,
         analytics: portfolioAnalytics
       });
