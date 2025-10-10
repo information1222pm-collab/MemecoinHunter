@@ -309,7 +309,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // CRITICAL: Start auto-trader BEFORE ML analyzer so it can listen for pattern events
   console.log('🤖 Starting Auto-Trader service...');
-  autoTrader.start();
+  try {
+    await autoTrader.start();
+  } catch (error) {
+    console.error('❌ Auto-Trader failed to start:', error);
+  }
   
   // Start ML analyzer after auto-trader is listening
   console.log('🧠 Starting ML Pattern Analyzer...');
