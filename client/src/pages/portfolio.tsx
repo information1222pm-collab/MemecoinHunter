@@ -168,6 +168,7 @@ export default function Portfolio() {
         avgBuyPrice: "42500.00",
         currentValue: "21250.00",
         unrealizedPnL: "2750.00",
+        analytics: null,
         token: { symbol: "BTC", name: "Bitcoin", currentPrice: "45000.00" }
       },
       {
@@ -177,9 +178,11 @@ export default function Portfolio() {
         avgBuyPrice: "2200.00",
         currentValue: "33440.00",
         unrealizedPnL: "440.00",
+        analytics: null,
         token: { symbol: "ETH", name: "Ethereum", currentPrice: "2200.00" }
       }
-    ]
+    ],
+    analytics: undefined
   };
 
   const demoTrades = [
@@ -211,7 +214,8 @@ export default function Portfolio() {
     dailyPnL: "0", 
     totalPnL: "0",
     winRate: "0",
-    positions: []
+    positions: [],
+    analytics: undefined
   }) : demoPortfolioData;
 
   const tradeData = isAuthenticated ? (trades || []) : demoTrades;
