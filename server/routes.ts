@@ -665,12 +665,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const positions = await storage.getPositionsByPortfolio(portfolio.id);
       
+      // Filter out closed positions (amount = 0)
+      const activePositions = positions.filter(p => parseFloat(p.amount) > 0);
+      
       // Get enhanced analytics from position tracker
       const portfolioAnalytics = await positionTracker.getPortfolioAnalytics(portfolio.id);
       const positionAnalytics = await positionTracker.getPositionAnalytics(portfolio.id);
       
-      // Merge position data with analytics
-      const enhancedPositions = await Promise.all(positions.map(async position => {
+      // Merge position data with analytics (only for active positions)
+      const enhancedPositions = await Promise.all(activePositions.map(async position => {
         const analytics = positionAnalytics.find(a => a.positionId === position.id);
         const token = await storage.getToken(position.tokenId);
         
@@ -705,12 +708,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const positions = await storage.getPositionsByPortfolio(portfolio.id);
       
+      // Filter out closed positions (amount = 0)
+      const activePositions = positions.filter(p => parseFloat(p.amount) > 0);
+      
       // Get enhanced analytics from position tracker
       const portfolioAnalytics = await positionTracker.getPortfolioAnalytics(portfolio.id);
       const positionAnalytics = await positionTracker.getPositionAnalytics(portfolio.id);
       
-      // Merge position data with analytics
-      const enhancedPositions = await Promise.all(positions.map(async position => {
+      // Merge position data with analytics (only for active positions)
+      const enhancedPositions = await Promise.all(activePositions.map(async position => {
         const analytics = positionAnalytics.find(a => a.positionId === position.id);
         const token = await storage.getToken(position.tokenId);
         

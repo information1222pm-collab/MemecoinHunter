@@ -233,6 +233,14 @@ export default function Portfolio() {
     return `${numValue >= 0 ? '+' : ''}${numValue.toFixed(2)}%`;
   };
 
+  const formatTokenAmount = (amount: string | number) => {
+    const numValue = typeof amount === 'string' ? parseFloat(amount) || 0 : (amount || 0);
+    if (numValue === 0) return '0';
+    if (numValue < 0.000001) return numValue.toExponential(2);
+    if (numValue < 1) return numValue.toFixed(8).replace(/\.?0+$/, '');
+    return numValue.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  };
+
   const getPnLColor = (value: string | number) => {
     const numValue = typeof value === 'string' ? parseFloat(value) || 0 : (value || 0);
     return numValue >= 0 ? 'price-up' : 'price-down';
@@ -404,7 +412,7 @@ export default function Portfolio() {
                               {position.token?.name || 'Unknown Token'}
                             </div>
                             <div className="text-xs text-muted-foreground hidden md:block">
-                              {parseFloat(position.amount).toLocaleString()} tokens
+                              {formatTokenAmount(position.amount)} tokens
                             </div>
                           </div>
                         </div>
