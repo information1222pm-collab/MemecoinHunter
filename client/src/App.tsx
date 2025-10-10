@@ -19,6 +19,7 @@ import Terminal from "@/pages/terminal";
 import Subscription from "@/pages/subscription";
 import Settings from "@/pages/settings";
 import SignIn from "@/pages/signin";
+import DemoAlerts from "@/pages/demo-alerts";
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 
@@ -35,6 +36,12 @@ function AuthenticatedSignInRedirect() {
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
+  const [location] = useLocation();
+
+  // Public routes that don't require authentication
+  if (location === '/demo') {
+    return <DemoAlerts />;
+  }
 
   // Show loading state while checking authentication
   if (isLoading) {
