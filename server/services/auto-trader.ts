@@ -805,12 +805,15 @@ class AutoTrader extends EventEmitter {
         console.log(`   🧠 Pattern: ${originalBuyTrade.patternId}`);
       }
       
+      const profitPercentage = avgBuyPrice > 0 ? (realizedPnL / totalBuyValue) * 100 : 0;
+      
       this.emit('tradeExecuted', {
         trade,
         signal: { type: 'sell', source: trigger, reason },
         token,
         portfolioId,
-        realizedPnL,
+        profitLoss: realizedPnL.toFixed(2),
+        profitPercentage: profitPercentage,
         timestamp: new Date().toISOString(),
         stats: this.getStatsForPortfolio(portfolioId)
       });

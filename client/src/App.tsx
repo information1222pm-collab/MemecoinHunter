@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { LanguageProvider } from "@/contexts/language-context";
 import { useAuth } from "@/hooks/use-auth";
+import { TradeNotifications } from "@/components/trade-notifications";
 import Home from "@/pages/home";
 import Dashboard from "@/pages/dashboard";
 import Scanner from "@/pages/scanner";
@@ -54,22 +55,25 @@ function Router() {
 
   // Show main app if authenticated
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/dashboard" component={Dashboard} />
-      <Route path="/scanner" component={Scanner} />
-      <Route path="/portfolio" component={Portfolio} />
-      <Route path="/analytics" component={Analytics} />
-      <Route path="/activity" component={Activity} />
-      <Route path="/journal" component={Journal} />
-      <Route path="/risk" component={RiskReports} />
-      <Route path="/alerts" component={Alerts} />
-      <Route path="/terminal" component={Terminal} />
-      <Route path="/subscription" component={Subscription} />
-      <Route path="/settings" component={Settings} />
-      <Route path="/signin" component={AuthenticatedSignInRedirect} />
-      <Route component={NotFound} />
-    </Switch>
+    <>
+      <TradeNotifications />
+      <Switch>
+        <Route path="/" component={Home} />
+        <Route path="/dashboard" component={Dashboard} />
+        <Route path="/scanner" component={Scanner} />
+        <Route path="/portfolio" component={Portfolio} />
+        <Route path="/analytics" component={Analytics} />
+        <Route path="/activity" component={Activity} />
+        <Route path="/journal" component={Journal} />
+        <Route path="/risk" component={RiskReports} />
+        <Route path="/alerts" component={Alerts} />
+        <Route path="/terminal" component={Terminal} />
+        <Route path="/subscription" component={Subscription} />
+        <Route path="/settings" component={Settings} />
+        <Route path="/signin" component={AuthenticatedSignInRedirect} />
+        <Route component={NotFound} />
+      </Switch>
+    </>
   );
 }
 
