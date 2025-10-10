@@ -11,6 +11,8 @@ import Scanner from "@/pages/scanner";
 import Portfolio from "@/pages/portfolio";
 import Analytics from "@/pages/analytics";
 import Activity from "@/pages/activity";
+import Journal from "@/pages/journal";
+import RiskReports from "@/pages/risk-reports";
 import Terminal from "@/pages/terminal";
 import Subscription from "@/pages/subscription";
 import Settings from "@/pages/settings";
@@ -58,6 +60,8 @@ function Router() {
       <Route path="/portfolio" component={Portfolio} />
       <Route path="/analytics" component={Analytics} />
       <Route path="/activity" component={Activity} />
+      <Route path="/journal" component={Journal} />
+      <Route path="/risk" component={RiskReports} />
       <Route path="/terminal" component={Terminal} />
       <Route path="/subscription" component={Subscription} />
       <Route path="/settings" component={Settings} />

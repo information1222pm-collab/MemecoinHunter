@@ -77,6 +77,16 @@ The architecture prioritizes real-time performance, type safety, and scalable su
 
 ## Recent Changes
 
+### October 10, 2025 - Advanced Analytics & Trading Intelligence
+- **Comprehensive Trading Analytics**: Real-time P&L tracking with realized/unrealized breakdown, win/loss ratios, average hold time analysis, and ROI by strategy metrics
+- **Automated Trade Journal**: Complete trade logging system capturing entry/exit signals, stop loss triggers, take profit events, and detailed outcome tracking with advanced filtering (by outcome, token, pattern, date range)
+- **Risk Management Reports**: Daily/weekly summaries with exposure metrics, realized profit tracking, drawdown analysis, and automated risk scoring (0-100 scale)
+- **Enhanced Dashboard**: Six new analytics cards displaying total P&L, win rate with trade counts, average hold times, portfolio exposure, profit factor, and top-performing strategies
+- **New Pages**: Trade Journal page with comprehensive filtering and Trade Reports page with period-based analysis (daily/weekly/monthly views)
+- **17 New API Endpoints**: 5 analytics endpoints, 5 trade journal endpoints, 7 risk management endpoints - all verified working with 200 status codes
+- **Auto-Refresh Data**: Dashboard updates every 15 seconds, journal and risk reports every 30 seconds for near-real-time insights
+- **Professional UI**: All new pages use glassmorphism theme with responsive layouts, loading states, and mobile-optimized card views
+
 ### October 10, 2025 - Free Access Update
 - **Subscription Restrictions Removed**: All features are now available to all authenticated users free of charge
 - **$10,000 Paper Trading Capital**: Every new member automatically receives $10,000 in virtual trading money to audit and test the platform's capabilities

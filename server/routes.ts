@@ -11,6 +11,9 @@ import { riskManager } from "./services/risk-manager";
 import { autoTrader } from "./services/auto-trader";
 import { stakeholderReportUpdater } from "./services/stakeholder-report-updater";
 import { positionTracker } from "./services/position-tracker";
+import { tradingAnalyticsService } from "./services/trading-analytics";
+import { tradeJournalService } from "./services/trade-journal";
+import { riskReportsService } from "./services/risk-reports";
 import { insertUserSchema, insertTradeSchema, insertTokenSchema } from "@shared/schema";
 import { z } from "zod";
 import * as bcrypt from "bcrypt";
@@ -316,6 +319,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('❌ Auto-Trader failed to start:', error);
     }
+    
+    // Start trade journal service to track all trades
+    console.log('📓 Starting Trade Journal Service...');
+    const { tradeJournalService } = await import('./services/trade-journal');
+    await tradeJournalService.initialize();
     
     // Start ML analyzer after auto-trader is listening
     console.log('🧠 Starting ML Pattern Analyzer...');
@@ -1136,6 +1144,627 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       res.status(500).json({ message: "Failed to log deployment", error });
+    }
+  });
+
+  // Trading Analytics Endpoints
+  app.get("/api/analytics/pnl", async (req, res) => {
+    try {
+      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
+      if (!demoUser) {
+        const saltRounds = 12;
+        const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
+        demoUser = await storage.createUser({
+          username: "demo_user",
+          email: "demo@memehunter.app",
+          password: hashedDemoPassword,
+          subscriptionTier: "pro",
+          language: "en"
+        });
+      }
+      
+      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+      if (!portfolio) {
+        portfolio = await storage.createPortfolio({
+          userId: demoUser.id,
+          totalValue: "10000.00",
+          dailyPnL: "0.00",
+          totalPnL: "0.00",
+          winRate: "0.00"
+        });
+      }
+
+      const metrics = await tradingAnalyticsService.getRealtimePnL(portfolio.id);
+      res.json(metrics);
+    } catch (error) {
+      console.error('Error fetching P&L metrics:', error);
+      res.status(500).json({ message: "Failed to fetch P&L metrics", error });
+    }
+  });
+
+  app.get("/api/analytics/winloss", async (req, res) => {
+    try {
+      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
+      if (!demoUser) {
+        const saltRounds = 12;
+        const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
+        demoUser = await storage.createUser({
+          username: "demo_user",
+          email: "demo@memehunter.app",
+          password: hashedDemoPassword,
+          subscriptionTier: "pro",
+          language: "en"
+        });
+      }
+      
+      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+      if (!portfolio) {
+        portfolio = await storage.createPortfolio({
+          userId: demoUser.id,
+          totalValue: "10000.00",
+          dailyPnL: "0.00",
+          totalPnL: "0.00",
+          winRate: "0.00"
+        });
+      }
+
+      const metrics = await tradingAnalyticsService.getWinLossRatios(portfolio.id);
+      res.json(metrics);
+    } catch (error) {
+      console.error('Error fetching win/loss metrics:', error);
+      res.status(500).json({ message: "Failed to fetch win/loss metrics", error });
+    }
+  });
+
+  app.get("/api/analytics/holdtime", async (req, res) => {
+    try {
+      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
+      if (!demoUser) {
+        const saltRounds = 12;
+        const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
+        demoUser = await storage.createUser({
+          username: "demo_user",
+          email: "demo@memehunter.app",
+          password: hashedDemoPassword,
+          subscriptionTier: "pro",
+          language: "en"
+        });
+      }
+      
+      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+      if (!portfolio) {
+        portfolio = await storage.createPortfolio({
+          userId: demoUser.id,
+          totalValue: "10000.00",
+          dailyPnL: "0.00",
+          totalPnL: "0.00",
+          winRate: "0.00"
+        });
+      }
+
+      const metrics = await tradingAnalyticsService.getAverageHoldTime(portfolio.id);
+      res.json(metrics);
+    } catch (error) {
+      console.error('Error fetching hold time metrics:', error);
+      res.status(500).json({ message: "Failed to fetch hold time metrics", error });
+    }
+  });
+
+  app.get("/api/analytics/roi-strategy", async (req, res) => {
+    try {
+      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
+      if (!demoUser) {
+        const saltRounds = 12;
+        const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
+        demoUser = await storage.createUser({
+          username: "demo_user",
+          email: "demo@memehunter.app",
+          password: hashedDemoPassword,
+          subscriptionTier: "pro",
+          language: "en"
+        });
+      }
+      
+      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+      if (!portfolio) {
+        portfolio = await storage.createPortfolio({
+          userId: demoUser.id,
+          totalValue: "10000.00",
+          dailyPnL: "0.00",
+          totalPnL: "0.00",
+          winRate: "0.00"
+        });
+      }
+
+      const strategies = await tradingAnalyticsService.getROIByStrategy(portfolio.id);
+      res.json(strategies);
+    } catch (error) {
+      console.error('Error fetching ROI by strategy:', error);
+      res.status(500).json({ message: "Failed to fetch ROI by strategy", error });
+    }
+  });
+
+  app.get("/api/analytics/all", async (req, res) => {
+    try {
+      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
+      if (!demoUser) {
+        const saltRounds = 12;
+        const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
+        demoUser = await storage.createUser({
+          username: "demo_user",
+          email: "demo@memehunter.app",
+          password: hashedDemoPassword,
+          subscriptionTier: "pro",
+          language: "en"
+        });
+      }
+      
+      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+      if (!portfolio) {
+        portfolio = await storage.createPortfolio({
+          userId: demoUser.id,
+          totalValue: "10000.00",
+          dailyPnL: "0.00",
+          totalPnL: "0.00",
+          winRate: "0.00"
+        });
+      }
+
+      const allMetrics = await tradingAnalyticsService.getAllMetrics(portfolio.id);
+      
+      // Transform data to match dashboard contract
+      const transformed = {
+        pnl: allMetrics.pnl,
+        winLoss: {
+          ...allMetrics.winLoss,
+          avgWin: allMetrics.winLoss.averageWin,
+          avgLoss: allMetrics.winLoss.averageLoss,
+        },
+        holdTime: {
+          avgHoldTime: allMetrics.holdTime.averageHoldTimeMs / (1000 * 60 * 60), // Convert ms to hours
+          avgWinHoldTime: allMetrics.holdTime.averageWinHoldTimeMs / (1000 * 60 * 60),
+          avgLossHoldTime: allMetrics.holdTime.averageLossHoldTimeMs / (1000 * 60 * 60),
+          totalClosedTrades: allMetrics.holdTime.totalClosedTrades,
+        },
+        strategies: allMetrics.strategies.map(s => ({
+          ...s,
+          roiPercent: s.roi, // Rename roi to roiPercent
+        })),
+      };
+      
+      res.json(transformed);
+    } catch (error) {
+      console.error('Error fetching all analytics metrics:', error);
+      res.status(500).json({ message: "Failed to fetch all analytics metrics", error });
+    }
+  });
+
+  // Trade Journal Endpoints
+  app.get("/api/journal/entries", async (req, res) => {
+    try {
+      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
+      if (!demoUser) {
+        const saltRounds = 12;
+        const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
+        demoUser = await storage.createUser({
+          username: "demo_user",
+          email: "demo@memehunter.app",
+          password: hashedDemoPassword,
+          subscriptionTier: "pro",
+          language: "en"
+        });
+      }
+      
+      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+      if (!portfolio) {
+        portfolio = await storage.createPortfolio({
+          userId: demoUser.id,
+          totalValue: "10000.00",
+          dailyPnL: "0.00",
+          totalPnL: "0.00",
+          winRate: "0.00"
+        });
+      }
+
+      const filters: any = {};
+      if (req.query.outcome) filters.outcome = req.query.outcome;
+      if (req.query.token) filters.tokenId = req.query.token;
+      if (req.query.pattern) filters.patternType = req.query.pattern;
+      if (req.query.startDate) filters.dateFrom = new Date(req.query.startDate as string);
+      if (req.query.endDate) filters.dateTo = new Date(req.query.endDate as string);
+
+      const entries = await tradeJournalService.getJournalEntries(portfolio.id, filters);
+      res.json(entries);
+    } catch (error) {
+      console.error('Error fetching journal entries:', error);
+      res.status(500).json({ message: "Failed to fetch journal entries", error });
+    }
+  });
+
+  app.get("/api/journal/trade/:tradeId", async (req, res) => {
+    try {
+      const { tradeId } = req.params;
+      const entry = await tradeJournalService.getTradeById(tradeId);
+      
+      if (!entry) {
+        return res.status(404).json({ message: "Trade not found" });
+      }
+      
+      res.json(entry);
+    } catch (error) {
+      console.error('Error fetching trade by ID:', error);
+      res.status(500).json({ message: "Failed to fetch trade", error });
+    }
+  });
+
+  app.get("/api/journal/stats", async (req, res) => {
+    try {
+      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
+      if (!demoUser) {
+        const saltRounds = 12;
+        const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
+        demoUser = await storage.createUser({
+          username: "demo_user",
+          email: "demo@memehunter.app",
+          password: hashedDemoPassword,
+          subscriptionTier: "pro",
+          language: "en"
+        });
+      }
+      
+      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+      if (!portfolio) {
+        portfolio = await storage.createPortfolio({
+          userId: demoUser.id,
+          totalValue: "10000.00",
+          dailyPnL: "0.00",
+          totalPnL: "0.00",
+          winRate: "0.00"
+        });
+      }
+
+      const stats = await tradeJournalService.getJournalStats(portfolio.id);
+      res.json(stats);
+    } catch (error) {
+      console.error('Error fetching journal stats:', error);
+      res.status(500).json({ message: "Failed to fetch journal stats", error });
+    }
+  });
+
+  app.get("/api/journal/by-outcome/:outcome", async (req, res) => {
+    try {
+      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
+      if (!demoUser) {
+        const saltRounds = 12;
+        const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
+        demoUser = await storage.createUser({
+          username: "demo_user",
+          email: "demo@memehunter.app",
+          password: hashedDemoPassword,
+          subscriptionTier: "pro",
+          language: "en"
+        });
+      }
+      
+      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+      if (!portfolio) {
+        portfolio = await storage.createPortfolio({
+          userId: demoUser.id,
+          totalValue: "10000.00",
+          dailyPnL: "0.00",
+          totalPnL: "0.00",
+          winRate: "0.00"
+        });
+      }
+
+      const { outcome } = req.params;
+      const validOutcomes = ['win', 'loss', 'breakeven', 'open'];
+      
+      if (!validOutcomes.includes(outcome)) {
+        return res.status(400).json({ message: "Invalid outcome. Must be: win, loss, breakeven, or open" });
+      }
+
+      const entries = await tradeJournalService.getEntriesByOutcome(
+        portfolio.id, 
+        outcome as 'win' | 'loss' | 'breakeven' | 'open'
+      );
+      res.json(entries);
+    } catch (error) {
+      console.error('Error fetching entries by outcome:', error);
+      res.status(500).json({ message: "Failed to fetch entries by outcome", error });
+    }
+  });
+
+  app.get("/api/journal/by-strategy/:pattern", async (req, res) => {
+    try {
+      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
+      if (!demoUser) {
+        const saltRounds = 12;
+        const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
+        demoUser = await storage.createUser({
+          username: "demo_user",
+          email: "demo@memehunter.app",
+          password: hashedDemoPassword,
+          subscriptionTier: "pro",
+          language: "en"
+        });
+      }
+      
+      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+      if (!portfolio) {
+        portfolio = await storage.createPortfolio({
+          userId: demoUser.id,
+          totalValue: "10000.00",
+          dailyPnL: "0.00",
+          totalPnL: "0.00",
+          winRate: "0.00"
+        });
+      }
+
+      const { pattern } = req.params;
+      const entries = await tradeJournalService.getEntriesByStrategy(portfolio.id, pattern);
+      res.json(entries);
+    } catch (error) {
+      console.error('Error fetching entries by strategy:', error);
+      res.status(500).json({ message: "Failed to fetch entries by strategy", error });
+    }
+  });
+
+  // Risk Reports Endpoints
+  app.get("/api/risk/daily", async (req, res) => {
+    try {
+      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
+      if (!demoUser) {
+        const saltRounds = 12;
+        const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
+        demoUser = await storage.createUser({
+          username: "demo_user",
+          email: "demo@memehunter.app",
+          password: hashedDemoPassword,
+          subscriptionTier: "pro",
+          language: "en"
+        });
+      }
+      
+      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+      if (!portfolio) {
+        portfolio = await storage.createPortfolio({
+          userId: demoUser.id,
+          totalValue: "10000.00",
+          dailyPnL: "0.00",
+          totalPnL: "0.00",
+          winRate: "0.00"
+        });
+      }
+
+      const date = req.query.date ? new Date(req.query.date as string) : undefined;
+      const summary = await riskReportsService.getDailySummary(portfolio.id, date);
+      res.json(summary);
+    } catch (error) {
+      console.error('Error fetching daily summary:', error);
+      res.status(500).json({ message: "Failed to fetch daily summary", error });
+    }
+  });
+
+  app.get("/api/risk/weekly", async (req, res) => {
+    try {
+      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
+      if (!demoUser) {
+        const saltRounds = 12;
+        const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
+        demoUser = await storage.createUser({
+          username: "demo_user",
+          email: "demo@memehunter.app",
+          password: hashedDemoPassword,
+          subscriptionTier: "pro",
+          language: "en"
+        });
+      }
+      
+      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+      if (!portfolio) {
+        portfolio = await storage.createPortfolio({
+          userId: demoUser.id,
+          totalValue: "10000.00",
+          dailyPnL: "0.00",
+          totalPnL: "0.00",
+          winRate: "0.00"
+        });
+      }
+
+      const weekStart = req.query.weekStart ? new Date(req.query.weekStart as string) : undefined;
+      const summary = await riskReportsService.getWeeklySummary(portfolio.id, weekStart);
+      res.json(summary);
+    } catch (error) {
+      console.error('Error fetching weekly summary:', error);
+      res.status(500).json({ message: "Failed to fetch weekly summary", error });
+    }
+  });
+
+  app.get("/api/risk/exposure", async (req, res) => {
+    try {
+      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
+      if (!demoUser) {
+        const saltRounds = 12;
+        const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
+        demoUser = await storage.createUser({
+          username: "demo_user",
+          email: "demo@memehunter.app",
+          password: hashedDemoPassword,
+          subscriptionTier: "pro",
+          language: "en"
+        });
+      }
+      
+      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+      if (!portfolio) {
+        portfolio = await storage.createPortfolio({
+          userId: demoUser.id,
+          totalValue: "10000.00",
+          dailyPnL: "0.00",
+          totalPnL: "0.00",
+          winRate: "0.00"
+        });
+      }
+
+      const exposure = await riskReportsService.getCurrentExposure(portfolio.id);
+      res.json(exposure);
+    } catch (error) {
+      console.error('Error fetching current exposure:', error);
+      res.status(500).json({ message: "Failed to fetch current exposure", error });
+    }
+  });
+
+  app.get("/api/risk/realized", async (req, res) => {
+    try {
+      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
+      if (!demoUser) {
+        const saltRounds = 12;
+        const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
+        demoUser = await storage.createUser({
+          username: "demo_user",
+          email: "demo@memehunter.app",
+          password: hashedDemoPassword,
+          subscriptionTier: "pro",
+          language: "en"
+        });
+      }
+      
+      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+      if (!portfolio) {
+        portfolio = await storage.createPortfolio({
+          userId: demoUser.id,
+          totalValue: "10000.00",
+          dailyPnL: "0.00",
+          totalPnL: "0.00",
+          winRate: "0.00"
+        });
+      }
+
+      const timeframe = (req.query.timeframe as 'daily' | 'weekly' | 'monthly' | 'all-time') || 'all-time';
+      const validTimeframes = ['daily', 'weekly', 'monthly', 'all-time'];
+      
+      if (!validTimeframes.includes(timeframe)) {
+        return res.status(400).json({ message: "Invalid timeframe. Must be: daily, weekly, monthly, or all-time" });
+      }
+
+      const realized = await riskReportsService.getRealizedProfits(portfolio.id, timeframe);
+      res.json(realized);
+    } catch (error) {
+      console.error('Error fetching realized profits:', error);
+      res.status(500).json({ message: "Failed to fetch realized profits", error });
+    }
+  });
+
+  app.get("/api/risk/drawdown", async (req, res) => {
+    try {
+      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
+      if (!demoUser) {
+        const saltRounds = 12;
+        const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
+        demoUser = await storage.createUser({
+          username: "demo_user",
+          email: "demo@memehunter.app",
+          password: hashedDemoPassword,
+          subscriptionTier: "pro",
+          language: "en"
+        });
+      }
+      
+      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+      if (!portfolio) {
+        portfolio = await storage.createPortfolio({
+          userId: demoUser.id,
+          totalValue: "10000.00",
+          dailyPnL: "0.00",
+          totalPnL: "0.00",
+          winRate: "0.00"
+        });
+      }
+
+      const drawdown = await riskReportsService.getDrawdownMetrics(portfolio.id);
+      res.json(drawdown);
+    } catch (error) {
+      console.error('Error fetching drawdown metrics:', error);
+      res.status(500).json({ message: "Failed to fetch drawdown metrics", error });
+    }
+  });
+
+  app.get("/api/risk/score", async (req, res) => {
+    try {
+      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
+      if (!demoUser) {
+        const saltRounds = 12;
+        const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
+        demoUser = await storage.createUser({
+          username: "demo_user",
+          email: "demo@memehunter.app",
+          password: hashedDemoPassword,
+          subscriptionTier: "pro",
+          language: "en"
+        });
+      }
+      
+      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+      if (!portfolio) {
+        portfolio = await storage.createPortfolio({
+          userId: demoUser.id,
+          totalValue: "10000.00",
+          dailyPnL: "0.00",
+          totalPnL: "0.00",
+          winRate: "0.00"
+        });
+      }
+
+      const score = await riskReportsService.calculateRiskScore(portfolio.id);
+      res.json(score);
+    } catch (error) {
+      console.error('Error calculating risk score:', error);
+      res.status(500).json({ message: "Failed to calculate risk score", error });
+    }
+  });
+
+  app.get("/api/risk/report/:period", async (req, res) => {
+    try {
+      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
+      if (!demoUser) {
+        const saltRounds = 12;
+        const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
+        demoUser = await storage.createUser({
+          username: "demo_user",
+          email: "demo@memehunter.app",
+          password: hashedDemoPassword,
+          subscriptionTier: "pro",
+          language: "en"
+        });
+      }
+      
+      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+      if (!portfolio) {
+        portfolio = await storage.createPortfolio({
+          userId: demoUser.id,
+          totalValue: "10000.00",
+          dailyPnL: "0.00",
+          totalPnL: "0.00",
+          winRate: "0.00"
+        });
+      }
+
+      const { period } = req.params;
+      const validPeriods = ['daily', 'weekly', 'monthly'];
+      
+      if (!validPeriods.includes(period)) {
+        return res.status(400).json({ message: "Invalid period. Must be: daily, weekly, or monthly" });
+      }
+
+      const report = await riskReportsService.generateFullReport(
+        portfolio.id, 
+        period as 'daily' | 'weekly' | 'monthly'
+      );
+      res.json(report);
+    } catch (error) {
+      console.error('Error generating full risk report:', error);
+      res.status(500).json({ message: "Failed to generate full risk report", error });
     }
   });
 

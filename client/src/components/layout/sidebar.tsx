@@ -19,6 +19,8 @@ import {
   Menu,
   ChevronLeft,
   X,
+  BookOpen,
+  Shield,
 } from "lucide-react";
 
 const navigationItems = [
@@ -28,6 +30,8 @@ const navigationItems = [
   { href: "/portfolio", icon: Briefcase, labelKey: "navigation.portfolio" },
   { href: "/analytics", icon: TrendingUp, labelKey: "navigation.analytics" },
   { href: "/activity", icon: Activity, labelKey: "navigation.activity", hasIndicator: true },
+  { href: "/journal", icon: BookOpen, labelKey: "navigation.journal" },
+  { href: "/risk", icon: Shield, labelKey: "navigation.risk" },
   { href: "/terminal", icon: Terminal, labelKey: "navigation.terminal" },
 ];
 
