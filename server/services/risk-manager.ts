@@ -159,10 +159,11 @@ class RiskManager extends EventEmitter {
       const kellyPercentage = this.calculateKellyPercentage(confidence, riskLimits.stopLossPercentage);
       
       // Risk-adjusted position size as percentage
+      const availableCapacity = this.getAvailableCapacity(positions, portfolioValue, riskLimits);
       const riskAdjustedPercentage = Math.min(
         kellyPercentage,
         riskLimits.maxPositionSize,
-        this.getAvailableCapacity(positions, portfolioValue, riskLimits)
+        availableCapacity
       );
 
       // Token-specific volatility adjustment
@@ -587,8 +588,10 @@ class RiskManager extends EventEmitter {
   }
 
   private getAvailableCapacity(positions: Position[], portfolioValue: number, riskLimits: RiskLimits): number {
-    const totalPositionValue = positions.reduce((sum, p) => sum + parseFloat(p.currentValue || '0'), 0);
-    const usedCapacity = (totalPositionValue / portfolioValue) * 100;
+    // Filter out zero-amount positions before calculating
+    const activePositions = positions.filter(p => parseFloat(p.amount) > 0);
+    const totalPositionValue = activePositions.reduce((sum, p) => sum + parseFloat(p.currentValue || '0'), 0);
+    const usedCapacity = portfolioValue > 0 ? (totalPositionValue / portfolioValue) * 100 : 0;
     const availableCapacity = Math.max(0, 95 - usedCapacity); // Keep 5% cash
     
     return Math.min(availableCapacity, riskLimits.maxPositionSize);

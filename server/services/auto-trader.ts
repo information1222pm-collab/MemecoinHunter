@@ -468,7 +468,9 @@ class AutoTrader extends EventEmitter {
         signal.confidence / 100
       );
       
-      const tradeValue = Math.min(positionSizing.recommendedSize, this.strategy.maxPositionSize);
+      // FIXED: RiskManager returns recommendedSize in TOKENS, convert to DOLLARS
+      const recommendedDollars = positionSizing.recommendedSize * signal.price;
+      const tradeValue = Math.min(recommendedDollars, this.strategy.maxPositionSize);
       console.log(`💡 [Portfolio ${portfolioId}] Dynamic position sizing: $${tradeValue.toFixed(2)} (${positionSizing.riskLevel} risk, ${positionSizing.reasoning})`);
       
       // IMPROVED: Enforce 10% minimum cash floor

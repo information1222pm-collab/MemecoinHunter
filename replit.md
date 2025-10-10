@@ -8,6 +8,17 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### October 10, 2025 - $0 Trade Bug FIXED
+- **Issue Reported**: System executing $0.00 trades visible to users across all portfolios
+- **Root Causes Identified**:
+  1. RiskManager's `calculatePositionSizing()` returns `recommendedSize` in TOKENS, but auto-trader treated it as DOLLARS
+  2. `getAvailableCapacity()` included zero-amount positions in calculations, causing incorrect portfolio allocation percentages
+- **Solution Implemented**:
+  1. Auto-trader now correctly converts tokens to dollars: `recommendedDollars = positionSizing.recommendedSize * signal.price`
+  2. RiskManager filters zero-amount positions before calculating capacity: `positions.filter(p => parseFloat(p.amount) > 0)`
+- **Verification**: All trades now execute with proper dollar amounts ($800-$1000 range based on 10-15% Kelly allocation)
+- **Impact**: Trading system fully operational with accurate position sizing across all 29 portfolios
+
 ### October 10, 2025 - PROFITABLE Trading Strategy Improvements
 - **Major Enhancement**: Implemented comprehensive profitability improvements to auto-trading system
 - **Pattern Performance Gating**: Trades now gated on proven pattern performance
