@@ -40,7 +40,7 @@ function DashboardContent() {
 
   // Fetch portfolio data with auto-refresh
   const { data: portfolioData } = useQuery({
-    queryKey: ['/api/portfolio/default'],
+    queryKey: ['/api/portfolio', 'default'],
     refetchInterval: 10000, // Refetch every 10 seconds
   });
 
