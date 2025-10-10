@@ -46,33 +46,75 @@ class AutoTrader extends EventEmitter {
     this.isActive = true;
     console.log('🤖 Auto-Trader started - Multi-mode (Paper + Real money trading with exchange integration)');
     
-    await this.initializePortfolio();
+    try {
+      // Step 1: Initialize portfolio with timeout protection
+      console.log('📊 Step 1/3: Initializing portfolio...');
+      await this.withTimeout(
+        this.initializePortfolio(),
+        10000,
+        'Portfolio initialization timed out after 10s'
+      );
+      console.log(`✅ Portfolio initialized successfully (ID: ${this.defaultPortfolioId})`);
+      
+      // Step 2: Start pattern performance analyzer with timeout protection
+      console.log('🧠 Step 2/3: Starting pattern performance analyzer...');
+      await this.withTimeout(
+        patternPerformanceAnalyzer.start(),
+        15000,
+        'Pattern analyzer initialization timed out after 15s'
+      );
+      console.log('✅ Pattern performance analyzer started successfully');
+      
+      // Step 3: Set up event listeners
+      console.log('🔌 Step 3/3: Setting up event listeners...');
+      
+      // Listen to ML pattern events
+      mlAnalyzer.on('patternDetected', (pattern) => {
+        this.handleMLPattern(pattern);
+      });
+      
+      // Listen to scanner alerts
+      scanner.on('alertTriggered', (alert) => {
+        this.handleScannerAlert(alert);
+      });
+      
+      // Listen to threshold updates from pattern analyzer
+      patternPerformanceAnalyzer.on('thresholdUpdated', (data) => {
+        this.strategy.minConfidence = data.minConfidence;
+        console.log(`🎯 Dynamic threshold updated: ${data.minConfidence}% (Win rate: ${(data.recentWinRate * 100).toFixed(1)}%)`);
+      });
+      
+      console.log('✅ Event listeners configured successfully');
+      
+    } catch (error) {
+      console.error('⚠️ Auto-Trader initialization encountered errors:', error);
+      console.error('⚠️ Continuing with reduced functionality...');
+    }
     
-    // Start pattern performance analyzer
-    await patternPerformanceAnalyzer.start();
-    
-    // Listen to ML pattern events
-    mlAnalyzer.on('patternDetected', (pattern) => {
-      this.handleMLPattern(pattern);
-    });
-    
-    // Listen to scanner alerts
-    scanner.on('alertTriggered', (alert) => {
-      this.handleScannerAlert(alert);
-    });
-    
-    // Listen to threshold updates from pattern analyzer
-    patternPerformanceAnalyzer.on('thresholdUpdated', (data) => {
-      this.strategy.minConfidence = data.minConfidence;
-      console.log(`🎯 Dynamic threshold updated: ${data.minConfidence}% (Win rate: ${(data.recentWinRate * 100).toFixed(1)}%)`);
-    });
-    
-    // Monitor positions every 30 seconds
+    // CRITICAL: Always set up monitoring interval, even if other steps failed
+    // This ensures positions are monitored for stop-loss/take-profit
+    console.log('⏰ Setting up position monitoring interval (30s)...');
     this.monitoringInterval = setInterval(() => {
       this.monitorPositions();
     }, 30000);
+    console.log('✅ Position monitoring interval active');
+    
+    // Run initial position check immediately
+    console.log('🔍 Running initial position check...');
+    this.monitorPositions().catch(error => {
+      console.error('Error in initial position check:', error);
+    });
     
     console.log('🤖 Auto-Trader initialization complete - listening for ML patterns');
+  }
+  
+  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) => 
+        setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+      )
+    ]);
   }
 
   stop() {
@@ -483,13 +525,20 @@ class AutoTrader extends EventEmitter {
   }
 
   private async monitorPositions() {
-    if (!this.isActive || !this.defaultPortfolioId) return;
+    if (!this.isActive || !this.defaultPortfolioId) {
+      console.log('⚠️ Position monitoring skipped: Auto-trader inactive or no portfolio ID');
+      return;
+    }
     
     try {
+      console.log('🔍 Monitoring positions for stop-loss/take-profit...');
+      
       // Update sell-only mode state based on current cash balance
       await this.updateSellOnlyModeState();
       
       const positions = await storage.getPositionsByPortfolio(this.defaultPortfolioId);
+      console.log(`📊 Checking ${positions.length} positions (${positions.filter(p => parseFloat(p.amount) > 0).length} active)`);
+      
       let totalPortfolioValue = 0;
       const positionsSold = new Set<string>(); // Track positions sold in this cycle
       

@@ -33,15 +33,30 @@ class PatternPerformanceAnalyzer extends EventEmitter {
     this.isActive = true;
     console.log('🧠 Pattern Performance Analyzer started');
     
-    await this.initializeLearningParams();
-    
-    // Update pattern performance every 2 minutes
-    this.updateInterval = setInterval(() => {
-      this.analyzeAllPatterns();
-    }, 120000);
-    
-    // Run initial analysis
-    await this.analyzeAllPatterns();
+    try {
+      console.log('📋 Initializing learning parameters...');
+      await this.initializeLearningParams();
+      console.log('✅ Learning parameters initialized');
+      
+      // Update pattern performance every 2 minutes
+      this.updateInterval = setInterval(() => {
+        this.analyzeAllPatterns().catch(error => {
+          console.error('Error in pattern analysis interval:', error);
+        });
+      }, 120000);
+      console.log('✅ Pattern analysis interval set (2 minutes)');
+      
+      // Run initial analysis (don't await to prevent blocking)
+      console.log('🔍 Starting initial pattern analysis...');
+      this.analyzeAllPatterns().catch(error => {
+        console.error('Error in initial pattern analysis:', error);
+      });
+      
+      console.log('✅ Pattern Performance Analyzer initialization complete');
+    } catch (error) {
+      console.error('⚠️ Pattern Performance Analyzer initialization error:', error);
+      console.error('⚠️ Continuing with default settings...');
+    }
   }
 
   stop() {
