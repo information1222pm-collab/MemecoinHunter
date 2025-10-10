@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { LanguageProvider } from "@/contexts/language-context";
 import { useAuth } from "@/hooks/use-auth";
-import { TradeNotifications } from "@/components/trade-notifications";
+import { TradeAlertModal } from "@/components/trade-alert-modal";
 import Home from "@/pages/home";
 import Dashboard from "@/pages/dashboard";
 import Scanner from "@/pages/scanner";
@@ -56,7 +56,7 @@ function Router() {
   // Show main app if authenticated
   return (
     <>
-      <TradeNotifications />
+      <TradeAlertModal />
       <Switch>
         <Route path="/" component={Home} />
         <Route path="/dashboard" component={Dashboard} />
