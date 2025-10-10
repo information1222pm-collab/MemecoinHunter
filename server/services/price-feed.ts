@@ -74,7 +74,7 @@ class PriceFeedService extends EventEmitter {
   private isRunning = false;
   private updateInterval?: NodeJS.Timeout;
   private readonly API_BASE = 'https://api.coingecko.com/api/v3';
-  private readonly RATE_LIMIT_DELAY = 1000; // 1 second between requests
+  private readonly RATE_LIMIT_DELAY = 2500; // 2.5 seconds between requests to avoid rate limits
   private lastRequestTime = 0;
   
   // Comprehensive list of memecoins and trending tokens to track
@@ -168,16 +168,21 @@ class PriceFeedService extends EventEmitter {
     this.isRunning = true;
     console.log('📡 Price feed service started (CoinGecko API)');
     
-    // Initialize tokens from CoinGecko API
-    this.initializeTokensFromAPI();
+    // Initialize tokens from CoinGecko API (with fallback)
+    this.initializeTokensFromAPI().catch(err => {
+      console.log('⚠️ Initial API call failed, using fallback tokens');
+    });
     
-    // Update prices every 30 seconds (respect API limits)
+    // Delay first price update to avoid overwhelming API on startup
+    setTimeout(() => {
+      this.updatePrices();
+    }, 10000); // Wait 10 seconds before first update
+    
+    // Update prices every 45 seconds (increased from 30 to reduce API pressure)
     this.updateInterval = setInterval(() => {
       this.updatePrices();
-    }, 30000);
+    }, 45000);
     
-    // Initial price update
-    setTimeout(() => this.updatePrices(), 2000);
     
     // Run coin discovery every 5 minutes
     setTimeout(() => {
@@ -270,46 +275,71 @@ class PriceFeedService extends EventEmitter {
     }
   }
 
-  private async fetchCoinsData(): Promise<CoinGeckoToken[]> {
-    await this.respectRateLimit();
+  private async fetchCoinsData(retryCount = 0): Promise<CoinGeckoToken[]> {
+    const maxRetries = 3;
+    const baseDelay = 2000; // 2 seconds base delay
     
-    // Enhanced URL with more data fields
-    const url = `${this.API_BASE}/coins/markets?vs_currency=usd&ids=${this.TRACKED_COINS.join(',')}&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h,7d,30d&include_24hr_change=true`;
-    
-    const response = await fetch(url, {
-      headers: {
-        'Accept': 'application/json',
+    try {
+      await this.respectRateLimit();
+      
+      // Enhanced URL with more data fields
+      const url = `${this.API_BASE}/coins/markets?vs_currency=usd&ids=${this.TRACKED_COINS.join(',')}&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h,7d,30d&include_24hr_change=true`;
+      
+      const response = await fetch(url, {
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
+      
+      // Handle rate limiting with exponential backoff
+      if (response.status === 429) {
+        if (retryCount < maxRetries) {
+          const delay = baseDelay * Math.pow(2, retryCount); // Exponential backoff: 2s, 4s, 8s
+          console.log(`⏳ Rate limited. Retrying in ${delay/1000}s... (attempt ${retryCount + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return this.fetchCoinsData(retryCount + 1);
+        }
+        throw new Error(`CoinGecko API rate limit exceeded after ${maxRetries} retries`);
       }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`CoinGecko API error: ${response.status} ${response.statusText}`);
+      
+      if (!response.ok) {
+        throw new Error(`CoinGecko API error: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      return data.map((coin: any) => ({
+        id: coin.id,
+        symbol: coin.symbol,
+        name: coin.name,
+        current_price: coin.current_price || 0,
+        market_cap: coin.market_cap || 0,
+        total_volume: coin.total_volume || 0,
+        price_change_percentage_24h: coin.price_change_percentage_24h || 0,
+        contract_address: coin.contract_address,
+        // Enhanced data fields
+        circulating_supply: coin.circulating_supply,
+        total_supply: coin.total_supply,
+        max_supply: coin.max_supply,
+        ath: coin.ath,
+        ath_change_percentage: coin.ath_change_percentage,
+        atl: coin.atl,
+        atl_change_percentage: coin.atl_change_percentage,
+        roi: coin.roi,
+        price_change_percentage_7d: coin.price_change_percentage_7d_in_currency,
+        price_change_percentage_30d: coin.price_change_percentage_30d_in_currency,
+        high_24h: coin.high_24h,
+        low_24h: coin.low_24h,
+      }));
+    } catch (error) {
+      // If we've exhausted retries or hit a non-retryable error, rethrow
+      if (retryCount >= maxRetries || !(error instanceof Error && error.message.includes('429'))) {
+        throw error;
+      }
+      // This shouldn't be reached but just in case
+      const delay = baseDelay * Math.pow(2, retryCount);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return this.fetchCoinsData(retryCount + 1);
     }
-    
-    const data = await response.json();
-    return data.map((coin: any) => ({
-      id: coin.id,
-      symbol: coin.symbol,
-      name: coin.name,
-      current_price: coin.current_price || 0,
-      market_cap: coin.market_cap || 0,
-      total_volume: coin.total_volume || 0,
-      price_change_percentage_24h: coin.price_change_percentage_24h || 0,
-      contract_address: coin.contract_address,
-      // Enhanced data fields
-      circulating_supply: coin.circulating_supply,
-      total_supply: coin.total_supply,
-      max_supply: coin.max_supply,
-      ath: coin.ath,
-      ath_change_percentage: coin.ath_change_percentage,
-      atl: coin.atl,
-      atl_change_percentage: coin.atl_change_percentage,
-      roi: coin.roi,
-      price_change_percentage_7d: coin.price_change_percentage_7d_in_currency,
-      price_change_percentage_30d: coin.price_change_percentage_30d_in_currency,
-      high_24h: coin.high_24h,
-      low_24h: coin.low_24h,
-    }));
   }
 
   private async respectRateLimit(): Promise<void> {

@@ -4,6 +4,7 @@ import { TokenScanner } from "@/components/trading/token-scanner";
 import { PriceChart } from "@/components/trading/price-chart";
 import { PortfolioSummary } from "@/components/trading/portfolio-summary";
 import { QuickTrade } from "@/components/trading/quick-trade";
+import { RecentTrades } from "@/components/trading/recent-trades";
 import { PatternInsights } from "@/components/ml/pattern-insights";
 import { CLITerminal } from "@/components/terminal/cli-terminal";
 import { Card, CardContent } from "@/components/ui/card";
@@ -231,6 +232,7 @@ function DashboardContent() {
             {/* Right Column - Sidebar Components */}
             <div className="space-y-6">
               <PortfolioSummary />
+              <RecentTrades />
               <QuickTrade />
               <PatternInsights />
             </div>

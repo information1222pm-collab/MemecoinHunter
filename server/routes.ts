@@ -302,29 +302,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }
 
-  // Start services in correct order - auto-trader BEFORE ML analyzer to receive events
-  console.log('🚀 Starting trading services...');
-  scanner.start();
-  priceFeed.start();
-  
-  // CRITICAL: Start auto-trader BEFORE ML analyzer so it can listen for pattern events
-  console.log('🤖 Starting Auto-Trader service...');
-  try {
-    await autoTrader.start();
-  } catch (error) {
-    console.error('❌ Auto-Trader failed to start:', error);
-  }
-  
-  // Start ML analyzer after auto-trader is listening
-  console.log('🧠 Starting ML Pattern Analyzer...');
-  mlAnalyzer.start();
-  
-  riskManager.start();
-  stakeholderReportUpdater.startAutoUpdater();
-  
-  // Start position tracker for real-time holdings updates
-  console.log('📊 Starting Position Tracker...');
-  positionTracker.start();
+  // Start services asynchronously AFTER server is listening to avoid blocking port 5000
+  // This prevents startup timeout issues
+  setImmediate(async () => {
+    console.log('🚀 Starting trading services...');
+    scanner.start();
+    priceFeed.start();
+    
+    // CRITICAL: Start auto-trader BEFORE ML analyzer so it can listen for pattern events
+    console.log('🤖 Starting Auto-Trader service...');
+    try {
+      await autoTrader.start();
+    } catch (error) {
+      console.error('❌ Auto-Trader failed to start:', error);
+    }
+    
+    // Start ML analyzer after auto-trader is listening
+    console.log('🧠 Starting ML Pattern Analyzer...');
+    mlAnalyzer.start();
+    
+    riskManager.start();
+    stakeholderReportUpdater.startAutoUpdater();
+    
+    // Start position tracker for real-time holdings updates
+    console.log('📊 Starting Position Tracker...');
+    positionTracker.start();
+  });
 
   // Set up real-time broadcasts with user scoping (CRITICAL SECURITY FIX)
   scanner.on('tokenScanned', (token) => {
@@ -666,6 +669,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch portfolio", error });
+    }
+  });
+
+  // Trades endpoint for default portfolio
+  app.get("/api/portfolio/default/trades", async (req, res) => {
+    try {
+      // Get or create demo user
+      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
+      if (!demoUser) {
+        const saltRounds = 12;
+        const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
+        
+        demoUser = await storage.createUser({
+          username: "demo_user",
+          email: "demo@memehunter.app",
+          password: hashedDemoPassword,
+          subscriptionTier: "pro",
+          language: "en"
+        });
+      }
+      
+      // Get or create demo portfolio
+      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+      if (!portfolio) {
+        portfolio = await storage.createPortfolio({
+          userId: demoUser.id,
+          totalValue: "10000.00",
+          dailyPnL: "0.00",
+          totalPnL: "0.00",
+          winRate: "0.00"
+        });
+      }
+      
+      const trades = await storage.getTradesByPortfolio(portfolio.id);
+      
+      // Enhance trades with token information
+      const enhancedTrades = await Promise.all(trades.map(async (trade) => {
+        const token = await storage.getToken(trade.tokenId);
+        return {
+          id: trade.id,
+          type: trade.type,
+          amount: trade.amount,
+          price: trade.price,
+          totalValue: trade.totalValue,
+          status: trade.status,
+          createdAt: trade.createdAt,
+          token: {
+            symbol: token?.symbol || 'Unknown',
+            name: token?.name || 'Unknown Token'
+          }
+        };
+      }));
+      
+      res.json(enhancedTrades);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch trades", error });
     }
   });
 
