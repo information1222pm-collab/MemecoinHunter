@@ -5,12 +5,24 @@ import { z } from "zod";
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  email: text("email").notNull().unique(),
-  password: text("password").notNull(),
+  username: text("username").unique(), // Optional for OAuth users
+  email: text("email").unique(), // Can be null for some OAuth providers
+  password: text("password"), // Optional - only for password-based auth
+  firstName: text("first_name"), // For OAuth providers
+  lastName: text("last_name"), // For OAuth providers
+  profileImageUrl: text("profile_image_url"), // For OAuth providers
   subscriptionTier: text("subscription_tier").default("basic"),
   language: text("language").default("en"),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Session storage table for Replit Auth (OpenID Connect)
+// Reference: blueprint:javascript_log_in_with_replit
+export const sessions = pgTable("sessions", {
+  sid: varchar("sid").primaryKey(),
+  sess: jsonb("sess").notNull(),
+  expire: timestamp("expire").notNull(),
 });
 
 export const tokens = pgTable("tokens", {
@@ -269,9 +281,21 @@ export const alertEventsRelations = relations(alertEvents, ({ one }) => ({
 }));
 
 // Insert schemas
+// For password-based registration
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
+});
+
+// For OAuth user upsert (Replit Auth)
+// Reference: blueprint:javascript_log_in_with_replit
+export const upsertUserSchema = z.object({
+  id: z.string(),
+  email: z.string().email().nullable(),
+  firstName: z.string().nullable(),
+  lastName: z.string().nullable(),
+  profileImageUrl: z.string().nullable(),
 });
 
 export const insertTokenSchema = createInsertSchema(tokens).omit({
@@ -430,6 +454,7 @@ export const tradingConfig = pgTable("trading_config", {
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UpsertUser = z.infer<typeof upsertUserSchema>; // For OAuth users
 
 export type Token = typeof tokens.$inferSelect;
 export type InsertToken = z.infer<typeof insertTokenSchema>;
