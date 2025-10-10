@@ -24,6 +24,7 @@ import csrf from "csurf";
 import cookie from "cookie";
 import rateLimit from "express-rate-limit";
 import signature from "cookie-signature";
+import { setupAuth } from "./replitAuth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -97,6 +98,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/trades', tradingLimiter);
   app.use('/api/auto-trader', tradingLimiter);
   app.use('/api', apiLimiter);
+
+  // Set up Replit Auth (Google/GitHub/X/Apple OAuth) if environment variables are configured
+  // Reference: blueprint:javascript_log_in_with_replit
+  await setupAuth(app);
 
   // RBAC Middleware for Role-Based Access Control (CRITICAL SECURITY FIX)
   const requireAuth = async (req: any, res: any, next: any) => {

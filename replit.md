@@ -41,11 +41,27 @@ The backend uses **Express.js** with **TypeScript** in an ESM configuration. The
 **Migration Management**: Drizzle Kit handles schema migrations and database versioning, with migrations stored in the `/migrations` directory.
 
 ### Authentication and Authorization
-The application implements session-based authentication. **All features are currently available to all authenticated users regardless of subscription tier** - subscription restrictions have been removed to provide free access.
+The application supports **dual authentication methods**:
+1. **Password-based Authentication**: Traditional email/password signup and login with bcrypt password hashing
+2. **OAuth (Google Login)**: OpenID Connect integration via Replit Auth for seamless Google sign-in
+
+**All features are currently available to all authenticated users regardless of subscription tier** - subscription restrictions have been removed to provide free access.
 
 **Paper Trading Capital**: Every new user automatically receives **$10,000 in virtual trading money** to audit and test the platform's capabilities without any financial risk.
 
-**Security Measures**: Input validation using Zod schemas, CORS configuration, CSRF protection, and secure session management with PostgreSQL session storage.
+**Google Login Setup** (Optional):
+To enable "Continue with Google" authentication:
+1. Ensure these environment variables are set:
+   - `REPLIT_DOMAINS`: Comma-separated list of domains (e.g., `your-app.replit.app`)
+   - `REPL_ID`: Your Repl ID from Replit
+   - `SESSION_SECRET`: Secure random string for session encryption
+   - `ISSUER_URL`: OAuth issuer URL (default: `https://replit.com/oidc`)
+2. Database requirements: PostgreSQL with `sessions` table (already created)
+3. The Google login button will appear automatically once environment variables are configured
+
+**Account Linking**: Users who sign up with email/password can later link their Google account - the system automatically matches accounts by email address.
+
+**Security Measures**: Input validation using Zod schemas, CORS configuration, CSRF protection for password auth, and secure OAuth token management with automatic refresh for Google login.
 
 ### External Dependencies
 
@@ -76,6 +92,16 @@ The application implements session-based authentication. **All features are curr
 The architecture prioritizes real-time performance, type safety, and scalable subscription management, making it well-suited for high-frequency trading applications with multiple user tiers.
 
 ## Recent Changes
+
+### October 10, 2025 - Google Login Infrastructure
+- **OAuth Integration**: Implemented OpenID Connect authentication via Replit Auth for seamless Google sign-in
+- **Database Schema Updates**: Extended users table to support OAuth fields (firstName, lastName, profileImageUrl), made password/username/email nullable for OAuth users
+- **Account Linking**: Automatic account linking by email - users who sign up with password can later link their Google account
+- **Session Management**: Created sessions table for OAuth session storage with PostgreSQL persistence
+- **Dual Authentication**: System now supports both traditional password-based auth and OAuth (Google, GitHub, X, Apple)
+- **Smart User Creation**: OAuth users automatically receive $10,000 paper trading portfolio on first login
+- **Environment-Based Activation**: Google login activates automatically when REPLIT_DOMAINS, REPL_ID, and SESSION_SECRET are configured
+- **Security**: OAuth tokens automatically refresh when expired, full CSRF protection maintained for password auth
 
 ### October 10, 2025 - Auto-Trader Initialization Fix
 - **Critical Bug Fixed**: Auto-trader was failing to complete initialization, preventing position monitoring from starting

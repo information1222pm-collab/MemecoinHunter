@@ -3,7 +3,7 @@ import {
   priceHistory, patterns, subscriptions, patternPerformance, mlLearningParams, auditLog,
   exchangeConfig, exchangeTrades, exchangeBalances, tradingConfig, apiKeys,
   alertRules, alertEvents,
-  type User, type InsertUser, type Token, type InsertToken,
+  type User, type InsertUser, type UpsertUser, type Token, type InsertToken,
   type Portfolio, type InsertPortfolio, type Trade, type InsertTrade,
   type Position, type InsertPosition, type ScanAlert, type InsertScanAlert,
   type PriceHistory, type InsertPriceHistory, type Pattern, type InsertPattern,
@@ -25,6 +25,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
+  upsertUser(user: UpsertUser): Promise<User>; // For OAuth (Replit Auth)
 
   // Token operations
   getToken(id: string): Promise<Token | undefined>;
@@ -142,6 +143,52 @@ export class DatabaseStorage implements IStorage {
 
   async updateUser(id: string, updates: Partial<InsertUser>): Promise<User> {
     const [user] = await db.update(users).set(updates).where(eq(users.id, id)).returning();
+    return user;
+  }
+
+  // OAuth user upsert (create or update) - Reference: blueprint:javascript_log_in_with_replit
+  // Critical: Link accounts by email if user already exists with that email
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    // Check if user with this email already exists (for account linking)
+    let existingUser: User | undefined = undefined;
+    if (userData.email) {
+      existingUser = await this.getUserByEmail(userData.email);
+    }
+    
+    let user: User;
+    if (existingUser) {
+      // Update existing user to link OAuth account
+      [user] = await db
+        .update(users)
+        .set({
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          profileImageUrl: userData.profileImageUrl,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, existingUser.id))
+        .returning();
+    } else {
+      // Create new OAuth user
+      [user] = await db
+        .insert(users)
+        .values(userData)
+        .onConflictDoUpdate({
+          target: users.id,
+          set: {
+            ...userData,
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+    }
+    
+    // Create default portfolio for new OAuth users if they don't have one
+    const existingPortfolio = await this.getPortfolioByUserId(user.id);
+    if (!existingPortfolio) {
+      await this.createPortfolio({ userId: user.id });
+    }
+    
     return user;
   }
 
