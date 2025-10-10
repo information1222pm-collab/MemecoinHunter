@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { useToast } from "@/hooks/use-toast";
 import { TrendingUp, TrendingDown, DollarSign, Sparkles, AlertCircle } from "lucide-react";
@@ -36,6 +36,7 @@ interface TradeEvent {
 export function TradeNotifications() {
   const { lastMessage } = useWebSocket();
   const { toast } = useToast();
+  const lastMilestoneRef = useRef<number>(0);
 
   useEffect(() => {
     if (!lastMessage) return;
@@ -171,7 +172,7 @@ export function TradeNotifications() {
           </div>
         ),
         variant: "default",
-        className: `border-${hasProfit ? 'blue' : 'red'}-500/50 bg-card`,
+        className: hasProfit ? "border-blue-500/50 bg-card" : "border-red-500/50 bg-card",
       });
     }
   };
@@ -208,15 +209,22 @@ export function TradeNotifications() {
       ? (totalPnL / parseFloat(portfolioData.startingCapital)) * 100 
       : 0;
 
-    // Show notification for reaching profit milestones
-    if (totalPnLPercentage >= 10 && totalPnLPercentage < 10.5) {
-      showMilestoneNotification(10, totalPnL);
-    } else if (totalPnLPercentage >= 25 && totalPnLPercentage < 25.5) {
-      showMilestoneNotification(25, totalPnL);
-    } else if (totalPnLPercentage >= 50 && totalPnLPercentage < 50.5) {
-      showMilestoneNotification(50, totalPnL);
-    } else if (totalPnLPercentage >= 100 && totalPnLPercentage < 100.5) {
-      showMilestoneNotification(100, totalPnL);
+    // Determine current milestone
+    let currentMilestone = 0;
+    if (totalPnLPercentage >= 100) {
+      currentMilestone = 100;
+    } else if (totalPnLPercentage >= 50) {
+      currentMilestone = 50;
+    } else if (totalPnLPercentage >= 25) {
+      currentMilestone = 25;
+    } else if (totalPnLPercentage >= 10) {
+      currentMilestone = 10;
+    }
+
+    // Only show notification if we've reached a new milestone
+    if (currentMilestone > 0 && currentMilestone > lastMilestoneRef.current) {
+      lastMilestoneRef.current = currentMilestone;
+      showMilestoneNotification(currentMilestone, totalPnL);
     }
   };
 
