@@ -110,18 +110,25 @@ class PositionTracker extends EventEmitter {
         }
       }
 
-      // Calculate portfolio analytics
+      // Calculate actual portfolio value (positions + cash)
+      const cashBalance = parseFloat(portfolio.cashBalance || '0');
+      const actualTotalValue = totalPortfolioValue + cashBalance;
+      const startingCapital = parseFloat(portfolio.startingCapital || '10000');
+      const actualTotalPnL = actualTotalValue - startingCapital;
+      
+      // Calculate portfolio analytics with actual total value
       const portfolioAnalytics = await this.calculatePortfolioAnalytics(
         portfolio,
         positionAnalytics,
-        totalPortfolioValue,
-        totalUnrealizedPnL
+        actualTotalValue,
+        actualTotalPnL
       );
-
-      // Update portfolio totals
+      
+      // Update portfolio totals including daily P&L from analytics
       await storage.updatePortfolio(portfolioId, {
-        totalValue: totalPortfolioValue.toFixed(2),
-        totalPnL: totalUnrealizedPnL.toFixed(2)
+        totalValue: actualTotalValue.toFixed(2),
+        totalPnL: actualTotalPnL.toFixed(2),
+        dailyPnL: portfolioAnalytics.dayChangeValue
       });
 
       // Emit real-time updates
@@ -253,22 +260,26 @@ class PositionTracker extends EventEmitter {
       const portfolio = await storage.getPortfolio(portfolioId);
       const positions = await storage.getPositionsByPortfolio(portfolioId);
       
-      if (!portfolio || positions.length === 0) return null;
+      if (!portfolio) return null;
 
       const positionAnalytics: PositionAnalytics[] = [];
-      let totalValue = 0;
-      let totalPnL = 0;
+      let totalPositionsValue = 0;
 
       for (const position of positions) {
         const analytics = await this.calculatePositionAnalytics(position);
         if (analytics) {
           positionAnalytics.push(analytics);
-          totalValue += parseFloat(analytics.currentValue);
-          totalPnL += parseFloat(analytics.unrealizedPnL);
+          totalPositionsValue += parseFloat(analytics.currentValue);
         }
       }
 
-      return await this.calculatePortfolioAnalytics(portfolio, positionAnalytics, totalValue, totalPnL);
+      // Calculate actual portfolio value including cash
+      const cashBalance = parseFloat(portfolio.cashBalance || '0');
+      const actualTotalValue = totalPositionsValue + cashBalance;
+      const startingCapital = parseFloat(portfolio.startingCapital || '10000');
+      const actualTotalPnL = actualTotalValue - startingCapital;
+
+      return await this.calculatePortfolioAnalytics(portfolio, positionAnalytics, actualTotalValue, actualTotalPnL);
     } catch (error) {
       console.error('📊 POSITION-TRACKER: Error getting portfolio analytics:', error);
       return null;
