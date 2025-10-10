@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useQuery } from "@tanstack/react-query";
-import { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, useMemo, useEffect, Fragment } from "react";
+import { useWebSocket } from "@/hooks/use-websocket";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -67,6 +68,8 @@ interface TradeJournalEntry {
 }
 
 export default function Journal() {
+  const queryClient = useQueryClient();
+  const { isConnected, lastMessage } = useWebSocket();
   const [outcomeFilter, setOutcomeFilter] = useState<string>("all");
   const [strategyFilter, setStrategyFilter] = useState<string>("all");
   const [startDate, setStartDate] = useState<string>("");
@@ -94,6 +97,23 @@ export default function Journal() {
     queryKey: ['/api/journal/entries', queryParams],
     refetchInterval: 30000,
   });
+
+  // WebSocket real-time updates
+  useEffect(() => {
+    if (!lastMessage || !isConnected) return;
+
+    const { type } = lastMessage;
+
+    switch (type) {
+      case 'trade_executed':
+      case 'portfolio_updated':
+      case 'positions_updated':
+        // Refresh journal when trades or positions change
+        queryClient.invalidateQueries({ queryKey: ['/api/journal/stats'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/journal/entries'] });
+        break;
+    }
+  }, [lastMessage, isConnected, queryClient]);
 
   // Get unique strategies from entries
   const uniqueStrategies = useMemo(() => {
@@ -447,9 +467,8 @@ export default function Journal() {
                       </thead>
                       <tbody>
                         {entries.map((entry, index) => (
-                          <>
+                          <Fragment key={entry.id}>
                             <tr
-                              key={entry.id}
                               className={cn(
                                 "border-b border-white/5 hover:bg-secondary/30 transition-colors cursor-pointer",
                                 index % 2 === 0 ? "bg-secondary/10" : ""
@@ -566,7 +585,7 @@ export default function Journal() {
                                 </td>
                               </tr>
                             )}
-                          </>
+                          </Fragment>
                         ))}
                       </tbody>
                     </table>
