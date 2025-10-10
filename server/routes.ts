@@ -689,7 +689,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Trading routes
   app.post("/api/trades", async (req, res) => {
     try {
-      const tradeData = insertTradeSchema.parse(req.body);
+      // Extract CSRF token from request body (validated by csrfProtection middleware)
+      const { _csrf, ...tradeRequestData } = req.body;
+      
+      // Parse trade data without CSRF token
+      const tradeData = insertTradeSchema.parse(tradeRequestData);
       
       // Validate portfolio exists
       const portfolio = await storage.getPortfolio(tradeData.portfolioId);

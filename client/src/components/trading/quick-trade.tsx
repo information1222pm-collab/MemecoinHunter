@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { getCsrfToken } from "@/lib/auth-utils";
 
 export function QuickTrade() {
   const { t } = useLanguage();
@@ -33,13 +34,18 @@ export function QuickTrade() {
 
   const tradeMutation = useMutation({
     mutationFn: async (tradeData: any) => {
-      return await apiRequest("POST", "/api/trades", tradeData);
+      const csrfToken = await getCsrfToken();
+      return await apiRequest("POST", "/api/trades", {
+        ...tradeData,
+        _csrf: csrfToken
+      });
     },
     onSuccess: () => {
       toast({
         title: t("trade.success"),
         description: t("trade.executed"),
       });
+      queryClient.invalidateQueries({ queryKey: ['/api/portfolio/default'] });
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio'] });
       setAmount("");
     },
