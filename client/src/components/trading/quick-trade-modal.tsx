@@ -35,7 +35,7 @@ export function QuickTradeModal({ selectedToken, onClose }: QuickTradeModalProps
 
   // Fetch portfolio data
   const { data: portfolio } = useQuery({
-    queryKey: ['/api/portfolio/default'],
+    queryKey: ['/api/portfolio', 'default'],
     staleTime: 0,
   });
 
@@ -52,7 +52,7 @@ export function QuickTradeModal({ selectedToken, onClose }: QuickTradeModalProps
         title: t("trade.success"),
         description: t("trade.executed"),
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/portfolio/default'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default'] });
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio'] });
       setAmount("");
       onClose();
