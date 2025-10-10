@@ -545,7 +545,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const positions = await storage.getPositionsByPortfolio(portfolio.id);
-      res.json({ ...portfolio, positions });
+      
+      // Get enhanced analytics from position tracker
+      const portfolioAnalytics = await positionTracker.getPortfolioAnalytics(portfolio.id);
+      const positionAnalytics = await positionTracker.getPositionAnalytics(portfolio.id);
+      
+      // Merge position data with analytics
+      const enhancedPositions = await Promise.all(positions.map(async position => {
+        const analytics = positionAnalytics.find(a => a.positionId === position.id);
+        const token = await storage.getToken(position.tokenId);
+        
+        return {
+          ...position,
+          analytics: analytics || null,
+          token: { 
+            symbol: token?.symbol || analytics?.tokenSymbol || 'Unknown',
+            name: token?.name || `${analytics?.tokenSymbol || 'Unknown'} Token`,
+            currentPrice: token?.currentPrice || '0'
+          }
+        };
+      }));
+      
+      res.json({ 
+        ...portfolio, 
+        positions: enhancedPositions,
+        analytics: portfolioAnalytics
+      });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch default portfolio", error });
     }
