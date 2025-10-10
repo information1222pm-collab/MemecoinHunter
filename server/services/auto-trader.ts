@@ -33,6 +33,7 @@ interface PortfolioState {
 class AutoTrader extends EventEmitter {
   private isActive = false;
   private enabledPortfolios = new Map<string, PortfolioState>(); // Track multiple portfolios
+  private positionStages = new Map<string, number>(); // Track take-profit stage per position (0=none, 1=first, 2=second, 3=final)
   private monitoringInterval?: NodeJS.Timeout;
   private syncInterval?: NodeJS.Timeout;
   
@@ -252,15 +253,16 @@ class AutoTrader extends EventEmitter {
           return;
         }
         
-        // Calculate expectancy: (avgReturn * winRate) - assumes averageReturn is already decimal
-        const expectancy = performance.averageReturn * performance.winRate;
+        // FIXED: Use averageReturn directly as expectancy (it's already net per-trade profit)
+        // averageReturn is calculated as totalProfit / totalTrades, so it represents expected value per trade
+        const expectancy = performance.averageReturn;
         
         if (expectancy < this.strategy.minPatternExpectancy) {
-          console.log(`🚫 Pattern ${pattern.patternType} REJECTED: Expectancy ${expectancy.toFixed(2)} < ${this.strategy.minPatternExpectancy} required`);
+          console.log(`🚫 Pattern ${pattern.patternType} REJECTED: Expectancy $${expectancy.toFixed(2)} < $${this.strategy.minPatternExpectancy} required`);
           return;
         }
         
-        console.log(`✅ Pattern ${pattern.patternType} APPROVED: Win rate ${(performance.winRate * 100).toFixed(1)}%, Expectancy ${expectancy.toFixed(2)}`);
+        console.log(`✅ Pattern ${pattern.patternType} APPROVED: Win rate ${(performance.winRate * 100).toFixed(1)}%, Expectancy $${expectancy.toFixed(2)} per trade`);
       } else {
         // New pattern with no history - allow but log it
         console.log(`⚠️ Pattern ${pattern.patternType} has no performance history - executing with caution`);
@@ -520,7 +522,7 @@ class AutoTrader extends EventEmitter {
       
       // Calculate trade amount ($500 per trade)
       const tradeAmount = (tradeValue / signal.price).toString();
-      const totalValue = (parseFloat(tradeAmount) * signal.price).toString();
+      const tradeTotal = (parseFloat(tradeAmount) * signal.price).toString();
       
       // Create trade record with pattern linkage
       const tradeData: InsertTrade = {
@@ -530,7 +532,7 @@ class AutoTrader extends EventEmitter {
         type: signal.type,
         amount: tradeAmount,
         price: signal.price.toString(),
-        totalValue,
+        totalValue: tradeTotal,
       };
       
       // Execute trade
@@ -699,28 +701,56 @@ class AutoTrader extends EventEmitter {
           const profitLoss = ((currentPrice - avgBuyPrice) / avgBuyPrice) * 100;
           let sellReason: string | null = null;
           let sellTrigger: string | null = null;
+          let partialSellPercent: number | null = null;
           
-          // Check stop-loss (8% loss) - highest priority
+          // Get current stage for this position (0 = none completed)
+          const currentStage = this.positionStages.get(position.id) || 0;
+          
+          // IMPROVED: Tighter stop-loss (5% instead of 8%)
           if (profitLoss <= -this.strategy.stopLossPercentage) {
             sellReason = `Stop-loss triggered at ${profitLoss.toFixed(1)}% loss`;
             sellTrigger = 'stop_loss';
+            // Full sell on stop-loss, clear stage tracking
+            this.positionStages.delete(position.id);
           }
-          // Use more aggressive take-profit when in sell-only mode
-          else if (profitLoss >= (portfolioState.sellOnlyMode ? this.strategy.sellOnlyTakeProfit : this.strategy.takeProfitPercentage)) {
-            const mode = portfolioState.sellOnlyMode ? 'SELL-ONLY' : 'NORMAL';
-            sellReason = `${mode} take-profit triggered at ${profitLoss.toFixed(1)}% gain`;
-            sellTrigger = 'take_profit';
+          // IMPROVED: Multi-stage take-profit strategy with state tracking (6%, 10%, 15%)
+          // Only execute next stage if previous stages are complete
+          else if (profitLoss >= this.strategy.takeProfitStages[2] && currentStage < 3) {
+            // Stage 3: 15%+ gain - sell remaining position
+            sellReason = `Take-profit Stage 3: ${profitLoss.toFixed(1)}% gain (final exit)`;
+            sellTrigger = 'take_profit_stage_3';
+            this.positionStages.set(position.id, 3);
+          }
+          else if (profitLoss >= this.strategy.takeProfitStages[1] && currentStage < 2) {
+            // Stage 2: 10%+ gain - sell 40% of position (lock in more profit)
+            sellReason = `Take-profit Stage 2: ${profitLoss.toFixed(1)}% gain (partial exit 40%)`;
+            sellTrigger = 'take_profit_stage_2';
+            partialSellPercent = 0.4;
+            this.positionStages.set(position.id, 2);
+          }
+          else if (profitLoss >= this.strategy.takeProfitStages[0] && currentStage < 1) {
+            // Stage 1: 6%+ gain - sell 30% of position (lock in initial profit)
+            sellReason = `Take-profit Stage 1: ${profitLoss.toFixed(1)}% gain (partial exit 30%)`;
+            sellTrigger = 'take_profit_stage_1';
+            partialSellPercent = 0.3;
+            this.positionStages.set(position.id, 1);
           }
           // In sell-only mode, also monitor for any meaningful profit to exit positions
           else if (portfolioState.sellOnlyMode && profitLoss > 2) {
             sellReason = `Sell-only mode: Exiting profitable position (${profitLoss.toFixed(1)}% gain)`;
             sellTrigger = 'cash_generation';
+            this.positionStages.delete(position.id);
           }
           
           // Execute sell only once per position per cycle
           if (sellReason && sellTrigger && !positionsSold.has(position.id)) {
-            await this.executeSell(position, token, sellTrigger, sellReason, portfolioId);
+            await this.executeSell(position, token, sellTrigger, sellReason, portfolioId, partialSellPercent);
             positionsSold.add(position.id);
+            
+            // Clean up stage tracking if position is fully closed
+            if (parseFloat(position.amount) <= 0 || !partialSellPercent) {
+              this.positionStages.delete(position.id);
+            }
           }
         }
       }
@@ -761,7 +791,7 @@ class AutoTrader extends EventEmitter {
     }
   }
 
-  private async executeSell(position: any, token: Token, trigger: string, reason: string, portfolioId: string) {
+  private async executeSell(position: any, token: Token, trigger: string, reason: string, portfolioId: string, partialSellPercent: number | null = null) {
     const portfolioState = this.enabledPortfolios.get(portfolioId);
     if (!portfolioState) return;
     
@@ -783,17 +813,28 @@ class AutoTrader extends EventEmitter {
       }
       
       const currentPrice = parseFloat(token.currentPrice || '0');
-      const amount = parseFloat(currentPosition.amount); // Use fresh position data
+      const fullAmount = parseFloat(currentPosition.amount); // Use fresh position data
       const avgBuyPrice = parseFloat(currentPosition.avgBuyPrice);
       
-      // Calculate realized P&L
-      const totalSellValue = amount * currentPrice;
-      const totalBuyValue = amount * avgBuyPrice;
-      const realizedPnL = totalSellValue - totalBuyValue;
-      const totalValue = (amount * currentPrice).toString();
+      // IMPROVED: Calculate sell amount (partial or full)
+      const sellAmount = partialSellPercent ? fullAmount * partialSellPercent : fullAmount;
+      const remainingAmount = fullAmount - sellAmount;
       
-      // CRITICAL: Set position amount to 0 to prevent concurrent sells (atomic operation)
-      await storage.updatePosition(currentPosition.id, { amount: '0' });
+      // Calculate realized P&L
+      const totalSellValue = sellAmount * currentPrice;
+      const totalBuyValue = sellAmount * avgBuyPrice;
+      const realizedPnL = totalSellValue - totalBuyValue;
+      const totalValue = (sellAmount * currentPrice).toString();
+      
+      // IMPROVED: Update position amount (partial sell keeps position open, full sell closes it)
+      await storage.updatePosition(currentPosition.id, { 
+        amount: remainingAmount.toString() 
+      });
+      
+      // Clean up stage tracking if position is fully closed
+      if (remainingAmount <= 0) {
+        this.positionStages.delete(currentPosition.id);
+      }
       
       // Find the original buy trade to get pattern linkage
       const buyTrades = await storage.getTradesByPortfolio(portfolioId);
@@ -808,7 +849,7 @@ class AutoTrader extends EventEmitter {
         tokenId: currentPosition.tokenId,
         patternId: originalBuyTrade?.patternId || null, // Link to same pattern as buy trade
         type: 'sell',
-        amount: currentPosition.amount,
+        amount: sellAmount.toString(),
         price: currentPrice.toString(),
         exitPrice: currentPrice.toString(),
         realizedPnL: realizedPnL.toString(),
@@ -856,8 +897,12 @@ class AutoTrader extends EventEmitter {
       
       const pnlSymbol = realizedPnL >= 0 ? '💚' : '❌';
       const pnlText = realizedPnL >= 0 ? `+$${realizedPnL.toFixed(2)}` : `-$${Math.abs(realizedPnL).toFixed(2)}`;
+      const sellType = partialSellPercent ? `PARTIAL SELL (${(partialSellPercent * 100).toFixed(0)}%)` : 'FULL SELL';
       
-      console.log(`🎯 [Portfolio ${portfolioId}] ${trigger.toUpperCase()}: Sold ${position.amount} ${token.symbol} at $${currentPrice.toFixed(6)}`);
+      console.log(`🎯 [Portfolio ${portfolioId}] ${trigger.toUpperCase()} - ${sellType}: Sold ${sellAmount.toFixed(6)} ${token.symbol} at $${currentPrice.toFixed(6)}`);
+      if (partialSellPercent) {
+        console.log(`   📊 Remaining position: ${remainingAmount.toFixed(6)} ${token.symbol}`);
+      }
       console.log(`   📝 ${reason}`);
       console.log(`   ${pnlSymbol} P&L: ${pnlText}`);
       if (originalBuyTrade?.patternId) {
