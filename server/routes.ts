@@ -41,7 +41,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     store: sessionStore,
     secret: sessionSecret,
     resave: false,
-    saveUninitialized: false,
+    saveUninitialized: true, // Required for CSRF to work - creates sessions for all visitors
     cookie: {
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
@@ -54,17 +54,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CSRF Protection for state-changing routes (CRITICAL SECURITY FIX)
   const csrfProtection = csrf({ cookie: false }); // Use session-based CSRF
   
-  // Comprehensive CSRF protection for ALL state-changing endpoints (CRITICAL SECURITY FIX)
+  // CSRF token endpoint - needs middleware to generate token but not validate
+  app.get('/api/csrf-token', csrfProtection, (req, res) => {
+    res.json({ csrfToken: req.csrfToken() });
+  });
+  
+  // Comprehensive CSRF protection for ALL state-changing endpoints
   app.use([
     '/api/auth/login', '/api/auth/register', '/api/auth/logout',
     '/api/portfolio', '/api/trades', '/api/positions', '/api/alerts', '/api/price-alerts',
     '/api/api-keys', '/api/settings', '/api/auto-trader'
   ].map(path => [path, path + '/*']).flat(), csrfProtection);
-  
-  // CSRF token endpoint for SPA (CRITICAL SECURITY FIX)
-  app.get('/api/csrf-token', (req, res) => {
-    res.json({ csrfToken: req.csrfToken() });
-  });
 
   // Rate Limiting for Security (CRITICAL SECURITY FIX)
   const authLimiter = rateLimit({
