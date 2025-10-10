@@ -449,7 +449,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const user = await storage.createUser(userDataWithHashedPassword);
       
-      // Create default portfolio for new user
+      // Create default portfolio for new user with $10,000 paper trading capital
+      // Database defaults: startingCapital = $10,000, cashBalance = $10,000
       await storage.createPortfolio({ userId: user.id });
       
       // Security audit log

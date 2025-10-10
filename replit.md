@@ -43,6 +43,8 @@ The backend uses **Express.js** with **TypeScript** in an ESM configuration. The
 ### Authentication and Authorization
 The application implements session-based authentication. **All features are currently available to all authenticated users regardless of subscription tier** - subscription restrictions have been removed to provide free access.
 
+**Paper Trading Capital**: Every new user automatically receives **$10,000 in virtual trading money** to audit and test the platform's capabilities without any financial risk.
+
 **Security Measures**: Input validation using Zod schemas, CORS configuration, CSRF protection, and secure session management with PostgreSQL session storage.
 
 ### External Dependencies
@@ -77,9 +79,10 @@ The architecture prioritizes real-time performance, type safety, and scalable su
 
 ### October 10, 2025 - Free Access Update
 - **Subscription Restrictions Removed**: All features are now available to all authenticated users free of charge
+- **$10,000 Paper Trading Capital**: Every new member automatically receives $10,000 in virtual trading money to audit and test the platform's capabilities
 - Users no longer need premium or pro subscriptions to access API keys, audit logs, or any other features
 - Authentication is still required for security, but subscription tiers no longer limit functionality
-- Updated documentation to reflect free access model
+- Updated documentation to reflect free access model with paper trading
 
 ### September 19, 2025 - Scanner Expansion & Comprehensive Coverage
 - **Massive Scanner Expansion**: Expanded from 8 to 47+ tokens actively tracked
