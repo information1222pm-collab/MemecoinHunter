@@ -385,9 +385,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Position tracker real-time events - SECURE: Send only to portfolio owner
+  const DEMO_USER_ID = 'a79316eb-37e4-4323-8685-c0900c784122'; // demo@memehunter.app
+  
   positionTracker.on('portfolioUpdated', (portfolioData) => {
     if (portfolioData?.userId) {
-      broadcastToUser(portfolioData.userId, { type: 'portfolio_updated', data: portfolioData });
+      // Broadcast demo portfolio updates globally so unauthenticated users can see them
+      if (portfolioData.userId === DEMO_USER_ID) {
+        broadcastMarketData({ type: 'portfolio_updated', data: portfolioData });
+      } else {
+        // Secure user-specific updates for authenticated portfolios
+        broadcastToUser(portfolioData.userId, { type: 'portfolio_updated', data: portfolioData });
+      }
     }
   });
 
@@ -396,7 +404,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (positionsData?.portfolioId) {
       storage.getPortfolio(positionsData.portfolioId).then(portfolio => {
         if (portfolio?.userId) {
-          broadcastToUser(portfolio.userId, { type: 'positions_updated', data: positionsData });
+          // Broadcast demo portfolio updates globally so unauthenticated users can see them
+          if (portfolio.userId === DEMO_USER_ID) {
+            broadcastMarketData({ type: 'positions_updated', data: positionsData });
+          } else {
+            // Secure user-specific updates for authenticated portfolios
+            broadcastToUser(portfolio.userId, { type: 'positions_updated', data: positionsData });
+          }
         }
       }).catch(err => console.error('Error getting portfolio for position updates:', err));
     }

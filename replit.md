@@ -6,6 +6,15 @@ CryptoHobby is a comprehensive memecoin trading platform offering real-time mark
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+### October 10, 2025 - Portfolio Live Data Fix
+- **Critical Bug Fixed**: Portfolio page wasn't receiving live WebSocket updates
+- **Root Cause**: Demo portfolio updates were sent only to the demo user ID, but viewers might not be authenticated as that user
+- **Solution**: Demo portfolio updates now broadcast globally (like market data) so all viewers receive real-time updates
+- **Security**: Authenticated user portfolios remain secure with user-scoped broadcasts
+- **Impact**: Portfolio page now shows live position values, price updates, and trade executions in real-time
+
 ## System Architecture
 
 ### Frontend
