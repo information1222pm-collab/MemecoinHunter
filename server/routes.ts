@@ -62,7 +62,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   ].map(path => [path, path + '/*']).flat(), csrfProtection);
   
   // CSRF token endpoint for SPA (CRITICAL SECURITY FIX)
-  app.get('/api/csrf-token', csrfProtection, (req, res) => {
+  app.get('/api/csrf-token', (req, res) => {
     res.json({ csrfToken: req.csrfToken() });
   });
 
