@@ -78,6 +78,11 @@ export function useWebSocket() {
     setIsConnected(false);
   };
 
+  const emitCustomEvent = (message: WebSocketMessage) => {
+    // Emit event locally for testing purposes without sending to server
+    setLastMessage(message);
+  };
+
   useEffect(() => {
     connect();
 
@@ -92,5 +97,6 @@ export function useWebSocket() {
     error,
     sendMessage,
     reconnect: connect,
+    emitCustomEvent,
   };
 }

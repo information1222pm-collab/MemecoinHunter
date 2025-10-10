@@ -8,12 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { useLanguage } from "@/hooks/use-language";
 import { useState } from "react";
-import { Settings as SettingsIcon, User, Bell, Shield, Globe, Palette } from "lucide-react";
+import { Settings as SettingsIcon, User, Bell, Shield, Globe, Palette, TestTube } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useWebSocket } from "@/hooks/use-websocket";
 
 export default function Settings() {
   const { t, language, setLanguage } = useLanguage();
   const { toast } = useToast();
+  const { emitCustomEvent } = useWebSocket();
   const [notifications, setNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -22,6 +24,77 @@ export default function Settings() {
     toast({
       title: "Settings Saved",
       description: "Your preferences have been updated successfully",
+    });
+  };
+
+  const testBuyAlert = () => {
+    emitCustomEvent({
+      type: 'trade_executed',
+      data: {
+        trade: {
+          id: 'test-buy-' + Date.now(),
+          portfolioId: 'test',
+          tokenId: 'test-token',
+          type: 'buy',
+          amount: '125000',
+          price: '0.004',
+          totalValue: '500',
+          timestamp: new Date(),
+        },
+        signal: {
+          type: 'ml_pattern',
+          source: 'pattern_analyzer',
+          reason: 'Strong bullish reversal pattern detected with 95% confidence',
+        },
+        token: {
+          id: 'test-token',
+          symbol: 'DOGE',
+          name: 'Dogecoin',
+          currentPrice: '0.004',
+        },
+      },
+    });
+  };
+
+  const testSellAlert = () => {
+    emitCustomEvent({
+      type: 'trade_executed',
+      data: {
+        trade: {
+          id: 'test-sell-' + Date.now(),
+          portfolioId: 'test',
+          tokenId: 'test-token',
+          type: 'sell',
+          amount: '125000',
+          price: '0.0052',
+          totalValue: '650',
+          timestamp: new Date(),
+        },
+        signal: {
+          type: 'take_profit',
+          reason: 'Price target reached, securing profits',
+        },
+        token: {
+          id: 'test-token',
+          symbol: 'DOGE',
+          name: 'Dogecoin',
+          currentPrice: '0.0052',
+        },
+        profitLoss: '150',
+        profitPercentage: 30,
+      },
+    });
+  };
+
+  const testMilestoneAlert = () => {
+    emitCustomEvent({
+      type: 'portfolio_updated',
+      data: {
+        id: 'test-portfolio',
+        totalValue: '12500',
+        totalPnL: '2500',
+        startingCapital: '10000',
+      },
     });
   };
 
@@ -217,6 +290,58 @@ export default function Settings() {
                       <input type="checkbox" id="system-alerts" className="rounded" data-testid="checkbox-system-alerts" />
                       <Label htmlFor="system-alerts" className="text-sm">System Alerts</Label>
                     </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Test Trade Alerts */}
+            <Card data-testid="card-test-alerts" className="col-span-1 lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <TestTube className="w-5 h-5" />
+                  <span>Test Trade Alert Windows</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Click the buttons below to see example trade alert windows. These large modals appear in the center of your screen whenever trades are executed, sold, or your portfolio reaches milestones.
+                  </p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Button 
+                      onClick={testBuyAlert} 
+                      className="w-full bg-green-600 hover:bg-green-700"
+                      data-testid="button-test-buy"
+                    >
+                      Test Buy Alert
+                    </Button>
+                    
+                    <Button 
+                      onClick={testSellAlert} 
+                      className="w-full bg-blue-600 hover:bg-blue-700"
+                      data-testid="button-test-sell"
+                    >
+                      Test Sell Alert
+                    </Button>
+                    
+                    <Button 
+                      onClick={testMilestoneAlert} 
+                      className="w-full bg-yellow-600 hover:bg-yellow-700"
+                      data-testid="button-test-milestone"
+                    >
+                      Test Milestone Alert
+                    </Button>
+                  </div>
+                  
+                  <div className="bg-muted/50 rounded-lg p-4 mt-4">
+                    <h4 className="font-semibold mb-2">What you'll see:</h4>
+                    <ul className="text-sm space-y-1 text-muted-foreground">
+                      <li>• <strong>Buy Alerts:</strong> Green modal showing token, amount, price, and total investment</li>
+                      <li>• <strong>Sell Alerts:</strong> Blue/Red modal with profit/loss breakdown and percentage</li>
+                      <li>• <strong>Milestone Alerts:</strong> Yellow celebration modal for 10%, 25%, 50%, 100% gains</li>
+                    </ul>
                   </div>
                 </div>
               </CardContent>
