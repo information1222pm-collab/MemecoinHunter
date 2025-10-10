@@ -8,6 +8,23 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+### October 10, 2025 - Portfolio Analytics Calculation Fix
+- **Critical Bug Fixed**: Portfolio calculations were inaccurate, showing contradictory metrics (negative dollar amount with positive percentage)
+- **Root Causes Identified**:
+  1. Total Value excluded cash balance (only counted position values)
+  2. Total P&L calculated from positions only, not actual portfolio value
+  3. Daily P&L was never being updated in the database
+- **Solution Implemented**:
+  - Position tracker now calculates total value as positions + cash balance
+  - Total P&L now correctly calculated as (total value - starting capital)
+  - Daily P&L properly saved to database from analytics pipeline
+  - API endpoints no longer double-count cash (totalValue already includes it)
+- **Impact**: All portfolio metrics now accurate and consistent across the platform
+- **Calculation Formulas**:
+  - `totalValue = positionsValue + cashBalance`
+  - `totalPnL = totalValue - startingCapital`
+  - `dailyPnL = analytics.dayChangeValue`
+
 ### October 10, 2025 - Login/Registration Flow Improvements
 - **Auto-Login After Registration**: New users are now automatically logged in after registration, eliminating the need to manually switch tabs and log in
 - **Session Persistence Enhanced**: Both login and registration endpoints now explicitly save sessions to PostgreSQL database using callback-based `req.session.save()` to ensure persistence before responding
