@@ -55,21 +55,24 @@ Preferred communication style: Simple, everyday language.
 - **Security**: Authenticated user portfolios remain secure with user-scoped broadcasts
 - **Impact**: Both pages now show live position values, price updates, trade executions, and analytics in real-time
 
-### October 10, 2025 - Real-Time Trade Notification System
-- **Feature Added**: Comprehensive real-time trade notification system using toast notifications
-- **Notification Types Implemented**:
-  1. **Buy Trades**: Green-themed notifications with token symbol, amount, price, total value, and ML signal reason
-  2. **Sell Trades**: Blue (profit) or Red (loss) themed with complete P&L breakdown including percentage and dollar amount
-  3. **Stop Loss Triggers**: Red-themed alerts when risk protection activates
-  4. **Milestone Achievements**: Celebratory notifications for 10%, 25%, 50%, and 100% portfolio gains (with deduplication)
+### October 10, 2025 - Prominent Trade Alert Modal System
+- **Feature Added**: Highly visible, center-screen modal dialog system for trade notifications (replaced subtle toast notifications)
+- **Alert Types Implemented**:
+  1. **Buy Trades**: Large green-themed modal with TrendingUp icon, token symbol, amount, price, total value, and ML signal reason
+  2. **Sell Trades**: Large blue (profit) or red (loss) themed modal with complete P&L breakdown including dollar amount and percentage
+  3. **Milestone Achievements**: Yellow-themed celebratory modal with Sparkles icon for 10%, 25%, 50%, and 100% portfolio gains
+  4. **Stop Loss Triggers**: Red-themed alert modal with AlertCircle icon when risk protection activates
 - **Technical Implementation**:
-  - `TradeNotifications` component subscribes to WebSocket events (`trade_executed`, `portfolio_updated`, `stop_loss_triggered`)
-  - Backend enhanced to emit `profitPercentage` with sell events for rich P&L display
-  - Toast system supports up to 5 simultaneous notifications with appropriate durations (5-8 seconds)
-  - Milestone deduplication using `useRef` prevents notification spam
-  - Tailwind-compliant class variants ensure proper profit/loss visual differentiation
-- **User Experience**: Users receive instant feedback on all auto-trading activity with detailed trade information, creating transparency and engagement with the automated trading system
-- **Integration**: Component mounted in `App.tsx` for authenticated users, operates independently without rendering UI elements
+  - `TradeAlertModal` component uses shadcn Dialog for prominent center-screen display
+  - Alert queue system serializes multiple simultaneous notifications to prevent overlap
+  - Auto-dismiss timer managed via `useRef` with proper cleanup to prevent race conditions
+  - Timer automatically clears when user manually dismisses or when new alert appears
+  - Each modal auto-dismisses after 8 seconds or can be closed manually with X button
+  - Alert history maintained (last 50 alerts) for potential future features
+  - Milestone deduplication prevents notification spam for same milestone
+- **User Experience**: Impossible-to-miss center-screen modals with large fonts (2xl titles), clear visual hierarchy, and prominent icons ensure users never miss trade executions or portfolio milestones
+- **Integration**: Component mounted in `App.tsx` for authenticated users, listens to WebSocket events (`trade_executed`, `portfolio_updated`, `stop_loss_triggered`)
+- **Testing**: End-to-end tests confirm modals appear prominently center-screen with complete trade data visible
 
 ## System Architecture
 
