@@ -48,6 +48,7 @@ export const portfolios = pgTable("portfolios", {
   dailyPnL: decimal("daily_pnl", { precision: 20, scale: 2 }).default("0"),
   totalPnL: decimal("total_pnl", { precision: 20, scale: 2 }).default("0"),
   winRate: decimal("win_rate", { precision: 5, scale: 2 }).default("0"),
+  autoTradingEnabled: boolean("auto_trading_enabled").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
