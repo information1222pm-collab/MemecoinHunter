@@ -182,7 +182,7 @@ export default function Home() {
   return (
     <div className="min-h-screen flex bg-background">
       <Sidebar />
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto mobile-safe-bottom">
         <Header />
         
         <motion.div 

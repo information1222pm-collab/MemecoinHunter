@@ -166,7 +166,7 @@ export default function Subscription() {
     return (
       <div className="min-h-screen flex bg-background">
         <Sidebar />
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto mobile-safe-bottom">
           <Header />
           <div className="p-6">
             <div className="flex items-center justify-center h-64">
@@ -181,7 +181,7 @@ export default function Subscription() {
   return (
     <div className="min-h-screen flex bg-background">
       <Sidebar />
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto mobile-safe-bottom">
         <Header />
         
         <div className="p-6 space-y-6">

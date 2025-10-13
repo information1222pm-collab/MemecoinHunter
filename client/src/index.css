@@ -109,6 +109,48 @@
       radial-gradient(circle at 80% 20%, hsla(200, 100%, 70%, 0.15) 0%, transparent 50%),
       hsl(var(--background));
     min-height: 100vh;
+    font-size: 16px;
+  }
+
+  /* Mobile-optimized typography */
+  @media (max-width: 768px) {
+    body {
+      font-size: 16px;
+      line-height: 1.6;
+    }
+    
+    h1 {
+      @apply text-2xl font-bold;
+      line-height: 1.2;
+    }
+    
+    h2 {
+      @apply text-xl font-semibold;
+      line-height: 1.3;
+    }
+    
+    h3 {
+      @apply text-lg font-medium;
+      line-height: 1.4;
+    }
+
+    /* Increase tap target spacing */
+    button, a, input, select {
+      margin-top: 0.25rem;
+      margin-bottom: 0.25rem;
+    }
+
+    /* Better card spacing on mobile */
+    .glass-card {
+      @apply p-4;
+    }
+  }
+
+  /* Add safe padding for mobile bottom navigation - only on mobile */
+  @media (max-width: 768px) {
+    .mobile-safe-bottom {
+      padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+    }
   }
 
   /* Glass morphism utilities - optimized for performance */

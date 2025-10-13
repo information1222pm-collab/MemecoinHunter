@@ -90,7 +90,7 @@ export default function Scanner() {
   return (
     <div className="min-h-screen flex bg-background">
       <Sidebar />
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto mobile-safe-bottom">
         <Header />
         
         <div className="p-6 space-y-6">
