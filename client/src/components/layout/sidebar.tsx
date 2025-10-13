@@ -112,6 +112,8 @@ export function Sidebar() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [hoveredIcon, setHoveredIcon] = useState<string | null>(null);
+  const [isHovering, setIsHovering] = useState(false);
+  const [autoCollapse, setAutoCollapse] = useState(true);
 
   // Check if mobile on mount and window resize
   useEffect(() => {
@@ -128,12 +130,16 @@ export function Sidebar() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Load collapsed state from localStorage on mount (desktop only)
+  // Load collapsed state and auto-collapse preference from localStorage on mount (desktop only)
   useEffect(() => {
     if (!isMobile) {
       const savedState = localStorage.getItem('sidebar-collapsed');
+      const savedAutoCollapse = localStorage.getItem('sidebar-auto-collapse');
       if (savedState) {
         setIsCollapsed(JSON.parse(savedState));
+      }
+      if (savedAutoCollapse) {
+        setAutoCollapse(JSON.parse(savedAutoCollapse));
       }
     }
   }, [isMobile]);
@@ -145,17 +151,55 @@ export function Sidebar() {
     }
   }, [isCollapsed, isMobile]);
 
+  // Auto-collapse when mouse leaves (with delay)
+  useEffect(() => {
+    if (!isMobile && autoCollapse && !isHovering && !isCollapsed) {
+      const timer = setTimeout(() => {
+        setIsCollapsed(true);
+      }, 2000); // 2 second delay before auto-collapse
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isHovering, isMobile, autoCollapse, isCollapsed]);
+
   const toggleSidebar = () => {
     if (isMobile) {
       setIsMobileOpen(!isMobileOpen);
     } else {
       setIsCollapsed(!isCollapsed);
+      // When manually collapsing, disable auto-collapse
+      // When manually expanding, re-enable auto-collapse
+      if (!isCollapsed) {
+        // User is manually collapsing
+        setAutoCollapse(false);
+        localStorage.setItem('sidebar-auto-collapse', JSON.stringify(false));
+      } else {
+        // User is manually expanding
+        setAutoCollapse(true);
+        localStorage.setItem('sidebar-auto-collapse', JSON.stringify(true));
+      }
     }
   };
 
   const closeMobileSidebar = () => {
     if (isMobile) {
       setIsMobileOpen(false);
+    }
+  };
+
+  const handleMouseEnter = () => {
+    if (!isMobile && autoCollapse) {
+      setIsHovering(true);
+      // Auto-expand on hover if collapsed and auto-collapse is enabled
+      if (isCollapsed) {
+        setIsCollapsed(false);
+      }
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (!isMobile && autoCollapse) {
+      setIsHovering(false);
     }
   };
 
@@ -250,6 +294,8 @@ export function Sidebar() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         style={{
           transform: isMobile 
             ? (isMobileOpen ? 'translateX(0)' : 'translateX(-100%)')
