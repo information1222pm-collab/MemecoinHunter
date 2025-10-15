@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { TradeAlertModal } from "@/components/trade-alert-modal";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import { CryptoBackground } from "@/components/background/CryptoBackground";
+import { InstantLoader } from "@/components/loading/instant-loader";
 import { lazy, Suspense, useEffect } from "react";
 
 const Home = lazy(() => import("@/pages/home"));
@@ -28,14 +29,7 @@ const DemoAlerts = lazy(() => import("@/pages/demo-alerts"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function LoadingFallback() {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-emerald-400 mx-auto mb-4"></div>
-        <p className="text-slate-300">Loading...</p>
-      </div>
-    </div>
-  );
+  return <InstantLoader />;
 }
 
 function AuthenticatedSignInRedirect() {
@@ -87,14 +81,7 @@ function Router() {
 
   // Show loading state while checking authentication
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-emerald-400 mx-auto mb-4"></div>
-          <p className="text-slate-300">Loading MemeCoin Hunter...</p>
-        </div>
-      </div>
-    );
+    return <InstantLoader />;
   }
 
   return (
