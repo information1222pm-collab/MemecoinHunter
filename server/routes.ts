@@ -683,6 +683,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Reset portfolio with custom starting capital
+  app.post("/api/portfolio/reset", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const { startingCapital } = req.body;
+      
+      // Validate starting capital
+      const capitalAmount = parseFloat(startingCapital);
+      if (isNaN(capitalAmount) || capitalAmount <= 0) {
+        return res.status(400).json({ message: "Invalid starting capital amount" });
+      }
+
+      const portfolio = await storage.getPortfolioByUserId(userId);
+      if (!portfolio) {
+        return res.status(404).json({ message: "Portfolio not found" });
+      }
+
+      // Reset the portfolio
+      const resetPortfolio = await storage.resetPortfolio(portfolio.id, startingCapital);
+      
+      res.json({ 
+        message: "Portfolio reset successfully",
+        portfolio: resetPortfolio 
+      });
+    } catch (error) {
+      console.error('[API] Error resetting portfolio:', error);
+      res.status(500).json({ message: "Failed to reset portfolio", error });
+    }
+  });
+
   // Demo default portfolio route for testing
   app.get("/api/portfolio/default", async (req, res) => {
     try {
