@@ -401,6 +401,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Start position tracker for real-time holdings updates
     console.log('📊 Starting Position Tracker...');
     positionTracker.start();
+    
+    // Start email scheduler for daily performance reports
+    console.log('📧 Starting Email Scheduler...');
+    const { SchedulerService } = await import('./services/scheduler-service.js');
+    const schedulerService = new SchedulerService();
+    schedulerService.startDailyEmailScheduler();
   });
 
   // Set up real-time broadcasts with user scoping (CRITICAL SECURITY FIX)
