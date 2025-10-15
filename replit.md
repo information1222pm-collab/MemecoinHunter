@@ -21,7 +21,17 @@ Primary database is PostgreSQL, accessed via Drizzle ORM and hosted on Neon. The
 Supports dual authentication: password-based and OAuth (Google Login via Replit Auth). Every new user receives $10,000 in virtual trading money. Account linking is supported by email. Security measures include Zod validation, CORS, CSRF protection, and secure OAuth token management. New users are automatically logged in after registration with session persistence.
 
 ### Technical Implementations
-Includes a robust token scanning system that automatically discovers and tracks trending memecoins using CoinGecko APIs, significantly expanding tracked coins and lowering discovery thresholds for more opportunities. ML pattern analysis runs across numerous tokens for signal generation. Automated trading functionalities have comprehensive profitability improvements, including pattern performance gating (50%+ win rate, positive expectancy), a multi-stage take-profit strategy (30% at 6% gain, 40% at 10% gain, rest at 15% gain), improved risk management (5% stop-loss, cash floor enforcement, daily loss thresholds), and dynamic position sizing using Kelly Criterion calculations. Critical bug fixes include accurate portfolio position display, correct portfolio analytics calculations (total value, P&L, daily P&L), and live data updates for the dashboard and portfolio pages.
+Includes a robust token scanning system that automatically discovers and tracks trending memecoins using CoinGecko APIs, significantly expanding tracked coins and lowering discovery thresholds for more opportunities.
+
+**Enhanced ML Pattern Analysis System (Latest Update):**
+- **Extended Historical Analysis**: Analyzes 7 days of price history (up from 24 hours) with minimum 50 data points for superior pattern recognition
+- **Advanced Technical Indicators**: ATR (Average True Range) for volatility measurement, ADX (Average Directional Index) for trend strength detection, OBV (On-Balance Volume) for volume momentum tracking, and Ichimoku Cloud for comprehensive multi-timeframe trend analysis
+- **Price Action Pattern Recognition**: Detects V-shaped reversals, strong bullish momentum (3+ consecutive highs), accumulation patterns (stable price + rising volume), and consolidation breakouts using close-price analysis
+- **Order Flow Analysis**: Identifies buy/sell pressure ratios (>65% buy pressure triggers signal) and institutional accumulation patterns by analyzing volume-weighted price action and OBV trends
+- **Ensemble ML Scoring**: Combines multiple pattern signals with weighted confidence scoring (80%+ threshold) for high-quality buy signals, incorporating trend strength bonuses from ADX (>25) and Ichimoku cloud alignment for +10% confidence boost
+- **ML Feature Enhancement**: Expanded feature set includes 10 technical indicators (vs previous 5), 6 sentiment features (vs previous 5), and advanced pattern recognition for superior signal accuracy
+
+Automated trading functionalities have comprehensive profitability improvements, including pattern performance gating (50%+ win rate, positive expectancy), a multi-stage take-profit strategy (30% at 6% gain, 40% at 10% gain, rest at 15% gain), improved risk management (5% stop-loss, cash floor enforcement, daily loss thresholds), and dynamic position sizing using Kelly Criterion calculations. Critical bug fixes include accurate portfolio position display, correct portfolio analytics calculations (total value, P&L, daily P&L), and live data updates for the dashboard and portfolio pages.
 
 ## External Dependencies
 

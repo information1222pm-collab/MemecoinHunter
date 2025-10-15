@@ -13,6 +13,17 @@ interface TechnicalIndicators {
   stochastic: { k: number[]; d: number[] };
   momentum: number[];
   priceVelocity: number[];
+  // ENHANCED: Advanced indicators for better buy signal detection
+  atr: number; // Average True Range - volatility measure
+  adx: number; // Average Directional Index - trend strength
+  obv: number[]; // On-Balance Volume - volume momentum
+  ichimoku: { // Ichimoku Cloud - comprehensive trend indicator
+    tenkan: number[];
+    kijun: number[];
+    senkouA: number[];
+    senkouB: number[];
+    chikou: number[];
+  };
 }
 
 interface MarketSentiment {
@@ -79,15 +90,16 @@ class MLAnalyzer extends EventEmitter {
     try {
       console.log(`🔍 ML-ANALYZER: Analyzing patterns for token ${token.symbol} (${token.id})`);
       
-      // Get price history for the last 24 hours
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      const history = await storage.getPriceHistory(token.id, oneDayAgo);
+      // ENHANCED: Get price history for the last 7 days for better trend analysis
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const history = await storage.getPriceHistory(token.id, sevenDaysAgo);
       
       console.log(`🔍 ML-ANALYZER: Found ${history.length} price history points for ${token.symbol}`);
       
-      if (history.length < 20) {
-        console.log(`🔍 ML-ANALYZER: Skipping ${token.symbol} - insufficient data (${history.length} < 20)`);
-        return; // Need at least 20 data points
+      // ENHANCED: Require more data points for better accuracy (increased from 20 to 50)
+      if (history.length < 50) {
+        console.log(`🔍 ML-ANALYZER: Skipping ${token.symbol} - insufficient data (${history.length} < 50)`);
+        return; // Need at least 50 data points for better analysis
       }
       
       console.log(`🔍 ML-ANALYZER: Calculating indicators for ${token.symbol}`);
@@ -111,6 +123,9 @@ class MLAnalyzer extends EventEmitter {
   private calculateTechnicalIndicators(history: PriceHistory[]): TechnicalIndicators {
     const prices = history.map(h => parseFloat(h.price)).reverse();
     const volumes = history.map(h => parseFloat(h.volume || '0')).reverse();
+    // Use price as approximation for high/low since PriceHistory doesn't have these fields
+    const highs = prices;
+    const lows = prices;
     
     return {
       sma: this.calculateSMA(prices, 10),
@@ -123,6 +138,11 @@ class MLAnalyzer extends EventEmitter {
       stochastic: this.calculateStochastic(prices, 14),
       momentum: this.calculateMomentum(prices, 10),
       priceVelocity: this.calculatePriceVelocity(prices),
+      // ENHANCED: Advanced indicators for superior buy signal detection
+      atr: this.calculateATR(highs, lows, prices, 14),
+      adx: this.calculateADX(highs, lows, prices, 14),
+      obv: this.calculateOBV(prices, volumes),
+      ichimoku: this.calculateIchimoku(highs, lows),
     };
   }
 
@@ -215,6 +235,20 @@ class MLAnalyzer extends EventEmitter {
     // Momentum-based patterns
     const momentumPatterns = this.detectMomentumPatterns(indicators, sentiment);
     patterns.push(...momentumPatterns);
+    
+    // ENHANCED: Price Action Pattern Recognition (adapted for close-only data)
+    const priceActionPatterns = this.detectPriceActionPatterns(prices, volumes);
+    patterns.push(...priceActionPatterns);
+    
+    // ENHANCED: Order Flow Analysis
+    const orderFlowPatterns = this.analyzeOrderFlow(prices, volumes, indicators);
+    patterns.push(...orderFlowPatterns);
+    
+    // ENHANCED: Ensemble ML Scoring - Combines multiple patterns for higher accuracy
+    const ensemblePattern = this.calculateEnsembleScore(patterns, features, indicators);
+    if (ensemblePattern) {
+      patterns.push(ensemblePattern);
+    }
     
     return patterns.filter(p => p.confidence > 65); // Higher threshold for better quality
   }
@@ -415,6 +449,147 @@ class MLAnalyzer extends EventEmitter {
     
     return velocity;
   }
+
+  // ENHANCED: Advanced Technical Indicators for Better Buy Signal Detection
+  
+  private calculateATR(highs: number[], lows: number[], closes: number[], period: number = 14): number {
+    if (highs.length < period + 1) return 0;
+    
+    const trueRanges: number[] = [];
+    for (let i = 1; i < highs.length; i++) {
+      const tr = Math.max(
+        highs[i] - lows[i],
+        Math.abs(highs[i] - closes[i - 1]),
+        Math.abs(lows[i] - closes[i - 1])
+      );
+      trueRanges.push(tr);
+    }
+    
+    // Calculate ATR as average of true ranges
+    const recentTR = trueRanges.slice(-period);
+    return recentTR.reduce((sum, tr) => sum + tr, 0) / period;
+  }
+  
+  private calculateADX(highs: number[], lows: number[], closes: number[], period: number = 14): number {
+    if (highs.length < period + 1) return 0;
+    
+    let positiveDM = 0;
+    let negativeDM = 0;
+    let trueRange = 0;
+    
+    for (let i = 1; i < Math.min(period + 1, highs.length); i++) {
+      const highMove = highs[i] - highs[i - 1];
+      const lowMove = lows[i - 1] - lows[i];
+      
+      if (highMove > lowMove && highMove > 0) {
+        positiveDM += highMove;
+      }
+      if (lowMove > highMove && lowMove > 0) {
+        negativeDM += lowMove;
+      }
+      
+      const tr = Math.max(
+        highs[i] - lows[i],
+        Math.abs(highs[i] - closes[i - 1]),
+        Math.abs(lows[i] - closes[i - 1])
+      );
+      trueRange += tr;
+    }
+    
+    if (trueRange === 0) return 0;
+    
+    const plusDI = (positiveDM / trueRange) * 100;
+    const minusDI = (negativeDM / trueRange) * 100;
+    const diSum = plusDI + minusDI;
+    
+    if (diSum === 0) return 0;
+    
+    // ADX = (|+DI - -DI| / (+DI + -DI)) * 100
+    return (Math.abs(plusDI - minusDI) / diSum) * 100;
+  }
+  
+  private calculateOBV(prices: number[], volumes: number[]): number[] {
+    const obv: number[] = [volumes[0] || 0];
+    
+    for (let i = 1; i < prices.length; i++) {
+      if (prices[i] > prices[i - 1]) {
+        obv.push(obv[i - 1] + volumes[i]);
+      } else if (prices[i] < prices[i - 1]) {
+        obv.push(obv[i - 1] - volumes[i]);
+      } else {
+        obv.push(obv[i - 1]);
+      }
+    }
+    
+    return obv;
+  }
+  
+  private calculateIchimoku(highs: number[], lows: number[]): {
+    tenkan: number[];
+    kijun: number[];
+    senkouA: number[];
+    senkouB: number[];
+    chikou: number[];
+  } {
+    const tenkanPeriod = 9;
+    const kijunPeriod = 26;
+    const senkouBPeriod = 52;
+    
+    const calculateMidpoint = (data: number[], period: number, index: number): number => {
+      if (index < period - 1) return 0;
+      const slice = data.slice(index - period + 1, index + 1);
+      return (Math.max(...slice) + Math.min(...slice)) / 2;
+    };
+    
+    const tenkan: number[] = [];
+    const kijun: number[] = [];
+    const senkouA: number[] = [];
+    const senkouB: number[] = [];
+    const chikou: number[] = [];
+    
+    for (let i = 0; i < highs.length; i++) {
+      // Tenkan-sen (Conversion Line): (9-period high + 9-period low) / 2
+      const tenkanHigh = i >= tenkanPeriod - 1 ? Math.max(...highs.slice(i - tenkanPeriod + 1, i + 1)) : 0;
+      const tenkanLow = i >= tenkanPeriod - 1 ? Math.min(...lows.slice(i - tenkanPeriod + 1, i + 1)) : 0;
+      tenkan.push((tenkanHigh + tenkanLow) / 2);
+      
+      // Kijun-sen (Base Line): (26-period high + 26-period low) / 2
+      const kijunHigh = i >= kijunPeriod - 1 ? Math.max(...highs.slice(i - kijunPeriod + 1, i + 1)) : 0;
+      const kijunLow = i >= kijunPeriod - 1 ? Math.min(...lows.slice(i - kijunPeriod + 1, i + 1)) : 0;
+      kijun.push((kijunHigh + kijunLow) / 2);
+      
+      // Senkou Span A (Leading Span A): (Tenkan-sen + Kijun-sen) / 2, plotted 26 periods ahead
+      senkouA.push((tenkan[i] + kijun[i]) / 2);
+      
+      // Senkou Span B (Leading Span B): (52-period high + 52-period low) / 2, plotted 26 periods ahead
+      const senkouBHigh = i >= senkouBPeriod - 1 ? Math.max(...highs.slice(i - senkouBPeriod + 1, i + 1)) : 0;
+      const senkouBLow = i >= senkouBPeriod - 1 ? Math.min(...lows.slice(i - senkouBPeriod + 1, i + 1)) : 0;
+      senkouB.push((senkouBHigh + senkouBLow) / 2);
+      
+      // Chikou Span (Lagging Span): Current closing price plotted 26 periods behind
+      chikou.push(highs[i]); // Using high as proxy for close
+    }
+    
+    return { tenkan, kijun, senkouA, senkouB, chikou };
+  }
+  
+  private getIchimokuCloudSignal(ichimoku: TechnicalIndicators['ichimoku'], prices: number[]): number {
+    const currentPrice = prices[prices.length - 1];
+    const tenkan = ichimoku.tenkan[ichimoku.tenkan.length - 1] || 0;
+    const kijun = ichimoku.kijun[ichimoku.kijun.length - 1] || 0;
+    const senkouA = ichimoku.senkouA[ichimoku.senkouA.length - 1] || 0;
+    const senkouB = ichimoku.senkouB[ichimoku.senkouB.length - 1] || 0;
+    
+    // Bullish signals: price above cloud, tenkan above kijun
+    const priceAboveCloud = currentPrice > Math.max(senkouA, senkouB);
+    const tenkanAboveKijun = tenkan > kijun;
+    
+    if (priceAboveCloud && tenkanAboveKijun) return 1; // Strong bullish
+    if (priceAboveCloud || tenkanAboveKijun) return 0.5; // Moderate bullish
+    if (!priceAboveCloud && !tenkanAboveKijun) return -1; // Bearish
+    
+    return 0; // Neutral
+  }
   
   private calculateMarketSentiment(prices: number[], volumes: number[], indicators: TechnicalIndicators): MarketSentiment {
     // Price acceleration (second derivative)
@@ -488,6 +663,12 @@ class MLAnalyzer extends EventEmitter {
       indicators.macd.macdLine[indicators.macd.macdLine.length - 1] || 0,
       indicators.stochastic.k[indicators.stochastic.k.length - 1] || 0,
       indicators.momentum[indicators.momentum.length - 1] || 0,
+      // ENHANCED: Advanced indicators for superior buy signal detection
+      indicators.atr, // Volatility measure for position sizing
+      indicators.adx, // Trend strength - stronger trends = better signals
+      indicators.obv[indicators.obv.length - 1] || 0, // Volume momentum
+      indicators.ichimoku.tenkan[indicators.ichimoku.tenkan.length - 1] || 0, // Short-term trend
+      indicators.ichimoku.kijun[indicators.ichimoku.kijun.length - 1] || 0, // Medium-term trend
     ];
     
     const sentimentFeatures = [
@@ -496,6 +677,8 @@ class MLAnalyzer extends EventEmitter {
       sentiment.trendStrength,
       sentiment.marketRegime === 'bullish' ? 1 : sentiment.marketRegime === 'bearish' ? -1 : 0,
       sentiment.volatilityRegime === 'high' ? 1 : sentiment.volatilityRegime === 'medium' ? 0.5 : 0,
+      // ENHANCED: Ichimoku cloud signals
+      this.getIchimokuCloudSignal(indicators.ichimoku, prices),
     ];
     
     const patternFeatures = [
@@ -1399,6 +1582,200 @@ class MLAnalyzer extends EventEmitter {
     }
     
     return patterns;
+  }
+  
+  // ENHANCED: Price Action Pattern Recognition (Close-only data adapted)
+  private detectPriceActionPatterns(prices: number[], volumes: number[]): Array<{type: string; confidence: number; timeframe: string; metadata: any}> {
+    const patterns: Array<{type: string; confidence: number; timeframe: string; metadata: any}> = [];
+    if (prices.length < 10) return patterns;
+    
+    const last = prices.length - 1;
+    const curr = prices[last];
+    const prev = prices[last - 1];
+    const prev2 = prices[last - 2];
+    const prev3 = prices[last - 3];
+    
+    // V-Shaped Reversal - Sharp decline followed by sharp recovery
+    const decline = (prev2 - prev3) / prev3;
+    const recovery = (curr - prev) / prev;
+    if (decline < -0.03 && recovery > 0.025) {
+      patterns.push({
+        type: 'v_shaped_reversal',
+        confidence: 78,
+        timeframe: '1h',
+        metadata: { declinePercent: decline * 100, recoveryPercent: recovery * 100 }
+      });
+    }
+    
+    // Strong Bullish Momentum - 3+ consecutive higher closes
+    const consecutive = prices.slice(-4).every((p, i, arr) => i === 0 || p > arr[i - 1]);
+    if (consecutive && volumes[last] > volumes[last - 1] * 1.2) {
+      patterns.push({
+        type: 'strong_bullish_momentum',
+        confidence: 82,
+        timeframe: '1h',
+        metadata: { consecutiveUps: 3, volumeIncrease: (volumes[last] / volumes[last - 1] - 1) * 100 }
+      });
+    }
+    
+    // Accumulation Pattern - Price stable, volume increasing
+    const priceRange = Math.abs(curr - prices[last - 5]) / prices[last - 5];
+    const avgRecentVol = volumes.slice(-3).reduce((a, b) => a + b, 0) / 3;
+    const avgOlderVol = volumes.slice(-6, -3).reduce((a, b) => a + b, 0) / 3;
+    
+    if (priceRange < 0.02 && avgRecentVol > avgOlderVol * 1.3) {
+      patterns.push({
+        type: 'accumulation_pattern',
+        confidence: 76,
+        timeframe: '2h',
+        metadata: { 
+          priceStability: priceRange * 100,
+          volumeIncrease: (avgRecentVol / avgOlderVol - 1) * 100,
+          signal: 'smart_money_accumulation'
+        }
+      });
+    }
+    
+    // Breakout from Consolidation
+    const recent5 = prices.slice(-5);
+    const consolidationRange = Math.max(...recent5) - Math.min(...recent5);
+    const avgPrice = recent5.reduce((a, b) => a + b, 0) / 5;
+    const breakoutSize = curr - avgPrice;
+    
+    if (consolidationRange / avgPrice < 0.015 && breakoutSize / avgPrice > 0.02 && curr > avgPrice) {
+      patterns.push({
+        type: 'consolidation_breakout',
+        confidence: 80,
+        timeframe: '1h',
+        metadata: {
+          consolidationRange: (consolidationRange / avgPrice) * 100,
+          breakoutSize: (breakoutSize / avgPrice) * 100
+        }
+      });
+    }
+    
+    return patterns;
+  }
+  
+  // ENHANCED: Order Flow Analysis for Buy/Sell Pressure Detection
+  private analyzeOrderFlow(prices: number[], volumes: number[], indicators: TechnicalIndicators): Array<{type: string; confidence: number; timeframe: string; metadata: any}> {
+    const patterns: Array<{type: string; confidence: number; timeframe: string; metadata: any}> = [];
+    if (prices.length < 10 || volumes.length < 10) return patterns;
+    
+    // Buying Pressure Analysis
+    const recentPrices = prices.slice(-10);
+    const recentVolumes = volumes.slice(-10);
+    
+    let buyVolume = 0;
+    let sellVolume = 0;
+    
+    for (let i = 1; i < recentPrices.length; i++) {
+      if (recentPrices[i] > recentPrices[i - 1]) {
+        buyVolume += recentVolumes[i];
+      } else {
+        sellVolume += recentVolumes[i];
+      }
+    }
+    
+    const totalVolume = buyVolume + sellVolume;
+    const buyPressure = totalVolume > 0 ? (buyVolume / totalVolume) * 100 : 0;
+    
+    // Strong Buying Pressure Pattern
+    if (buyPressure > 65) {
+      patterns.push({
+        type: 'strong_buy_pressure',
+        confidence: Math.min(buyPressure, 95),
+        timeframe: '1h',
+        metadata: {
+          buyPressure,
+          buyVolume,
+          sellVolume,
+          volumeRatio: buyVolume / (sellVolume || 1)
+        }
+      });
+    }
+    
+    // Institutional Accumulation Detection
+    const obvTrend = indicators.obv.slice(-5);
+    const obvIncreasing = obvTrend.every((v, i) => i === 0 || v >= obvTrend[i - 1]);
+    const priceStable = Math.abs(recentPrices[recentPrices.length - 1] - recentPrices[0]) / recentPrices[0] < 0.02;
+    
+    if (obvIncreasing && priceStable) {
+      patterns.push({
+        type: 'institutional_accumulation',
+        confidence: 78,
+        timeframe: '2h',
+        metadata: {
+          obvTrend: 'increasing',
+          priceAction: 'stable',
+          signal: 'smart_money_buying'
+        }
+      });
+    }
+    
+    return patterns;
+  }
+  
+  // ENHANCED: Ensemble ML Scoring - Combines Multiple Signals
+  private calculateEnsembleScore(
+    patterns: Array<{type: string; confidence: number; timeframe: string; metadata: any}>,
+    features: MLFeatures,
+    indicators: TechnicalIndicators
+  ): {type: string; confidence: number; timeframe: string; metadata: any} | null {
+    if (patterns.length < 3) return null; // Need multiple signals for ensemble
+    
+    // Weight different pattern types
+    const weights: {[key: string]: number} = {
+      'multi_timeframe_ml': 1.5,
+      'neural_network_pattern': 1.4,
+      'bullish_engulfing': 1.3,
+      'morning_star': 1.3,
+      'strong_buy_pressure': 1.2,
+      'institutional_accumulation': 1.4,
+      'volume_profile_ml': 1.2,
+      'ml_breakout': 1.3,
+      'fibonacci_ml_pattern': 1.1,
+    };
+    
+    // Calculate weighted ensemble score
+    let weightedSum = 0;
+    let totalWeight = 0;
+    const contributingPatterns: string[] = [];
+    
+    for (const pattern of patterns) {
+      const weight = weights[pattern.type] || 1.0;
+      weightedSum += pattern.confidence * weight;
+      totalWeight += weight;
+      contributingPatterns.push(pattern.type);
+    }
+    
+    const ensembleConfidence = totalWeight > 0 ? weightedSum / totalWeight : 0;
+    
+    // Boost for trend alignment
+    const trendBoost = indicators.adx > 25 ? 5 : 0; // Strong trend boost
+    const ichimokuBoost = this.getIchimokuCloudSignal(indicators.ichimoku, [0]) === 1 ? 5 : 0;
+    
+    const finalConfidence = Math.min(ensembleConfidence + trendBoost + ichimokuBoost, 95);
+    
+    // Only return ensemble if it's strong
+    if (finalConfidence >= 80 && patterns.length >= 3) {
+      return {
+        type: 'ensemble_ml_signal',
+        confidence: finalConfidence,
+        timeframe: '1h',
+        metadata: {
+          patternCount: patterns.length,
+          contributingPatterns,
+          baseScore: ensembleConfidence,
+          trendStrength: indicators.adx,
+          trendBoost,
+          ichimokuBoost,
+          signalQuality: 'high'
+        }
+      };
+    }
+    
+    return null;
   }
   
   private detectMomentumPatterns(indicators: TechnicalIndicators, sentiment: MarketSentiment): Array<{type: string; confidence: number; timeframe: string; metadata: any}> {
