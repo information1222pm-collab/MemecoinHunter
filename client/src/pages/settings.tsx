@@ -8,17 +8,32 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { useLanguage } from "@/hooks/use-language";
 import { useState } from "react";
-import { Settings as SettingsIcon, User, Bell, Shield, Globe, Palette, TestTube } from "lucide-react";
+import { Settings as SettingsIcon, User, Bell, Shield, Globe, Palette, TestTube, RefreshCw, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useWebSocket } from "@/hooks/use-websocket";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function Settings() {
   const { t, language, setLanguage } = useLanguage();
   const { toast } = useToast();
   const { emitCustomEvent } = useWebSocket();
+  const queryClient = useQueryClient();
   const [notifications, setNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [startingCapital, setStartingCapital] = useState("10000");
 
   const handleSaveSettings = () => {
     toast({
@@ -97,6 +112,31 @@ export default function Settings() {
       },
     });
   };
+
+  const resetPortfolioMutation = useMutation({
+    mutationFn: async (startingCapital: string) => {
+      return await apiRequest("/api/portfolio/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ startingCapital }),
+      });
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/portfolio'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default'] });
+      toast({
+        title: "Portfolio Reset",
+        description: `Your portfolio has been reset with $${parseFloat(startingCapital).toLocaleString()} starting capital`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Reset Failed",
+        description: error.message || "Failed to reset portfolio. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -343,6 +383,91 @@ export default function Settings() {
                       <li>• <strong>Milestone Alerts:</strong> Yellow celebration modal for 10%, 25%, 50%, 100% gains</li>
                     </ul>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Portfolio Reset */}
+            <Card data-testid="card-portfolio-reset" className="col-span-1 lg:col-span-2 border-destructive/50">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2 text-destructive">
+                  <RefreshCw className="w-5 h-5" />
+                  <span>Reset Portfolio</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="bg-destructive/10 rounded-lg p-4">
+                    <p className="text-sm text-destructive font-semibold mb-2">⚠️ Warning: This action cannot be undone!</p>
+                    <p className="text-sm text-muted-foreground">
+                      Resetting your portfolio will:
+                    </p>
+                    <ul className="text-sm text-muted-foreground mt-2 space-y-1 ml-4">
+                      <li>• Delete all current positions</li>
+                      <li>• Reset all P&L values to zero</li>
+                      <li>• Keep your trade history for reference</li>
+                      <li>• Set your cash balance to the new starting capital</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="starting-capital" className="flex items-center space-x-2">
+                      <DollarSign className="w-4 h-4" />
+                      <span>Starting Capital Amount</span>
+                    </Label>
+                    <div className="mt-2 flex items-center space-x-4">
+                      <Input
+                        id="starting-capital"
+                        type="number"
+                        min="100"
+                        step="100"
+                        value={startingCapital}
+                        onChange={(e) => setStartingCapital(e.target.value)}
+                        className="max-w-xs"
+                        data-testid="input-starting-capital"
+                        placeholder="10000"
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        = ${parseFloat(startingCapital || "0").toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Minimum: $100 | Recommended: $1,000 - $100,000
+                    </p>
+                  </div>
+
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        variant="destructive" 
+                        className="w-full md:w-auto"
+                        disabled={resetPortfolioMutation.isPending || parseFloat(startingCapital) < 100}
+                        data-testid="button-reset-portfolio"
+                      >
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        {resetPortfolioMutation.isPending ? "Resetting..." : "Reset Portfolio"}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will permanently delete all your current positions and reset your portfolio to ${parseFloat(startingCapital).toLocaleString()} starting capital. 
+                          This action cannot be undone. Your trade history will be preserved for reference.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel data-testid="button-cancel-reset">Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => resetPortfolioMutation.mutate(startingCapital)}
+                          className="bg-destructive hover:bg-destructive/90"
+                          data-testid="button-confirm-reset"
+                        >
+                          Yes, Reset Portfolio
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </CardContent>
             </Card>
