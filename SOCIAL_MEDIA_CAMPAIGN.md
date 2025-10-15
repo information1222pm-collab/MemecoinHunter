@@ -1,4 +1,4 @@
-# 🚀 CryptoHobby Social Media Marketing Campaign
+# 🚀 MemeCoin Hunter Social Media Marketing Campaign
 ## Memecoin Trading Platform - 2025 Campaign Strategy
 
 ---

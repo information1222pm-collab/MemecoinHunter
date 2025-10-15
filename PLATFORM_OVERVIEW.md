@@ -1,8 +1,8 @@
-# CryptoHobby - Advanced Memecoin Trading Intelligence Platform
+# MemeCoin Hunter - Advanced Memecoin Trading Intelligence Platform
 
 ## 🚀 Platform Overview
 
-CryptoHobby is a cutting-edge **paper trading and analysis platform** specialized in memecoin pattern recognition and trading strategy development. Built with institutional-grade technology, the platform combines real-time market scanning, machine learning pattern detection, and comprehensive risk management tools in a **100% simulated trading environment** to help traders develop and test strategies with zero financial risk.
+MemeCoin Hunter is a cutting-edge **paper trading and analysis platform** specialized in memecoin pattern recognition and trading strategy development. Built with institutional-grade technology, the platform combines real-time market scanning, machine learning pattern detection, and comprehensive risk management tools in a **100% simulated trading environment** to help traders develop and test strategies with zero financial risk.
 
 **Paper Trading Model**: All users receive **$10,000 in virtual trading capital** to test strategies, practice trading, and audit platform capabilities in a realistic market simulation. All features are completely free - no premium tiers or hidden fees. This is a **simulation platform for education and strategy development**, not live trading.
 
@@ -515,7 +515,7 @@ Once you've proven profitability in paper trading:
 
 ## 💡 Final Word
 
-CryptoHobby is a comprehensive **paper trading and analysis platform** designed to help you develop winning strategies in the memecoin market without risking real capital. With ML-powered pattern detection, real-time scanning of 110+ tokens, automated journaling, and institutional-grade risk management tools, you have everything needed to learn, practice, and validate trading strategies before considering real market deployment.
+MemeCoin Hunter is a comprehensive **paper trading and analysis platform** designed to help you develop winning strategies in the memecoin market without risking real capital. With ML-powered pattern detection, real-time scanning of 110+ tokens, automated journaling, and institutional-grade risk management tools, you have everything needed to learn, practice, and validate trading strategies before considering real market deployment.
 
 **Start with $10,000 virtual capital, master the tools, prove your strategy in simulation, and build the confidence needed for real trading.**
 

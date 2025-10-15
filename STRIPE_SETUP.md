@@ -1,7 +1,7 @@
 # Stripe Subscription Setup Guide
 
 ## Overview
-This guide will help you set up Stripe subscription products and prices for CryptoHobby's three-tier membership system.
+This guide will help you set up Stripe subscription products and prices for MemeCoin Hunter's three-tier membership system.
 
 ---
 
@@ -11,7 +11,7 @@ This guide will help you set up Stripe subscription products and prices for Cryp
 2. Create three products:
 
 ### Product 1: Basic Plan
-- **Name**: CryptoHobby Basic
+- **Name**: MemeCoin Hunter Basic
 - **Description**: Paper trading with basic scanning and charts
 - **Pricing Model**: Standard pricing
 - **Price**: $9.00 USD
@@ -20,7 +20,7 @@ This guide will help you set up Stripe subscription products and prices for Cryp
 - **Copy the Price ID** (format: `price_xxxxx`) - you'll need this!
 
 ### Product 2: Pro Plan
-- **Name**: CryptoHobby Pro  
+- **Name**: MemeCoin Hunter Pro  
 - **Description**: Advanced ML patterns, real-time alerts, and CLI access
 - **Pricing Model**: Standard pricing
 - **Price**: $29.00 USD
@@ -29,7 +29,7 @@ This guide will help you set up Stripe subscription products and prices for Cryp
 - **Copy the Price ID** (format: `price_xxxxx`) - you'll need this!
 
 ### Product 3: Enterprise Plan
-- **Name**: CryptoHobby Enterprise
+- **Name**: MemeCoin Hunter Enterprise
 - **Description**: Unlimited scanning, custom ML, API access, and dedicated support
 - **Pricing Model**: Standard pricing  
 - **Price**: $99.99 USD
@@ -193,4 +193,4 @@ Real money trading is only enabled for:
 **Need Help?**
 - [Stripe Documentation](https://docs.stripe.com/billing/subscriptions)
 - [Stripe Support](https://support.stripe.com/)
-- CryptoHobby Support: support@cryptohobby.com
+- MemeCoin Hunter Support: support@memecoinhunter.com

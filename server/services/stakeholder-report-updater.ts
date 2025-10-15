@@ -15,7 +15,7 @@ class StakeholderReportUpdater {
   private reportPath: string;
 
   constructor() {
-    this.reportPath = join(process.cwd(), "CryptoHobby_Stakeholder_Report_Q4_2025.md");
+    this.reportPath = join(process.cwd(), "MemeCoin_Hunter_Stakeholder_Report_Q4_2025.md");
   }
 
   async updateSystemMetrics(): Promise<void> {
