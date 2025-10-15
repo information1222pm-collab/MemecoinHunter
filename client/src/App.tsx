@@ -7,9 +7,10 @@ import { LanguageProvider } from "@/contexts/language-context";
 import { useAuth } from "@/hooks/use-auth";
 import { TradeAlertModal } from "@/components/trade-alert-modal";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
-import { CryptoBackground } from "@/components/background/CryptoBackground";
 import { InstantLoader } from "@/components/loading/instant-loader";
 import { lazy, Suspense, useEffect } from "react";
+
+const CryptoBackground = lazy(() => import("@/components/background/CryptoBackground").then(m => ({ default: m.CryptoBackground })));
 
 const Home = lazy(() => import("@/pages/home"));
 const Dashboard = lazy(() => import("@/pages/dashboard"));
@@ -155,7 +156,9 @@ function App() {
       <TooltipProvider>
         <LanguageProvider>
           <div className="dark relative min-h-screen">
-            <CryptoBackground />
+            <Suspense fallback={null}>
+              <CryptoBackground />
+            </Suspense>
             <Toaster />
             <Router />
           </div>
