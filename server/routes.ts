@@ -935,7 +935,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedPortfolio = await storage.updatePortfolio(portfolio.id, { riskLevel });
       
       // Clear the auto-trader's risk config cache so it picks up the new level
-      const { autoTrader } = await import('./services/auto-trader.js');
       autoTrader['clearRiskConfigCache'](portfolio.id);
       
       res.json({
@@ -945,6 +944,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('[API] Error updating risk level:', error);
       res.status(500).json({ message: "Failed to update risk level", error });
+    }
+  });
+
+  // Toggle auto-trading for portfolio
+  app.patch("/api/portfolio/auto-trading", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const { enabled } = req.body;
+      
+      if (typeof enabled !== 'boolean') {
+        return res.status(400).json({ 
+          message: "Invalid value - 'enabled' must be a boolean"
+        });
+      }
+
+      const portfolio = await storage.getPortfolioByUserId(userId);
+      if (!portfolio) {
+        return res.status(404).json({ message: "Portfolio not found" });
+      }
+
+      // Update the portfolio auto-trading status
+      const updatedPortfolio = await storage.updatePortfolio(portfolio.id, { 
+        autoTradingEnabled: enabled 
+      });
+      
+      // Enable or disable auto-trading in the auto-trader service
+      if (enabled) {
+        await autoTrader.enableAutoTrading(portfolio.id);
+        console.log(`✅ Auto-trading activated for portfolio ${portfolio.id}`);
+      } else {
+        await autoTrader.disableAutoTrading(portfolio.id);
+        console.log(`🛑 Auto-trading deactivated for portfolio ${portfolio.id}`);
+      }
+      
+      res.json({
+        message: enabled ? 'Auto-trading activated' : 'Auto-trading deactivated',
+        portfolio: updatedPortfolio
+      });
+    } catch (error) {
+      console.error('[API] Error toggling auto-trading:', error);
+      res.status(500).json({ message: "Failed to toggle auto-trading", error });
     }
   });
 

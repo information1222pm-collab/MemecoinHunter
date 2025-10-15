@@ -4,22 +4,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Switch } from "@/components/ui/switch";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useLanguage } from "@/hooks/use-language";
 import { useWebSocket } from "@/hooks/use-websocket";
+import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState, useMemo } from "react";
-import { TrendingUp, TrendingDown, DollarSign, Percent, Clock, ArrowUpRight, ArrowDownRight, BarChart3, PieChart } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Percent, Clock, ArrowUpRight, ArrowDownRight, BarChart3, PieChart, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PositionAnalytics } from "@/components/portfolio/position-analytics";
 import { ResponsivePieChart } from "@/components/charts/ResponsivePieChart";
 import { ResponsiveAreaChart } from "@/components/charts/ResponsiveAreaChart";
 import { ResponsiveBarChart } from "@/components/charts/ResponsiveBarChart";
 import { generateColorPalette, generateSyntheticTimeline, getValueColor } from "@/lib/chart-utils";
+import { apiRequest, queryClient as globalQueryClient } from "@/lib/queryClient";
 
 export default function Portfolio() {
   const { t } = useLanguage();
   const { isConnected, lastMessage } = useWebSocket();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [showAnalytics, setShowAnalytics] = useState(false);
   
   const { data: portfolio, error: portfolioError } = useQuery<{
@@ -29,6 +33,7 @@ export default function Portfolio() {
     dailyPnL: string;
     totalPnL: string;
     winRate: string;
+    autoTradingEnabled: boolean;
     positions: Array<{
       id: string;
       tokenId: string;
@@ -98,6 +103,31 @@ export default function Portfolio() {
     refetchInterval: 60000, // 60s - trade history is historical
     staleTime: 45000,
     retry: false,
+  });
+
+  // Auto-trading toggle mutation
+  const toggleAutoTradingMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      return await apiRequest('PATCH', '/api/portfolio/auto-trading', { enabled });
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/portfolio'] });
+      toast({
+        title: data.message,
+        description: data.portfolio.autoTradingEnabled 
+          ? "The trading bot will now automatically execute trades based on ML pattern signals." 
+          : "Automated trading has been paused. No new trades will be executed.",
+        duration: 4000,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error toggling auto-trading",
+        description: error.message || "Failed to update auto-trading status",
+        variant: "destructive",
+        duration: 4000,
+      });
+    },
   });
 
   // Check if user is authenticated (401 errors indicate unauthenticated)
@@ -306,6 +336,23 @@ export default function Portfolio() {
           <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold tracking-tight">{t('portfolio.title')}</h1>
             <div className="flex items-center space-x-4">
+              {/* Auto-Trading Toggle */}
+              {isAuthenticated && portfolio && (
+                <div className="flex items-center space-x-3 px-3 py-2 rounded-lg border border-primary/20 bg-primary/5">
+                  <Bot className={cn(
+                    "w-4 h-4 transition-colors",
+                    portfolio.autoTradingEnabled ? "text-green-500" : "text-gray-500"
+                  )} />
+                  <span className="text-sm font-medium">Auto-Trading</span>
+                  <Switch
+                    checked={portfolio.autoTradingEnabled || false}
+                    onCheckedChange={(checked) => toggleAutoTradingMutation.mutate(checked)}
+                    disabled={toggleAutoTradingMutation.isPending}
+                    data-testid="switch-auto-trading"
+                  />
+                </div>
+              )}
+              
               <Button
                 variant={showAnalytics ? "default" : "outline"}
                 size="sm"
