@@ -1307,6 +1307,11 @@ class AutoTrader extends EventEmitter {
     }
   }
 
+  clearRiskConfigCache(portfolioId: string) {
+    this.riskConfigs.delete(portfolioId);
+    console.log(`🔄 Cleared risk config cache for portfolio ${portfolioId}`);
+  }
+
   getStatsForPortfolio(portfolioId: string) {
     const portfolioState = this.enabledPortfolios.get(portfolioId);
     if (!portfolioState) return null;

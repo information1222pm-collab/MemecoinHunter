@@ -7,11 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useLanguage } from "@/hooks/use-language";
-import { useState } from "react";
-import { Settings as SettingsIcon, User, Bell, Shield, Globe, Palette, TestTube, RefreshCw, DollarSign } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Settings as SettingsIcon, User, Bell, Shield, Globe, Palette, TestTube, RefreshCw, DollarSign, TrendingUp, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useWebSocket } from "@/hooks/use-websocket";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import {
   AlertDialog,
@@ -24,6 +24,202 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+
+// Risk level configurations for display
+const riskLevelInfo = {
+  conservative: {
+    name: "Conservative",
+    description: "Minimal risk with lower returns. Focus on capital preservation.",
+    color: "text-blue-500",
+    icon: Shield,
+    features: [
+      "0.5x Kelly multiplier for ultra-safe sizing",
+      "70% confidence threshold",
+      "6% stop-loss protection",
+      "Multi-stage profit taking"
+    ]
+  },
+  moderate: {
+    name: "Moderate",
+    description: "Balanced approach with moderate risk tolerance.",
+    color: "text-green-500",
+    icon: TrendingUp,
+    features: [
+      "1.0x Kelly multiplier for standard sizing",
+      "65% confidence threshold",
+      "6.5% stop-loss protection",
+      "Conservative take-profit strategy"
+    ]
+  },
+  balanced: {
+    name: "Balanced",
+    description: "Default setting balancing risk and reward. (Recommended)",
+    color: "text-yellow-500",
+    icon: TrendingUp,
+    features: [
+      "1.5x Kelly multiplier for balanced sizing",
+      "60% confidence threshold",
+      "7% stop-loss protection",
+      "Balanced risk-reward approach"
+    ]
+  },
+  aggressive: {
+    name: "Aggressive",
+    description: "Higher risk for potentially greater returns.",
+    color: "text-orange-500",
+    icon: AlertTriangle,
+    features: [
+      "2.0x Kelly multiplier for larger positions",
+      "Lower confidence requirements",
+      "7.5% stop-loss threshold",
+      "Accept higher volatility"
+    ]
+  },
+  very_aggressive: {
+    name: "Very Aggressive",
+    description: "Maximum risk for maximum potential returns.",
+    color: "text-red-500",
+    icon: AlertTriangle,
+    features: [
+      "3.0x Kelly multiplier for maximum sizing",
+      "Lowest confidence threshold (60%)",
+      "8% stop-loss threshold",
+      "Highest volatility tolerance"
+    ]
+  }
+};
+
+function RiskLevelCard() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  // Fetch current portfolio to get risk level
+  const { data: portfolio } = useQuery<any>({
+    queryKey: ['/api/portfolio'],
+  });
+
+  // Fetch available risk levels
+  const { data: riskLevels } = useQuery<any[]>({
+    queryKey: ['/api/risk-levels'],
+  });
+
+  const [selectedRisk, setSelectedRisk] = useState<string>(portfolio?.riskLevel || 'balanced');
+
+  // Update selected risk when portfolio loads
+  useEffect(() => {
+    if (portfolio?.riskLevel) {
+      setSelectedRisk(portfolio.riskLevel);
+    }
+  }, [portfolio?.riskLevel]);
+
+  const updateRiskLevelMutation = useMutation({
+    mutationFn: async (riskLevel: string) => {
+      return await apiRequest("PATCH", "/api/portfolio/risk-level", { riskLevel });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/portfolio'] });
+      const riskLevel = data?.portfolio?.riskLevel || selectedRisk;
+      toast({
+        title: "Risk Level Updated",
+        description: `Your trading risk level has been updated to ${riskLevelInfo[riskLevel as keyof typeof riskLevelInfo]?.name}`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update risk level. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleRiskLevelChange = (value: string) => {
+    setSelectedRisk(value);
+    updateRiskLevelMutation.mutate(value);
+  };
+
+  const currentRiskInfo = riskLevelInfo[selectedRisk as keyof typeof riskLevelInfo] || riskLevelInfo.balanced;
+  const RiskIcon = currentRiskInfo.icon;
+
+  return (
+    <Card data-testid="card-risk-level" className="col-span-1 lg:col-span-2">
+      <CardHeader>
+        <CardTitle className="flex items-center space-x-2">
+          <RiskIcon className={`w-5 h-5 ${currentRiskInfo.color}`} />
+          <span>Trading Risk Level</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Configure your automated trading strategy's risk tolerance. This affects position sizing, stop-loss levels, and trade confidence requirements.
+          </p>
+
+          <div>
+            <Label htmlFor="risk-level">Risk Level</Label>
+            <Select value={selectedRisk} onValueChange={handleRiskLevelChange}>
+              <SelectTrigger className="mt-1" data-testid="select-risk-level">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="conservative">
+                  <div className="flex items-center space-x-2">
+                    <Shield className="w-4 h-4 text-blue-500" />
+                    <span>Conservative</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="moderate">
+                  <div className="flex items-center space-x-2">
+                    <TrendingUp className="w-4 h-4 text-green-500" />
+                    <span>Moderate</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="balanced">
+                  <div className="flex items-center space-x-2">
+                    <TrendingUp className="w-4 h-4 text-yellow-500" />
+                    <span>Balanced (Recommended)</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="aggressive">
+                  <div className="flex items-center space-x-2">
+                    <AlertTriangle className="w-4 h-4 text-orange-500" />
+                    <span>Aggressive</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="very_aggressive">
+                  <div className="flex items-center space-x-2">
+                    <AlertTriangle className="w-4 h-4 text-red-500" />
+                    <span>Very Aggressive</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="bg-muted/50 rounded-lg p-4">
+            <div className="flex items-center space-x-2 mb-2">
+              <RiskIcon className={`w-5 h-5 ${currentRiskInfo.color}`} />
+              <h4 className="font-semibold">{currentRiskInfo.name}</h4>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">{currentRiskInfo.description}</p>
+            <ul className="text-sm space-y-1 text-muted-foreground">
+              {currentRiskInfo.features.map((feature, idx) => (
+                <li key={idx}>• {feature}</li>
+              ))}
+            </ul>
+          </div>
+
+          {updateRiskLevelMutation.isPending && (
+            <div className="text-sm text-muted-foreground flex items-center space-x-2">
+              <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full" />
+              <span>Updating risk level...</span>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Settings() {
   const { t, language, setLanguage } = useLanguage();
@@ -382,6 +578,9 @@ export default function Settings() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Risk Level Configuration */}
+            <RiskLevelCard />
 
             {/* Portfolio Reset */}
             <Card data-testid="card-portfolio-reset" className="col-span-1 lg:col-span-2 border-destructive/50">
