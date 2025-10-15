@@ -74,7 +74,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     store: sessionStore,
     secret: sessionSecret,
     resave: false,
-    saveUninitialized: true, // Required for CSRF to work - creates sessions for all visitors
+    saveUninitialized: false, // SECURITY: Only create sessions for authenticated users
     cookie: {
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
@@ -140,6 +140,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/auth/register', authLimiter);
   app.use('/api/trades', tradingLimiter);
   app.use('/api/auto-trader', tradingLimiter);
+  app.use('/api/portfolio/default', apiLimiter); // Protect public demo endpoints
   app.use('/api', apiLimiter);
 
   // Set up Replit Auth (Google/GitHub/X/Apple OAuth) if environment variables are configured
@@ -262,15 +263,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.warn(`[SECURITY] WebSocket session validation failed:`, error);
     }
     
-    // Associate WebSocket with user if authenticated
-    if (userId) {
-      if (!userConnections.has(userId)) {
-        userConnections.set(userId, new Set());
-      }
-      userConnections.get(userId)!.add(ws);
-      (ws as any).userId = userId;
-      console.log(`[AUDIT] WebSocket associated with user ${userId}`);
+    // SECURITY: Require authentication for WebSocket connections
+    if (!userId) {
+      console.warn(`[SECURITY] WebSocket connection rejected - not authenticated from ${remoteAddress}`);
+      ws.close(1008, 'Authentication required');
+      return;
     }
+    
+    // Associate WebSocket with user if authenticated
+    if (!userConnections.has(userId)) {
+      userConnections.set(userId, new Set());
+    }
+    userConnections.get(userId)!.add(ws);
+    (ws as any).userId = userId;
+    console.log(`[AUDIT] WebSocket associated with user ${userId}`);
     
     // Add comprehensive error handling
     ws.on('error', (error) => {
