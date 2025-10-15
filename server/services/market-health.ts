@@ -30,19 +30,20 @@ export class MarketHealthAnalyzer {
   }
 
   async analyzeMarketHealth(): Promise<MarketHealthMetrics> {
-    // Use cached result if recent
-    if (this.lastHealthCheck && this.lastCheckTime) {
-      const timeSinceCheck = Date.now() - this.lastCheckTime.getTime();
-      if (timeSinceCheck < this.CACHE_DURATION_MS) {
-        return this.lastHealthCheck;
+    try {
+      // Use cached result if recent
+      if (this.lastHealthCheck && this.lastCheckTime) {
+        const timeSinceCheck = Date.now() - this.lastCheckTime.getTime();
+        if (timeSinceCheck < this.CACHE_DURATION_MS) {
+          return this.lastHealthCheck;
+        }
       }
-    }
 
-    console.log('📊 MARKET-HEALTH: Starting market health analysis...');
+      console.log('📊 MARKET-HEALTH: Starting market health analysis...');
 
-    // Get all tokens with recent price data
-    const tokens = await this.storage.getAllTokens();
-    const tokenMetrics: TokenMetrics[] = [];
+      // Get all tokens with recent price data
+      const tokens = await this.storage.getAllTokens();
+      const tokenMetrics: TokenMetrics[] = [];
 
     for (const token of tokens) {
       // Get price history from last 48 hours
@@ -52,7 +53,18 @@ export class MarketHealthAnalyzer {
 
       const currentPrice = parseFloat(priceHistory[priceHistory.length - 1].price);
       const price24hAgo = parseFloat(priceHistory[Math.max(0, priceHistory.length - 24)].price);
+      
+      // Skip if prices are invalid
+      if (!currentPrice || !price24hAgo || isNaN(currentPrice) || isNaN(price24hAgo) || price24hAgo === 0) {
+        continue;
+      }
+      
       const priceChange24h = ((currentPrice - price24hAgo) / price24hAgo) * 100;
+      
+      // Skip if price change is invalid
+      if (isNaN(priceChange24h) || !isFinite(priceChange24h)) {
+        continue;
+      }
 
       // Calculate volume metrics
       const recentVolume = priceHistory.slice(-6).reduce((sum, h) => sum + parseFloat(h.volume || '0'), 0) / 6;
@@ -68,61 +80,70 @@ export class MarketHealthAnalyzer {
       });
     }
 
-    if (tokenMetrics.length < 10) {
-      console.warn('⚠️ MARKET-HEALTH: Insufficient data for analysis (<10 tokens)');
-      return this.getDefaultHealth('insufficient_data');
+      if (tokenMetrics.length < 10) {
+        console.warn('⚠️ MARKET-HEALTH: Insufficient data for analysis (<10 tokens)');
+        return this.getDefaultHealth('insufficient_data');
+      }
+
+      // Calculate health metrics
+      const volatility = this.calculateVolatility(tokenMetrics);
+      const trend = this.calculateTrend(tokenMetrics);
+      const breadth = this.calculateBreadth(tokenMetrics);
+      const volumeHealth = this.calculateVolumeHealth(tokenMetrics);
+      const correlation = this.calculateCorrelation(tokenMetrics);
+
+      // Calculate overall health score (0-100)
+      const healthScore = this.calculateHealthScore({
+        volatility,
+        trend,
+        breadth,
+        volumeHealth,
+        correlation
+      });
+
+      // Determine trading recommendation
+      const { recommendation, factors } = this.getRecommendation(healthScore, {
+        volatility,
+        breadth,
+        volumeHealth,
+        trend
+      });
+
+      const health: MarketHealthMetrics = {
+        healthScore,
+        volatility,
+        trend,
+        breadth,
+        volumeHealth,
+        correlation,
+        recommendation,
+        factors
+      };
+
+      // Cache the result
+      this.lastHealthCheck = health;
+      this.lastCheckTime = new Date();
+
+      console.log(`📊 MARKET-HEALTH: Score ${healthScore.toFixed(1)}/100 | ${recommendation.toUpperCase()} | Trend: ${trend}`);
+      console.log(`   💹 Volatility: ${volatility.toFixed(1)}% | Breadth: ${breadth.toFixed(1)}% | Volume: ${volumeHealth.toFixed(1)}/100`);
+      
+      return health;
+    } catch (error) {
+      console.error('❌ MARKET-HEALTH: Error during analysis:', error);
+      return this.getDefaultHealth('analysis_error');
     }
-
-    // Calculate health metrics
-    const volatility = this.calculateVolatility(tokenMetrics);
-    const trend = this.calculateTrend(tokenMetrics);
-    const breadth = this.calculateBreadth(tokenMetrics);
-    const volumeHealth = this.calculateVolumeHealth(tokenMetrics);
-    const correlation = this.calculateCorrelation(tokenMetrics);
-
-    // Calculate overall health score (0-100)
-    const healthScore = this.calculateHealthScore({
-      volatility,
-      trend,
-      breadth,
-      volumeHealth,
-      correlation
-    });
-
-    // Determine trading recommendation
-    const { recommendation, factors } = this.getRecommendation(healthScore, {
-      volatility,
-      breadth,
-      volumeHealth,
-      trend
-    });
-
-    const health: MarketHealthMetrics = {
-      healthScore,
-      volatility,
-      trend,
-      breadth,
-      volumeHealth,
-      correlation,
-      recommendation,
-      factors
-    };
-
-    // Cache the result
-    this.lastHealthCheck = health;
-    this.lastCheckTime = new Date();
-
-    console.log(`📊 MARKET-HEALTH: Score ${healthScore.toFixed(1)}/100 | ${recommendation.toUpperCase()} | Trend: ${trend}`);
-    console.log(`   💹 Volatility: ${volatility.toFixed(1)}% | Breadth: ${breadth.toFixed(1)}% | Volume: ${volumeHealth.toFixed(1)}/100`);
-    
-    return health;
   }
 
   private calculateVolatility(metrics: TokenMetrics[]): number {
     // Calculate market-wide volatility based on price changes
-    const priceChanges = metrics.map(m => Math.abs(m.priceChange24h));
+    const priceChanges = metrics
+      .map(m => Math.abs(m.priceChange24h))
+      .filter(v => isFinite(v) && !isNaN(v)); // Filter out invalid values
+    
+    if (priceChanges.length === 0) return 0;
+    
     const avgVolatility = priceChanges.reduce((sum, v) => sum + v, 0) / priceChanges.length;
-    return avgVolatility;
+    return isFinite(avgVolatility) ? avgVolatility : 0;
   }
 
   private calculateTrend(metrics: TokenMetrics[]): 'bullish' | 'bearish' | 'neutral' {
