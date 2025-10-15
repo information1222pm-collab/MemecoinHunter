@@ -7,6 +7,7 @@ import { storage } from "./storage";
 import { scanner } from "./services/scanner";
 import { mlAnalyzer } from "./services/ml-analyzer";
 import { priceFeed } from "./services/price-feed";
+import { streamingPriceGateway } from "./services/streaming-price-gateway";
 import { riskManager } from "./services/risk-manager";
 import { autoTrader } from "./services/auto-trader";
 import { stakeholderReportUpdater } from "./services/stakeholder-report-updater";
@@ -317,6 +318,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setImmediate(async () => {
     console.log('🚀 Starting trading services...');
     scanner.start();
+    
+    // Start REAL-TIME streaming price gateway (<1s latency)
+    console.log('⚡ Starting Streaming Price Gateway (real-time feeds)...');
+    try {
+      await streamingPriceGateway.start();
+      console.log('✅ Real-time price streaming active - <1s latency');
+    } catch (error) {
+      console.error('❌ Streaming Price Gateway failed:', error);
+      console.log('⚠️  Falling back to traditional price feed...');
+    }
+    
+    // Keep traditional price feed as fallback for tokens not on exchanges
     priceFeed.start();
     
     // Start alert service and wire up WebSocket broadcaster
@@ -364,6 +377,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     broadcastMarketData({ type: 'scanner_update', data: status });
   });
 
+  // Real-time streaming price updates (<1s latency)
+  streamingPriceGateway.on('priceUpdate', (update) => {
+    broadcastMarketData({ type: 'price_update', data: update });
+    // Forward price updates to alert service
+    alertService.handlePriceUpdate(update);
+  });
+  
+  // Traditional price feed (fallback for non-exchange tokens)
   priceFeed.on('priceUpdate', (update) => {
     broadcastMarketData({ type: 'price_update', data: update });
     // Forward price updates to alert service
