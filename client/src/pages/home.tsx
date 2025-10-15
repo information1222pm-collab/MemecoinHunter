@@ -8,6 +8,8 @@ import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
 import { motion } from "framer-motion";
+import { DemoModal } from "@/components/onboarding/demo-modal";
+import { useState, useEffect } from "react";
 import { 
   TrendingUp, 
   Zap, 
@@ -53,6 +55,19 @@ import { useQuery } from "@tanstack/react-query";
 
 export default function Home() {
   const { t } = useLanguage();
+  const [showDemo, setShowDemo] = useState(false);
+
+  // Check if user has seen the demo
+  useEffect(() => {
+    const demoCompleted = localStorage.getItem('demo_completed');
+    if (!demoCompleted) {
+      // Show demo after a short delay for better UX
+      const timer = setTimeout(() => {
+        setShowDemo(true);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   const { data: scannerStatus } = useQuery<{
     isRunning: boolean;
@@ -184,6 +199,9 @@ export default function Home() {
       <Sidebar />
       <main className="flex-1 overflow-auto mobile-safe-bottom">
         <Header />
+        
+        {/* Demo Modal for first-time users */}
+        <DemoModal isOpen={showDemo} onClose={() => setShowDemo(false)} />
         
         <motion.div 
           className="p-4 md:p-6 space-y-6 md:space-y-8"
