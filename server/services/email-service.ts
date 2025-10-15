@@ -21,11 +21,21 @@ interface UserInfo {
 
 export class EmailService {
   private fromEmail = 'MemeCoin Hunter <onboarding@resend.dev>';
+  
+  private getAppUrl(): string {
+    const replitDomains = process.env.REPLIT_DOMAINS;
+    if (replitDomains) {
+      const domains = replitDomains.split(',');
+      return `https://${domains[0]}`;
+    }
+    return 'http://localhost:5000';
+  }
 
   async sendDailyPerformanceReport(user: UserInfo, metrics: PortfolioMetrics): Promise<void> {
     const isEnterprise = user.subscriptionTier === 'enterprise';
     const pnlColor = metrics.dailyPnL >= 0 ? '#10b981' : '#ef4444';
     const pnlSign = metrics.dailyPnL >= 0 ? '+' : '';
+    const appUrl = this.getAppUrl();
 
     const htmlContent = `
 <!DOCTYPE html>
@@ -117,7 +127,7 @@ export class EmailService {
                       <li style="margin: 6px 0;">24/7 premium support</li>
                       <li style="margin: 6px 0;">Custom trading strategies</li>
                     </ul>
-                    <a href="https://cryptohobby.app/settings" style="display: inline-block; margin-top: 16px; padding: 12px 24px; background-color: #ffffff; color: #10b981; text-decoration: none; font-weight: 600; border-radius: 6px; font-size: 14px;">Upgrade Now</a>
+                    <a href="${appUrl}/settings" style="display: inline-block; margin-top: 16px; padding: 12px 24px; background-color: #ffffff; color: #10b981; text-decoration: none; font-weight: 600; border-radius: 6px; font-size: 14px;">Upgrade Now</a>
                   </td>
                 </tr>
               </table>
@@ -129,8 +139,8 @@ export class EmailService {
           <tr>
             <td style="padding: 30px 40px; text-align: center; border-top: 1px solid #262626;">
               <p style="margin: 0; font-size: 14px; color: #6b7280;">
-                <a href="https://cryptohobby.app" style="color: #10b981; text-decoration: none;">Visit Dashboard</a> | 
-                <a href="https://cryptohobby.app/settings" style="color: #10b981; text-decoration: none;">Settings</a>
+                <a href="${appUrl}" style="color: #10b981; text-decoration: none;">Visit Dashboard</a> | 
+                <a href="${appUrl}/settings" style="color: #10b981; text-decoration: none;">Settings</a>
               </p>
               <p style="margin: 12px 0 0; font-size: 12px; color: #6b7280;">
                 © ${new Date().getFullYear()} MemeCoin Hunter. All rights reserved.
