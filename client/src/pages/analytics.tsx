@@ -6,10 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/hooks/use-language";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWebSocket } from "@/hooks/use-websocket";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { TrendingUp, TrendingDown, BarChart3, PieChart, Activity, AlertTriangle, Target, Zap, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ResponsiveAreaChart } from "@/components/charts/ResponsiveAreaChart";
+import { ResponsivePieChart } from "@/components/charts/ResponsivePieChart";
+import { ResponsiveBarChart } from "@/components/charts/ResponsiveBarChart";
+import { transformToTimeSeries, getValueColor } from "@/lib/chart-utils";
 
 export default function Analytics() {
   const { t } = useLanguage();
@@ -79,10 +83,59 @@ export default function Analytics() {
     type: string;
     realizedPnL: string;
     totalValue: string;
+    createdAt: string;
+    closedAt?: string;
   }>>({ 
     queryKey: ['/api/portfolio', 'default', 'trades'],
     refetchInterval: 60000,
     retry: false, // Don't retry on 401 errors
+  });
+
+  // Fetch comprehensive analytics data
+  const { data: analyticsData, isLoading: analyticsLoading, error: analyticsError } = useQuery<{
+    pnl: {
+      totalRealizedPnL: number;
+      totalUnrealizedPnL: number;
+      totalPnL: number;
+      dailyPnL: number;
+      pnlPercentage: number;
+      startingCapital: number;
+      currentValue: number;
+    };
+    winLoss: {
+      totalWins: number;
+      totalLosses: number;
+      totalBreakeven: number;
+      winRate: number;
+      avgWin: number;
+      avgLoss: number;
+      profitFactor: number;
+      largestWin: number;
+      largestLoss: number;
+    };
+    holdTime: {
+      avgHoldTime: number;
+      avgWinHoldTime: number;
+      avgLossHoldTime: number;
+      totalClosedTrades: number;
+    };
+    strategies: Array<{
+      patternId: string | null;
+      patternType: string;
+      totalTrades: number;
+      winningTrades: number;
+      losingTrades: number;
+      totalProfit: number;
+      totalLoss: number;
+      netProfit: number;
+      roiPercent: number;
+      winRate: number;
+      averageReturn: number;
+    }>;
+  }>({
+    queryKey: ['/api/analytics/all'],
+    refetchInterval: 60000,
+    retry: false,
   });
 
   // Check if user is authenticated (401 errors indicate unauthenticated)
@@ -98,7 +151,108 @@ export default function Analytics() {
     );
   };
 
-  const isAuthenticated = !hasAuthError(portfolioError) && !hasAuthError(autoTraderError) && !hasAuthError(tradesError);
+  const isAuthenticated = !hasAuthError(portfolioError) && !hasAuthError(autoTraderError) && !hasAuthError(tradesError) && !hasAuthError(analyticsError);
+
+  // Transform data for charts using useMemo for performance
+  const chartData = useMemo(() => {
+    // Create cumulative P&L timeline from trades
+    const pnlTimeline = trades && trades.length > 0
+      ? trades
+          .filter(t => t.closedAt)
+          .sort((a, b) => new Date(a.closedAt!).getTime() - new Date(b.closedAt!).getTime())
+          .reduce((acc, trade, index) => {
+            const pnl = parseFloat(trade.realizedPnL || '0');
+            const prevCumulative = index > 0 ? acc[index - 1].value : 0;
+            const cumulative = prevCumulative + pnl;
+            
+            acc.push({
+              timestamp: new Date(trade.closedAt!).getTime(),
+              value: cumulative,
+              date: new Date(trade.closedAt!).toLocaleDateString(),
+            });
+            return acc;
+          }, [] as Array<{ timestamp: number; value: number; date: string }>)
+      : [];
+
+    // Win/Loss distribution data
+    const winLossData = analyticsData?.winLoss
+      ? [
+          { name: 'Wins', value: analyticsData.winLoss.totalWins },
+          { name: 'Losses', value: analyticsData.winLoss.totalLosses },
+          { name: 'Breakeven', value: analyticsData.winLoss.totalBreakeven },
+        ].filter(item => item.value > 0)
+      : [];
+
+    // Strategy performance data
+    const strategyData = analyticsData?.strategies
+      ? analyticsData.strategies
+          .filter(s => s.totalTrades > 0)
+          .map(s => ({
+            name: s.patternType,
+            pnl: s.netProfit,
+            trades: s.totalTrades,
+            winRate: s.winRate,
+          }))
+          .sort((a, b) => b.pnl - a.pnl)
+      : [];
+
+    // Trading volume data (aggregate by date)
+    const volumeData = trades && trades.length > 0
+      ? Object.entries(
+          trades.reduce((acc, trade) => {
+            const date = new Date(trade.createdAt).toLocaleDateString();
+            const volume = parseFloat(trade.totalValue || '0');
+            acc[date] = (acc[date] || 0) + volume;
+            return acc;
+          }, {} as Record<string, number>)
+        )
+          .map(([date, volume]) => ({
+            date,
+            volume,
+            timestamp: new Date(date).getTime(),
+          }))
+          .sort((a, b) => a.timestamp - b.timestamp)
+      : [];
+
+    return { pnlTimeline, winLossData, strategyData, volumeData };
+  }, [trades, analyticsData]);
+
+  // Demo chart data for unauthenticated users
+  const demoChartData = {
+    pnlTimeline: [
+      { timestamp: Date.now() - 7 * 24 * 60 * 60 * 1000, value: 0, date: '7 days ago' },
+      { timestamp: Date.now() - 6 * 24 * 60 * 60 * 1000, value: 120, date: '6 days ago' },
+      { timestamp: Date.now() - 5 * 24 * 60 * 60 * 1000, value: -50, date: '5 days ago' },
+      { timestamp: Date.now() - 4 * 24 * 60 * 60 * 1000, value: 200, date: '4 days ago' },
+      { timestamp: Date.now() - 3 * 24 * 60 * 60 * 1000, value: 350, date: '3 days ago' },
+      { timestamp: Date.now() - 2 * 24 * 60 * 60 * 1000, value: 280, date: '2 days ago' },
+      { timestamp: Date.now() - 1 * 24 * 60 * 60 * 1000, value: 450, date: '1 day ago' },
+      { timestamp: Date.now(), value: 690, date: 'Today' },
+    ],
+    winLossData: [
+      { name: 'Wins', value: 32 },
+      { name: 'Losses', value: 12 },
+      { name: 'Breakeven', value: 1 },
+    ],
+    strategyData: [
+      { name: 'V-Reversal', pnl: 450, trades: 12, winRate: 75 },
+      { name: 'Accumulation', pnl: 320, trades: 8, winRate: 62.5 },
+      { name: 'Breakout', pnl: 180, trades: 6, winRate: 66.7 },
+      { name: 'Manual Trading', pnl: -120, trades: 4, winRate: 25 },
+    ],
+    volumeData: [
+      { date: '10/08', volume: 5420, timestamp: Date.now() - 7 * 24 * 60 * 60 * 1000 },
+      { date: '10/09', volume: 6890, timestamp: Date.now() - 6 * 24 * 60 * 60 * 1000 },
+      { date: '10/10', volume: 4320, timestamp: Date.now() - 5 * 24 * 60 * 60 * 1000 },
+      { date: '10/11', volume: 7650, timestamp: Date.now() - 4 * 24 * 60 * 60 * 1000 },
+      { date: '10/12', volume: 5890, timestamp: Date.now() - 3 * 24 * 60 * 60 * 1000 },
+      { date: '10/13', volume: 8120, timestamp: Date.now() - 2 * 24 * 60 * 60 * 1000 },
+      { date: '10/14', volume: 9430, timestamp: Date.now() - 1 * 24 * 60 * 60 * 1000 },
+    ],
+  };
+
+  // Use real data if authenticated, demo data if not
+  const currentChartData = isAuthenticated ? chartData : demoChartData;
 
   // Real-time WebSocket data updates
   useEffect(() => {
@@ -120,6 +274,7 @@ export default function Analytics() {
         // Invalidate auto-trader and trades data when a new trade is executed
         queryClient.invalidateQueries({ queryKey: ['/api/auto-trader/portfolio'] });
         queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default', 'trades'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/analytics/all'] });
         break;
       
       case 'pattern_detected':
@@ -367,11 +522,13 @@ export default function Analytics() {
                 onClick={() => {
                   queryClient.invalidateQueries({ queryKey: ['/api/auto-trader/portfolio'] });
                   queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default'] });
+                  queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default', 'trades'] });
+                  queryClient.invalidateQueries({ queryKey: ['/api/analytics/all'] });
                   if (autoTraderStats?.portfolioId) {
                     queryClient.invalidateQueries({ queryKey: ['/api/risk/portfolio', autoTraderStats.portfolioId] });
                   }
                 }}
-                disabled={portfolioLoading || riskLoading}
+                disabled={portfolioLoading || riskLoading || analyticsLoading}
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Refresh Data
@@ -448,7 +605,7 @@ export default function Analytics() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4 mb-6">
                   <div className="text-center p-4 bg-secondary/20 rounded-lg" data-testid="stat-win-rate">
                     <div className="text-xl font-bold text-price-up">
                       {formatPercentage(performanceMetrics.winRate)}
@@ -474,6 +631,29 @@ export default function Analytics() {
                     <div className="text-sm text-muted-foreground">Avg Loss</div>
                   </div>
                 </div>
+
+                {/* Win/Loss Distribution Donut Chart */}
+                {analyticsLoading ? (
+                  <Skeleton className="h-64 w-full" />
+                ) : currentChartData.winLossData.length > 0 ? (
+                  <div>
+                    <h4 className="text-sm font-medium mb-3">Win/Loss Distribution</h4>
+                    <ResponsivePieChart
+                      data={currentChartData.winLossData}
+                      height={280}
+                      innerRadius={60}
+                      showLegend={true}
+                      formatType="number"
+                      colors={['hsl(142, 76%, 45%)', 'hsl(0, 84%, 60%)', 'hsl(215, 20%, 65%)']}
+                      showLabels={true}
+                      testId="chart-win-loss-distribution"
+                    />
+                  </div>
+                ) : (
+                  <div className="h-64 flex items-center justify-center bg-secondary/20 rounded-lg">
+                    <p className="text-sm text-muted-foreground">No trade data available</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -514,6 +694,74 @@ export default function Analytics() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Strategy Performance Bar Chart */}
+          <Card data-testid="card-strategy-performance">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <BarChart3 className="w-5 h-5" />
+                <span>Strategy Performance</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {analyticsLoading ? (
+                <Skeleton className="h-80 w-full" />
+              ) : currentChartData.strategyData.length > 0 ? (
+                <ResponsiveBarChart
+                  data={currentChartData.strategyData}
+                  xKey="name"
+                  yKey="pnl"
+                  height={320}
+                  formatType="currency"
+                  colorByValue={true}
+                  showGrid={true}
+                  testId="chart-strategy-performance"
+                />
+              ) : (
+                <div className="h-80 flex items-center justify-center bg-secondary/20 rounded-lg">
+                  <div className="text-center">
+                    <BarChart3 className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-lg font-medium text-muted-foreground">No Strategy Data Available</p>
+                    <p className="text-sm text-muted-foreground">Execute trades to see strategy performance</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Trading Volume Column Chart */}
+          <Card data-testid="card-trading-volume">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Activity className="w-5 h-5" />
+                <span>Trading Volume</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {portfolioLoading ? (
+                <Skeleton className="h-80 w-full" />
+              ) : currentChartData.volumeData.length > 0 ? (
+                <ResponsiveBarChart
+                  data={currentChartData.volumeData}
+                  xKey="date"
+                  yKey="volume"
+                  height={320}
+                  formatType="currency"
+                  colors={['hsl(220, 70%, 50%)']}
+                  showGrid={true}
+                  testId="chart-trading-volume"
+                />
+              ) : (
+                <div className="h-80 flex items-center justify-center bg-secondary/20 rounded-lg">
+                  <div className="text-center">
+                    <Activity className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-lg font-medium text-muted-foreground">No Volume Data Available</p>
+                    <p className="text-sm text-muted-foreground">Start trading to see volume trends</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Top Performers */}
           <Card data-testid="card-top-performers">
@@ -560,22 +808,43 @@ export default function Analytics() {
             </CardContent>
           </Card>
 
-          {/* Performance Chart Placeholder */}
+          {/* Cumulative P&L Area Chart */}
           <Card data-testid="card-performance-chart">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <PieChart className="w-5 h-5" />
-                <span>Portfolio Performance Chart</span>
+                <Activity className="w-5 h-5" />
+                <span>Cumulative P&L Performance</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-64 flex items-center justify-center bg-secondary/20 rounded-lg">
-                <div className="text-center">
-                  <BarChart3 className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-lg font-medium text-muted-foreground">Interactive Charts Coming Soon</p>
-                  <p className="text-sm text-muted-foreground">Advanced portfolio analytics and visualizations</p>
+              {portfolioLoading || analyticsLoading ? (
+                <div className="h-80">
+                  <Skeleton className="h-full w-full" />
                 </div>
-              </div>
+              ) : currentChartData.pnlTimeline.length > 0 ? (
+                <ResponsiveAreaChart
+                  data={currentChartData.pnlTimeline}
+                  xKey="timestamp"
+                  yKey="value"
+                  height={320}
+                  formatType="currency"
+                  gradientColors={
+                    currentChartData.pnlTimeline[currentChartData.pnlTimeline.length - 1]?.value >= 0
+                      ? ['hsl(142, 76%, 45%)', 'hsl(142, 76%, 35%)']
+                      : ['hsl(0, 84%, 60%)', 'hsl(0, 84%, 50%)']
+                  }
+                  showGrid={true}
+                  testId="chart-cumulative-pnl"
+                />
+              ) : (
+                <div className="h-80 flex items-center justify-center bg-secondary/20 rounded-lg">
+                  <div className="text-center">
+                    <BarChart3 className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-lg font-medium text-muted-foreground">No P&L Data Available</p>
+                    <p className="text-sm text-muted-foreground">Start trading to see your performance</p>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
