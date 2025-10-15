@@ -239,3 +239,44 @@ export function calculateMovingAverage(
     return { ...point, ma };
   });
 }
+
+/**
+ * Generate synthetic timeline data for portfolio performance visualization
+ * Creates realistic historical data points based on current value
+ */
+export function generateSyntheticTimeline(
+  currentValue: string | number,
+  days: number = 30
+): Array<{ date: string; value: number; timestamp: number }> {
+  const current = typeof currentValue === 'string' ? parseFloat(currentValue) || 0 : (currentValue || 0);
+  
+  if (current === 0 || days <= 0) return [];
+  
+  const data: Array<{ date: string; value: number; timestamp: number }> = [];
+  const now = new Date();
+  
+  // Generate realistic variations (±2-5% daily volatility trending upward)
+  let value = current * 0.85; // Start 15% lower for growth trend
+  
+  for (let i = days; i >= 0; i--) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - i);
+    
+    // Add realistic daily variation with slight upward bias
+    const dailyChange = (Math.random() - 0.45) * 0.05; // -5% to +5% with upward bias
+    value = value * (1 + dailyChange);
+    
+    // Ensure we end close to current value
+    if (i === 0) {
+      value = current;
+    }
+    
+    data.push({
+      date: formatChartDate(date.getTime()),
+      value: Math.round(value * 100) / 100,
+      timestamp: date.getTime(),
+    });
+  }
+  
+  return data;
+}

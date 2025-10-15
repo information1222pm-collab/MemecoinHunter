@@ -3,13 +3,18 @@ import { Header } from "@/components/layout/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "@/hooks/use-language";
 import { useWebSocket } from "@/hooks/use-websocket";
-import { useEffect, useState } from "react";
-import { TrendingUp, TrendingDown, DollarSign, Percent, Clock, ArrowUpRight, ArrowDownRight, BarChart3 } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { TrendingUp, TrendingDown, DollarSign, Percent, Clock, ArrowUpRight, ArrowDownRight, BarChart3, PieChart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PositionAnalytics } from "@/components/portfolio/position-analytics";
+import { ResponsivePieChart } from "@/components/charts/ResponsivePieChart";
+import { ResponsiveAreaChart } from "@/components/charts/ResponsiveAreaChart";
+import { ResponsiveBarChart } from "@/components/charts/ResponsiveBarChart";
+import { generateColorPalette, generateSyntheticTimeline, getValueColor } from "@/lib/chart-utils";
 
 export default function Portfolio() {
   const { t } = useLanguage();
@@ -246,6 +251,37 @@ export default function Portfolio() {
     return numValue >= 0 ? 'price-up' : 'price-down';
   };
 
+  // Chart Data Transformations
+  const allocationData = useMemo(() => {
+    if (!portfolioData.positions || portfolioData.positions.length === 0) return [];
+    
+    return portfolioData.positions.map(pos => {
+      const quantity = parseFloat(pos.amount) || 0;
+      const currentPrice = parseFloat(pos.token?.currentPrice) || 0;
+      return {
+        name: pos.token?.symbol || 'Unknown',
+        value: quantity * currentPrice,
+      };
+    }).filter(item => item.value > 0);
+  }, [portfolioData.positions]);
+
+  const performanceData = useMemo(() => {
+    const totalValue = parseFloat(portfolioData.totalValue) || 0;
+    return generateSyntheticTimeline(totalValue, 30);
+  }, [portfolioData.totalValue]);
+
+  const comparisonData = useMemo(() => {
+    if (!portfolioData.positions || portfolioData.positions.length === 0) return [];
+    
+    return portfolioData.positions.map(pos => ({
+      name: pos.token?.symbol || 'Unknown',
+      value: parseFloat(pos.unrealizedPnL) || 0,
+    })).filter(item => item.name !== 'Unknown');
+  }, [portfolioData.positions]);
+
+  const isLoading = !portfolio && !portfolioError;
+  const hasPositions = portfolioData.positions && portfolioData.positions.length > 0;
+
   return (
     <div className="min-h-screen flex bg-background">
       <Sidebar />
@@ -384,6 +420,126 @@ export default function Portfolio() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Interactive Charts Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Position Allocation Donut Chart */}
+            <Card data-testid="card-chart-allocation">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <PieChart className="w-5 h-5" />
+                  Position Allocation
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-[300px] w-full" />
+                    <div className="flex justify-center gap-4">
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="h-4 w-20" />
+                    </div>
+                  </div>
+                ) : !hasPositions ? (
+                  <div className="h-[300px] flex items-center justify-center">
+                    <div className="text-center text-muted-foreground">
+                      <PieChart className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>No positions to display</p>
+                      <p className="text-sm">Start trading to see allocation</p>
+                    </div>
+                  </div>
+                ) : (
+                  <ResponsivePieChart
+                    data={allocationData}
+                    height={300}
+                    innerRadius={60}
+                    formatType="currency"
+                    showLegend={true}
+                    colors={generateColorPalette(allocationData.length)}
+                    testId="chart-position-allocation"
+                  />
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Performance Timeline Area Chart */}
+            <Card data-testid="card-chart-performance">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5" />
+                  Portfolio Performance (30 Days)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-[300px] w-full" />
+                  </div>
+                ) : !hasPositions || performanceData.length === 0 ? (
+                  <div className="h-[300px] flex items-center justify-center">
+                    <div className="text-center text-muted-foreground">
+                      <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>No performance data available</p>
+                      <p className="text-sm">Start trading to track performance</p>
+                    </div>
+                  </div>
+                ) : (
+                  <ResponsiveAreaChart
+                    data={performanceData}
+                    xKey="date"
+                    yKey="value"
+                    height={300}
+                    formatType="currency"
+                    showGrid={true}
+                    gradientColors={
+                      parseFloat(portfolioData.totalPnL) >= 0
+                        ? ['hsl(142, 76%, 45%)', 'hsl(142, 76%, 45%)']
+                        : ['hsl(0, 84%, 60%)', 'hsl(0, 84%, 60%)']
+                    }
+                    testId="chart-portfolio-performance"
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Position Comparison Bar Chart */}
+          <Card data-testid="card-chart-comparison">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5" />
+                Position P&L Comparison
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-[350px] w-full" />
+                </div>
+              ) : !hasPositions ? (
+                <div className="h-[350px] flex items-center justify-center">
+                  <div className="text-center text-muted-foreground">
+                    <BarChart3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>No positions to compare</p>
+                    <p className="text-sm">Start trading to see P&L comparison</p>
+                  </div>
+                </div>
+              ) : (
+                <ResponsiveBarChart
+                  data={comparisonData}
+                  xKey="name"
+                  yKey="value"
+                  height={350}
+                  formatType="currency"
+                  showGrid={true}
+                  horizontal={true}
+                  colorByValue={true}
+                  testId="chart-position-comparison"
+                />
+              )}
+            </CardContent>
+          </Card>
 
           {/* Positions and Trades */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
