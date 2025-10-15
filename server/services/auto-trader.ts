@@ -5,6 +5,7 @@ import { scanner } from './scanner';
 import { mlAnalyzer } from './ml-analyzer';
 import { patternPerformanceAnalyzer } from './pattern-performance-analyzer';
 import { exchangeService } from './exchange-service';
+import { MarketHealthAnalyzer } from './market-health';
 import type { Token, Pattern, InsertTrade } from '@shared/schema';
 import type { ExchangeTradingSignal } from './exchange-service';
 
@@ -36,6 +37,8 @@ class AutoTrader extends EventEmitter {
   private positionStages = new Map<string, number>(); // Track take-profit stage per position (0=none, 1=first, 2=second, 3=final)
   private monitoringInterval?: NodeJS.Timeout;
   private syncInterval?: NodeJS.Timeout;
+  private marketHealthAnalyzer = new MarketHealthAnalyzer(storage);
+  private healthCheckInterval?: NodeJS.Timeout;
   
   private strategy = {
     minConfidence: 75, // Dynamic minimum confidence
@@ -110,7 +113,19 @@ class AutoTrader extends EventEmitter {
       this.syncEnabledPortfolios();
     }, 60000);
     
-    console.log('✅ Monitoring intervals active');
+    // Check market health every 5 minutes
+    this.healthCheckInterval = setInterval(() => {
+      this.marketHealthAnalyzer.analyzeMarketHealth().catch(err => {
+        console.error('Error analyzing market health:', err);
+      });
+    }, 5 * 60 * 1000);
+    
+    // Run initial health check
+    this.marketHealthAnalyzer.analyzeMarketHealth().catch(err => {
+      console.error('Error in initial market health check:', err);
+    });
+    
+    console.log('✅ Monitoring intervals active (positions, portfolios, market health)');
     
     // Run initial position check immediately
     console.log('🔍 Running initial position check...');
@@ -139,6 +154,9 @@ class AutoTrader extends EventEmitter {
     }
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
+    }
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
     }
     
     mlAnalyzer.removeAllListeners('patternDetected');
@@ -272,6 +290,16 @@ class AutoTrader extends EventEmitter {
       const adjustedConfidence = performance 
         ? baseConfidence * performance.confidenceMultiplier
         : baseConfidence;
+      
+      // MARKET HEALTH CHECK: Analyze overall market conditions
+      const marketHealth = await this.marketHealthAnalyzer.analyzeMarketHealth();
+      
+      // Check if we should trade based on market health and confidence
+      if (!this.marketHealthAnalyzer.shouldTrade(adjustedConfidence)) {
+        console.log(`🚫 MARKET-HEALTH: Trade blocked - ${marketHealth.recommendation.toUpperCase()}`);
+        console.log(`   Health Score: ${marketHealth.healthScore.toFixed(1)}/100 | Factors: ${marketHealth.factors.join(', ')}`);
+        return;
+      }
       
       // Get current dynamic minimum confidence
       const currentMinConfidence = await patternPerformanceAnalyzer.getCurrentMinConfidence();
@@ -470,7 +498,15 @@ class AutoTrader extends EventEmitter {
       
       // FIXED: RiskManager returns recommendedSize in TOKENS, convert to DOLLARS
       const recommendedDollars = positionSizing.recommendedSize * signal.price;
-      const tradeValue = Math.min(recommendedDollars, this.strategy.maxPositionSize);
+      let tradeValue = Math.min(recommendedDollars, this.strategy.maxPositionSize);
+      
+      // MARKET HEALTH: Apply position size adjustment based on market conditions
+      const healthMultiplier = this.marketHealthAnalyzer.getPositionSizeMultiplier();
+      if (healthMultiplier < 1.0) {
+        tradeValue = tradeValue * healthMultiplier;
+        console.log(`📊 MARKET-HEALTH: Position size reduced by ${((1 - healthMultiplier) * 100).toFixed(0)}% due to market conditions`);
+      }
+      
       console.log(`💡 [Portfolio ${portfolioId}] Dynamic position sizing: $${tradeValue.toFixed(2)} (${positionSizing.riskLevel} risk, ${positionSizing.reasoning})`);
       
       // IMPROVED: Enforce 10% minimum cash floor
