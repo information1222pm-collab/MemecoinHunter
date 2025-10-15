@@ -381,8 +381,8 @@ class AutoTrader extends EventEmitter {
         console.log(`⚠️ CHART-ANALYZER: Bearish chart signal detected - confidence reduced to ${confidence.toFixed(1)}%`);
       }
       
-      // CRITICAL FIX: Always validate risk-reward ratio, reject if poor or missing
-      if (!chartSignal.riskRewardRatio || chartSignal.riskRewardRatio < 1.5) {
+      // AGGRESSIVE MODE: Lowered R:R requirement from 1.5:1 to 1.2:1
+      if (!chartSignal.riskRewardRatio || chartSignal.riskRewardRatio < 1.2) {
         console.log(`⚠️ CHART-ANALYZER: Poor/missing risk-reward ratio (${chartSignal.riskRewardRatio?.toFixed(2) || '0'}:1) - trade rejected`);
         return null; // Reject trade with poor or missing R:R
       }
