@@ -115,11 +115,7 @@ export default function Settings() {
 
   const resetPortfolioMutation = useMutation({
     mutationFn: async (startingCapital: string) => {
-      return await apiRequest("/api/portfolio/reset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ startingCapital }),
-      });
+      return await apiRequest("POST", "/api/portfolio/reset", { startingCapital });
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio'] });
