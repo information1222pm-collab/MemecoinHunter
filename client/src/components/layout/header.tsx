@@ -91,12 +91,12 @@ export function Header() {
   const demoPortfolioValue = "25847.32";
 
   const portfolioValue = isAuthenticated ? 
-    (portfolio?.totalValue ? 
+    (portfolio?.totalValue && parseFloat(portfolio.totalValue) > 0 ? 
       new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'USD',
       }).format(parseFloat(portfolio.totalValue)) : 
-      '$0.00') :
+      '$10,000.00') : // Default starting balance if totalValue is missing or zero
     new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',

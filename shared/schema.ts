@@ -41,7 +41,7 @@ export const tokens = pgTable("tokens", {
 export const portfolios = pgTable("portfolios", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
-  totalValue: decimal("total_value", { precision: 20, scale: 2 }).default("0"),
+  totalValue: decimal("total_value", { precision: 20, scale: 2 }).default("10000.00"),
   startingCapital: decimal("starting_capital", { precision: 20, scale: 2 }).default("10000.00"),
   cashBalance: decimal("cash_balance", { precision: 20, scale: 2 }).default("10000.00"),
   realizedPnL: decimal("realized_pnl", { precision: 20, scale: 2 }).default("0"),
