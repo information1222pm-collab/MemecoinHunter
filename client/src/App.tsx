@@ -141,6 +141,9 @@ function Router() {
           <Route path="/subscription">
             {() => <ProtectedRoute component={Subscription} />}
           </Route>
+          <Route path="/billing">
+            {() => <ProtectedRoute component={Subscription} />}
+          </Route>
           <Route path="/settings">
             {() => <ProtectedRoute component={Settings} />}
           </Route>
