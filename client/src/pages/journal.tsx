@@ -3,6 +3,7 @@ import { Header } from "@/components/layout/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo, useEffect, Fragment } from "react";
@@ -19,10 +20,16 @@ import {
   Filter,
   X,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  PieChart,
+  BarChart3,
+  Clock3
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
+import { ResponsivePieChart } from "@/components/charts/ResponsivePieChart";
+import { ResponsiveBarChart } from "@/components/charts/ResponsiveBarChart";
+import { ResponsiveHistogram } from "@/components/charts/ResponsiveHistogram";
 
 interface JournalStats {
   totalTrades: number;
@@ -125,6 +132,75 @@ export default function Journal() {
       }
     });
     return Array.from(strategies);
+  }, [entries]);
+
+  // Chart 1: Trade Outcomes Donut Chart Data
+  const outcomesData = useMemo(() => {
+    if (!stats) return [];
+    return [
+      { name: 'Wins', value: stats.winCount || 0 },
+      { name: 'Losses', value: stats.lossCount || 0 },
+      { name: 'Breakeven', value: stats.breakevenCount || 0 },
+    ].filter(item => item.value > 0);
+  }, [stats]);
+
+  // Chart 2: P&L by Strategy Stacked Bar Chart Data
+  const strategyPnLData = useMemo(() => {
+    if (!entries || entries.length === 0) return [];
+    
+    const grouped: Record<string, { wins: number; losses: number }> = {};
+    
+    entries.forEach(entry => {
+      if (entry.outcome === 'open' || !entry.realizedPnL) return;
+      
+      const strategy = entry.patternType || 'Manual';
+      const pnl = parseFloat(entry.realizedPnL);
+      
+      if (!grouped[strategy]) {
+        grouped[strategy] = { wins: 0, losses: 0 };
+      }
+      
+      if (pnl > 0) {
+        grouped[strategy].wins += pnl;
+      } else if (pnl < 0) {
+        grouped[strategy].losses += Math.abs(pnl);
+      }
+    });
+    
+    return Object.entries(grouped).map(([name, values]) => ({
+      name: name.replace(/_/g, ' ').toUpperCase(),
+      wins: values.wins,
+      losses: values.losses,
+    }));
+  }, [entries]);
+
+  // Chart 3: Hold Time Distribution Histogram Data
+  const holdTimeData = useMemo(() => {
+    if (!entries || entries.length === 0) return [];
+    
+    const bins = [
+      { range: '0-1h', min: 0, max: 1, count: 0 },
+      { range: '1-6h', min: 1, max: 6, count: 0 },
+      { range: '6-24h', min: 6, max: 24, count: 0 },
+      { range: '1-3d', min: 24, max: 72, count: 0 },
+      { range: '3-7d', min: 72, max: 168, count: 0 },
+      { range: '7d+', min: 168, max: Infinity, count: 0 },
+    ];
+    
+    entries.forEach(entry => {
+      if (!entry.holdTime) return;
+      
+      const hours = entry.holdTime / (1000 * 60 * 60);
+      
+      for (const bin of bins) {
+        if (hours >= bin.min && hours < bin.max) {
+          bin.count++;
+          break;
+        }
+      }
+    });
+    
+    return bins.filter(bin => bin.count > 0);
   }, [entries]);
 
   // Formatting helpers
@@ -342,6 +418,101 @@ export default function Journal() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Charts Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+            {/* Trade Outcomes Donut Chart */}
+            <Card data-testid="chart-trade-outcomes" className="backdrop-blur-md bg-card/50 border-white/10">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <PieChart className="w-5 h-5 text-orange-400" />
+                  <span>Trade Outcomes</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {statsLoading ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : outcomesData.length === 0 ? (
+                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                    No trade data available
+                  </div>
+                ) : (
+                  <ResponsivePieChart
+                    data={outcomesData}
+                    height={300}
+                    innerRadius={60}
+                    showLegend={true}
+                    formatType="number"
+                    colors={['hsl(142, 76%, 45%)', 'hsl(0, 84%, 60%)', 'hsl(215, 20%, 65%)']}
+                    testId="pie-trade-outcomes"
+                  />
+                )}
+              </CardContent>
+            </Card>
+
+            {/* P&L by Strategy Stacked Bar Chart */}
+            <Card data-testid="chart-strategy-pnl" className="backdrop-blur-md bg-card/50 border-white/10">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <BarChart3 className="w-5 h-5 text-orange-400" />
+                  <span>P&L by Strategy</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {entriesLoading ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : strategyPnLData.length === 0 ? (
+                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                    No strategy data available
+                  </div>
+                ) : (
+                  <ResponsiveBarChart
+                    data={strategyPnLData}
+                    xKey="name"
+                    yKey={['wins', 'losses']}
+                    height={300}
+                    showLegend={true}
+                    showGrid={true}
+                    formatType="currency"
+                    stacked={true}
+                    colors={['hsl(142, 76%, 45%)', 'hsl(0, 84%, 60%)']}
+                    testId="bar-strategy-pnl"
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Hold Time Distribution Histogram */}
+          <Card data-testid="chart-hold-time-distribution" className="backdrop-blur-md bg-card/50 border-white/10">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Clock3 className="w-5 h-5 text-orange-400" />
+                <span>Hold Time Distribution</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {entriesLoading ? (
+                <Skeleton className="h-[300px] w-full" />
+              ) : holdTimeData.length === 0 ? (
+                <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                  No hold time data available
+                </div>
+              ) : (
+                <ResponsiveBarChart
+                  data={holdTimeData}
+                  xKey="range"
+                  yKey="count"
+                  height={300}
+                  showGrid={true}
+                  formatType="number"
+                  color="hsl(262, 73%, 65%)"
+                  colors={['hsl(262, 73%, 65%)']}
+                  testId="histogram-hold-time"
+                />
+              )}
+            </CardContent>
+          </Card>
 
           {/* Filters Section */}
           <Card className="backdrop-blur-md bg-card/50 border-white/10">

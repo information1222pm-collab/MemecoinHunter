@@ -4,12 +4,17 @@ import { TokenScanner } from "@/components/trading/token-scanner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "@/hooks/use-language";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { Settings, Play, Pause, RefreshCw } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useMemo } from "react";
+import { ResponsiveHistogram } from "@/components/charts/ResponsiveHistogram";
+import { ResponsiveScatterPlot } from "@/components/charts/ResponsiveScatterPlot";
+import { createHistogramBins, getValueColor } from "@/lib/chart-utils";
 
 export default function Scanner() {
   const { t } = useLanguage();
@@ -86,6 +91,28 @@ export default function Scanner() {
     avgVolumeChange: tokens && tokens.length > 0 ? tokens.reduce((sum, token) => sum + Math.abs(parseFloat(token.priceChange24h || '0')), 0) / tokens.length : 0,
     majorMovements: tokens ? tokens.filter(token => Math.abs(parseFloat(token.priceChange24h || '0')) > 15).length : 0 // Very significant price movements
   };
+
+  // Price changes histogram data
+  const priceChangesData = useMemo(() => {
+    if (!tokens || tokens.length === 0) return [];
+    const changes = tokens
+      .map(t => parseFloat(t.priceChange24h))
+      .filter(v => !isNaN(v));
+    return createHistogramBins(changes, 10);
+  }, [tokens]);
+
+  // Market cap vs volume scatter data
+  const scatterData = useMemo(() => {
+    if (!tokens || tokens.length === 0) return [];
+    return tokens.map(token => ({
+      x: parseFloat(token.marketCap),
+      y: parseFloat(token.volume24h),
+      z: parseFloat(token.volume24h) / 1000,
+      name: token.symbol,
+      symbol: token.symbol,
+      change: parseFloat(token.priceChange24h)
+    })).filter(d => !isNaN(d.x) && !isNaN(d.y) && d.x > 0 && d.y > 0);
+  }, [tokens]);
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -278,6 +305,65 @@ export default function Scanner() {
 
           {/* Main Scanner Table */}
           <TokenScanner />
+
+          {/* Charts Section */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card data-testid="card-price-changes-histogram">
+              <CardHeader>
+                <CardTitle>Price Changes Distribution</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!tokens ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : priceChangesData.length === 0 ? (
+                  <div className="h-[300px] flex items-center justify-center text-muted-foreground" data-testid="text-no-histogram-data">
+                    No price change data available
+                  </div>
+                ) : (
+                  <ResponsiveHistogram
+                    data={tokens.map(t => parseFloat(t.priceChange24h)).filter(v => !isNaN(v))}
+                    binCount={10}
+                    height={300}
+                    showGrid={true}
+                    colorByValue={true}
+                    xAxisLabel="Price Change (%)"
+                    yAxisLabel="Token Count"
+                    testId="chart-price-changes-histogram"
+                  />
+                )}
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-market-cap-scatter">
+              <CardHeader>
+                <CardTitle>Market Cap vs Volume</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!tokens ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : scatterData.length === 0 ? (
+                  <div className="h-[300px] flex items-center justify-center text-muted-foreground" data-testid="text-no-scatter-data">
+                    No market data available
+                  </div>
+                ) : (
+                  <ResponsiveScatterPlot
+                    data={scatterData}
+                    xKey="x"
+                    yKey="y"
+                    zKey="z"
+                    height={300}
+                    showGrid={true}
+                    formatXType="number"
+                    formatYType="number"
+                    xAxisLabel="Market Cap"
+                    yAxisLabel="24h Volume"
+                    colors={scatterData.map(d => getValueColor(d.change))}
+                    testId="chart-market-cap-scatter"
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Scanner Analytics */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
