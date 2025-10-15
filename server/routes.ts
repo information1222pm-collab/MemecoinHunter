@@ -1975,6 +1975,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Trophy Room - Top Profitable Trades
+  app.get("/api/trophy-room", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 20;
+      
+      // Get all closed trades with realized P&L
+      const allTrades = await storage.getAllTrades();
+      
+      // Filter to closed trades with positive P&L and enrich with token data
+      const closedTrades = await Promise.all(
+        allTrades
+          .filter(trade => 
+            trade.type === 'buy' && 
+            trade.exitPrice !== null && 
+            trade.realizedPnL !== null &&
+            parseFloat(trade.realizedPnL.toString()) > 0
+          )
+          .map(async (trade) => {
+            const token = await storage.getToken(trade.tokenId);
+            const pattern = trade.patternId ? await storage.getPattern(trade.patternId) : null;
+            
+            const entryPrice = parseFloat(trade.price);
+            const exitPrice = parseFloat(trade.exitPrice!.toString());
+            const realizedPnL = parseFloat(trade.realizedPnL!.toString());
+            const returnPercent = ((exitPrice - entryPrice) / entryPrice) * 100;
+            
+            let holdTime = 0;
+            if (trade.closedAt && trade.createdAt) {
+              holdTime = new Date(trade.closedAt.toString()).getTime() - new Date(trade.createdAt.toString()).getTime();
+            }
+            
+            return {
+              id: trade.id,
+              tokenSymbol: token?.symbol || 'UNKNOWN',
+              tokenName: token?.name || 'Unknown Token',
+              entryPrice: entryPrice,
+              exitPrice: exitPrice,
+              amount: parseFloat(trade.amount),
+              realizedPnL: realizedPnL,
+              returnPercent: returnPercent,
+              holdTime: holdTime,
+              holdTimeDays: holdTime / (1000 * 60 * 60 * 24),
+              entryDate: trade.createdAt ? new Date(trade.createdAt.toString()).toISOString() : null,
+              exitDate: trade.closedAt ? new Date(trade.closedAt.toString()).toISOString() : null,
+              patternType: pattern?.patternType || null,
+              patternConfidence: pattern?.confidence ? parseFloat(pattern.confidence.toString()) : null,
+            };
+          })
+      );
+      
+      // Sort by realized P&L descending and limit
+      const topTrades = closedTrades
+        .sort((a, b) => b.realizedPnL - a.realizedPnL)
+        .slice(0, limit);
+      
+      res.json(topTrades);
+    } catch (error) {
+      console.error('Error fetching trophy room trades:', error);
+      res.status(500).json({ message: "Failed to fetch trophy room trades", error });
+    }
+  });
+
   // Risk Reports Endpoints
   app.get("/api/risk/daily", async (req, res) => {
     try {

@@ -22,6 +22,7 @@ import {
   BookOpen,
   Shield,
   Bell,
+  Trophy,
 } from "lucide-react";
 
 const navigationItems = [
@@ -32,6 +33,7 @@ const navigationItems = [
   { href: "/analytics", icon: TrendingUp, labelKey: "navigation.analytics" },
   { href: "/activity", icon: Activity, labelKey: "navigation.activity", hasIndicator: true },
   { href: "/journal", icon: BookOpen, labelKey: "navigation.journal" },
+  { href: "/trophy-room", icon: Trophy, labelKey: "navigation.trophyRoom" },
   { href: "/risk", icon: Shield, labelKey: "navigation.risk" },
   { href: "/alerts", icon: Bell, labelKey: "navigation.alerts" },
   { href: "/terminal", icon: Terminal, labelKey: "navigation.terminal" },

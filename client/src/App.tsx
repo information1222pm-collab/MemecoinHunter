@@ -14,6 +14,7 @@ import Portfolio from "@/pages/portfolio";
 import Analytics from "@/pages/analytics";
 import Activity from "@/pages/activity";
 import Journal from "@/pages/journal";
+import TrophyRoom from "@/pages/trophy-room";
 import RiskReports from "@/pages/risk-reports";
 import Alerts from "@/pages/alerts";
 import Terminal from "@/pages/terminal";
@@ -74,6 +75,7 @@ function Router() {
         <Route path="/analytics" component={Analytics} />
         <Route path="/activity" component={Activity} />
         <Route path="/journal" component={Journal} />
+        <Route path="/trophy-room" component={TrophyRoom} />
         <Route path="/risk" component={RiskReports} />
         <Route path="/alerts" component={Alerts} />
         <Route path="/terminal" component={Terminal} />
