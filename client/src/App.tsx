@@ -49,18 +49,25 @@ function AuthenticatedSignInRedirect() {
   return null; // Redirect happens immediately
 }
 
+function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+  const { isAuthenticated } = useAuth();
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setLocation('/signin');
+    }
+  }, [isAuthenticated, setLocation]);
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  return <Component />;
+}
+
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
-  const [location] = useLocation();
-
-  // Public routes that don't require authentication
-  if (location === '/demo') {
-    return (
-      <Suspense fallback={<LoadingFallback />}>
-        <DemoAlerts />
-      </Suspense>
-    );
-  }
 
   // Show loading state while checking authentication
   if (isLoading) {
@@ -74,36 +81,64 @@ function Router() {
     );
   }
 
-  // Show sign-in page if not authenticated
-  if (!isAuthenticated) {
-    return (
-      <Suspense fallback={<LoadingFallback />}>
-        <SignIn />
-      </Suspense>
-    );
-  }
-
-  // Show main app if authenticated
   return (
     <>
-      <TradeAlertModal />
-      <MobileBottomNav />
+      {isAuthenticated && (
+        <>
+          <TradeAlertModal />
+          <MobileBottomNav />
+        </>
+      )}
       <Suspense fallback={<LoadingFallback />}>
         <Switch>
-          <Route path="/" component={Home} />
-          <Route path="/dashboard" component={Dashboard} />
-          <Route path="/scanner" component={Scanner} />
-          <Route path="/portfolio" component={Portfolio} />
-          <Route path="/analytics" component={Analytics} />
-          <Route path="/activity" component={Activity} />
-          <Route path="/journal" component={Journal} />
-          <Route path="/trophy-room" component={TrophyRoom} />
-          <Route path="/risk" component={RiskReports} />
-          <Route path="/alerts" component={Alerts} />
-          <Route path="/terminal" component={Terminal} />
-          <Route path="/subscription" component={Subscription} />
-          <Route path="/settings" component={Settings} />
-          <Route path="/signin" component={AuthenticatedSignInRedirect} />
+          {/* Public routes */}
+          <Route path="/demo" component={DemoAlerts} />
+          <Route path="/signin">
+            {isAuthenticated ? <AuthenticatedSignInRedirect /> : <SignIn />}
+          </Route>
+
+          {/* Protected routes */}
+          <Route path="/">
+            {() => <ProtectedRoute component={Home} />}
+          </Route>
+          <Route path="/dashboard">
+            {() => <ProtectedRoute component={Dashboard} />}
+          </Route>
+          <Route path="/scanner">
+            {() => <ProtectedRoute component={Scanner} />}
+          </Route>
+          <Route path="/portfolio">
+            {() => <ProtectedRoute component={Portfolio} />}
+          </Route>
+          <Route path="/analytics">
+            {() => <ProtectedRoute component={Analytics} />}
+          </Route>
+          <Route path="/activity">
+            {() => <ProtectedRoute component={Activity} />}
+          </Route>
+          <Route path="/journal">
+            {() => <ProtectedRoute component={Journal} />}
+          </Route>
+          <Route path="/trophy-room">
+            {() => <ProtectedRoute component={TrophyRoom} />}
+          </Route>
+          <Route path="/risk">
+            {() => <ProtectedRoute component={RiskReports} />}
+          </Route>
+          <Route path="/alerts">
+            {() => <ProtectedRoute component={Alerts} />}
+          </Route>
+          <Route path="/terminal">
+            {() => <ProtectedRoute component={Terminal} />}
+          </Route>
+          <Route path="/subscription">
+            {() => <ProtectedRoute component={Subscription} />}
+          </Route>
+          <Route path="/settings">
+            {() => <ProtectedRoute component={Settings} />}
+          </Route>
+          
+          {/* 404 */}
           <Route component={NotFound} />
         </Switch>
       </Suspense>
