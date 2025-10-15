@@ -7,6 +7,7 @@ import { LanguageProvider } from "@/contexts/language-context";
 import { useAuth } from "@/hooks/use-auth";
 import { TradeAlertModal } from "@/components/trade-alert-modal";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
+import { CryptoBackground } from "@/components/background/CryptoBackground";
 import Home from "@/pages/home";
 import Dashboard from "@/pages/dashboard";
 import Scanner from "@/pages/scanner";
@@ -93,7 +94,8 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <LanguageProvider>
-          <div className="dark">
+          <div className="dark relative min-h-screen">
+            <CryptoBackground />
             <Toaster />
             <Router />
           </div>
