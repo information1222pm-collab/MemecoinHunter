@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import { storage } from '../storage';
 import type { Position, Token } from '@shared/schema';
+import { streamingPriceGateway } from './streaming-price-gateway';
 
 interface PositionAnalytics {
   positionId: string;
@@ -12,7 +13,7 @@ interface PositionAnalytics {
   allocation: number; // Percentage of portfolio
   dayChange: number;
   dayChangeValue: string;
-  holdingPeriod: number; // Days held
+  holdingPeriod: number;
 }
 
 interface PortfolioAnalytics {
@@ -39,21 +40,35 @@ interface PortfolioAnalytics {
 class PositionTracker extends EventEmitter {
   private isRunning = false;
   private updateInterval?: NodeJS.Timeout;
-  private readonly UPDATE_FREQUENCY = 15000; // OPTIMIZED: 15 seconds for faster portfolio updates
+  private readonly BACKUP_UPDATE_FREQUENCY = 30000; // Backup polling every 30s
+  private throttleTimers = new Map<string, NodeJS.Timeout>(); // Throttle per portfolio
+  private readonly THROTTLE_MS = 250; // Update UI every 250ms max
+  private tokenToPortfoliosCache = new Map<string, Set<string>>(); // Cache token -> portfolios mapping
 
   async start() {
     if (this.isRunning) return;
     
     this.isRunning = true;
-    console.log('📊 Position Tracker started');
+    console.log('📊 Position Tracker started (Event-Driven Mode)');
+    
+    // Build token-to-portfolio cache
+    await this.buildTokenCache();
     
     // Initial update
     await this.updateAllPositions();
     
-    // Set up regular updates
+    // Listen to real-time price updates from streaming gateway
+    streamingPriceGateway.on('priceUpdate', async (update: any) => {
+      await this.handlePriceUpdate(update);
+    });
+    
+    // Backup polling mechanism (every 30s) to catch any missed updates
     this.updateInterval = setInterval(async () => {
       await this.updateAllPositions();
-    }, this.UPDATE_FREQUENCY);
+      await this.buildTokenCache(); // Refresh cache periodically
+    }, this.BACKUP_UPDATE_FREQUENCY);
+    
+    console.log('📊 Position Tracker: Real-time updates enabled with 250ms throttling');
   }
 
   stop() {
@@ -63,20 +78,79 @@ class PositionTracker extends EventEmitter {
     if (this.updateInterval) {
       clearInterval(this.updateInterval);
     }
+    
+    // Clear all throttle timers
+    const timers = Array.from(this.throttleTimers.values());
+    for (const timer of timers) {
+      clearTimeout(timer);
+    }
+    this.throttleTimers.clear();
+    
     console.log('📊 Position Tracker stopped');
+  }
+
+  private async buildTokenCache() {
+    try {
+      const portfolios = await storage.getAllPortfolios();
+      const newCache = new Map<string, Set<string>>();
+      
+      for (const portfolio of portfolios) {
+        const positions = await storage.getPositionsByPortfolio(portfolio.id);
+        for (const position of positions) {
+          if (!newCache.has(position.tokenId)) {
+            newCache.set(position.tokenId, new Set());
+          }
+          newCache.get(position.tokenId)!.add(position.portfolioId);
+        }
+      }
+      
+      this.tokenToPortfoliosCache = newCache;
+    } catch (error) {
+      console.error('📊 POSITION-TRACKER: Error building token cache:', error);
+    }
+  }
+
+  private async handlePriceUpdate(update: { tokenId: string; price: number; timestamp: Date }) {
+    try {
+      // Use cache to quickly find affected portfolios
+      const affectedPortfolios = this.tokenToPortfoliosCache.get(update.tokenId);
+      
+      if (!affectedPortfolios || affectedPortfolios.size === 0) return;
+      
+      // Update each affected portfolio with throttling
+      const portfolioIds = Array.from(affectedPortfolios);
+      for (const portfolioId of portfolioIds) {
+        this.throttledPortfolioUpdate(portfolioId);
+      }
+      
+    } catch (error) {
+      console.error('📊 POSITION-TRACKER: Error handling price update:', error);
+    }
+  }
+
+  private throttledPortfolioUpdate(portfolioId: string) {
+    // Clear existing timer for this portfolio if it exists
+    if (this.throttleTimers.has(portfolioId)) {
+      clearTimeout(this.throttleTimers.get(portfolioId)!);
+    }
+    
+    // Set new timer to update after throttle period
+    const timer = setTimeout(async () => {
+      await this.updatePortfolioPositions(portfolioId);
+      this.throttleTimers.delete(portfolioId);
+    }, this.THROTTLE_MS);
+    
+    this.throttleTimers.set(portfolioId, timer);
   }
 
   private async updateAllPositions() {
     try {
-      console.log('📊 POSITION-TRACKER: Updating all position values...');
-      
       const portfolios = await storage.getAllPortfolios();
       
       for (const portfolio of portfolios) {
         await this.updatePortfolioPositions(portfolio.id);
       }
       
-      console.log(`📊 POSITION-TRACKER: Updated ${portfolios.length} portfolios`);
     } catch (error) {
       console.error('📊 POSITION-TRACKER: Error updating positions:', error);
     }
