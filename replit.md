@@ -102,3 +102,20 @@ A robust token scanning system utilizes CoinGecko APIs for discovering trending 
 - Trophy/award-themed dark glassmorphism design with responsive layout
 - Multilingual navigation support (EN, ES, DE, JA, KO)
 - Integrated between Journal and Risk Reports in sidebar navigation
+
+### 5-Tier Risk Level System ✅
+- **Comprehensive Risk Management**: Portfolio-specific risk levels with distinct trading parameters
+- **Five Risk Tiers**:
+  - **Conservative**: 0.5x Kelly multiplier, 85% min confidence, 3% stop-loss, 25% min cash - Ultra-safe for risk-averse traders
+  - **Moderate**: 0.75x Kelly multiplier, 78% min confidence, 4% stop-loss, 20% min cash - Controlled risk approach
+  - **Balanced** (Default): 1.0x Kelly multiplier, 72% min confidence, 5% stop-loss, 15% min cash - Optimal risk-reward
+  - **Aggressive**: 1.5x Kelly multiplier, 65% min confidence, 6% stop-loss, 10% min cash - Higher risk/reward
+  - **Very Aggressive**: 2.0x Kelly multiplier, 58% min confidence, 8% stop-loss, 5% min cash - Maximum risk tolerance
+- **Dynamic Configuration**: Auto-trader and risk manager fetch portfolio-specific risk level and apply corresponding parameters
+- **Backend Implementation**:
+  - Database: Added `riskLevel` enum field to portfolios table with default 'balanced'
+  - Service: `server/services/risk-levels.ts` defines all tier configurations
+  - API Endpoints: `GET /api/risk-levels` (list all tiers), `PATCH /api/portfolio/risk-level` (update portfolio)
+  - Cache Management: Auto-trader clears risk config cache when portfolio risk level changes
+- **Frontend UI**: Settings page includes Risk Level card with dropdown selector, color-coded icons, feature descriptions, and real-time updates with toast notifications
+- **Impact**: Each portfolio can now trade with personalized risk tolerance, affecting position sizing, stop-loss levels, confidence thresholds, take-profit strategies, and market health requirements
