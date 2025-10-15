@@ -253,29 +253,29 @@ export class MarketHealthAnalyzer {
   ): { recommendation: MarketHealthMetrics['recommendation']; factors: string[] } {
     const factors: string[] = [];
 
-    // Critical conditions that force minimal trading
-    if (metrics.volatility > 20) {
+    // AGGRESSIVE MODE: More lenient critical conditions
+    if (metrics.volatility > 30) { // Increased from 20 to 30
       factors.push('Extreme volatility detected');
     }
-    if (metrics.breadth < 20 && metrics.trend === 'bearish') {
+    if (metrics.breadth < 15 && metrics.trend === 'bearish') { // Lowered from 20 to 15
       factors.push('Severe bearish market breadth');
     }
-    if (metrics.volumeHealth < 30) {
+    if (metrics.volumeHealth < 20) { // Lowered from 30 to 20
       factors.push('Unhealthy volume patterns');
     }
 
-    // Determine recommendation based on health score and critical factors
-    if (healthScore >= 70 && factors.length === 0) {
+    // AGGRESSIVE MODE: Lower health score thresholds for more trading
+    if (healthScore >= 60 && factors.length === 0) { // Lowered from 70
       return {
         recommendation: 'trade_normally',
         factors: ['Market conditions favorable', 'Normal trading activity recommended']
       };
-    } else if (healthScore >= 50 && factors.length <= 1) {
+    } else if (healthScore >= 40 && factors.length <= 1) { // Lowered from 50
       return {
         recommendation: 'trade_cautiously',
         factors: factors.length > 0 ? factors : ['Moderate market conditions', 'Reduced position sizes advised']
       };
-    } else if (healthScore >= 30 && factors.length <= 2) {
+    } else if (healthScore >= 20 && factors.length <= 2) { // Lowered from 30
       return {
         recommendation: 'minimize_trading',
         factors: factors.length > 0 ? factors : ['Poor market conditions', 'Minimal trading activity']
@@ -307,18 +307,18 @@ export class MarketHealthAnalyzer {
 
   shouldTrade(confidence: number): boolean {
     if (!this.lastHealthCheck) {
-      return confidence >= 85; // Very high bar if no health data
+      return confidence >= 80; // AGGRESSIVE: Lowered from 85
     }
 
     const { recommendation, healthScore } = this.lastHealthCheck;
 
     switch (recommendation) {
       case 'trade_normally':
-        return confidence >= 80; // Normal threshold
+        return confidence >= 75; // AGGRESSIVE: Lowered from 80
       case 'trade_cautiously':
-        return confidence >= 85; // Higher threshold
+        return confidence >= 78; // AGGRESSIVE: Lowered from 85
       case 'minimize_trading':
-        return confidence >= 90; // Very high threshold
+        return confidence >= 82; // AGGRESSIVE: Lowered from 90
       case 'halt_trading':
         return false; // No trading
       default:
