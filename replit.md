@@ -11,8 +11,22 @@ Preferred communication style: Simple, everyday language.
 ### Frontend
 Built with React 18 and TypeScript, using Vite for development. Styling is handled by Tailwind CSS with a custom dark theme and shadcn/ui for consistent components. State management uses TanStack Query for server state and React hooks for local state. Wouter is used for client-side routing. WebSocket integration provides real-time updates. The platform features a modern glassmorphism design system with a dark theme, utilizing Framer Motion for animations and transitions. The UI is responsive and optimized for a professional trading experience, including sophisticated icon-specific animations and micro-interactions throughout the sidebar, and prominent center-screen modal dialogs for trade notifications and milestones.
 
+**Optimized Real-Time Data Updates:**
+- Dashboard analytics: 15s refresh (analytics, exposure, market health)
+- Scanner status: 3s refresh for near real-time updates
+- Alerts: 10s refresh for faster alert notifications
+- Portfolio positions: 15s refresh with 10s stale time
+- Trade history: 20s refresh with 15s stale time
+- WebSocket integration for instant updates on trades, portfolio changes, and price movements
+
 ### Backend
 Developed with Express.js and TypeScript (ESM configuration), providing a RESTful API and WebSocket support. Key background services include a Token Scanner, an ML Pattern Analyzer, and a Price Feed Service. The WebSocket server manages real-time client connections.
+
+**Optimized Service Intervals:**
+- Price Feed Service: 20s update interval (reduced from 45s) for faster market data
+- Position Tracker: 15s update interval (reduced from 30s) for more responsive portfolio updates
+- WebSocket price broadcasting: Instant price updates pushed to all connected clients
+- Market health analysis: Real-time calculation with 5-minute caching
 
 ### Data Storage
 Primary database is PostgreSQL, accessed via Drizzle ORM and hosted on Neon. The schema is normalized, including tables for users, tokens, portfolios, trades, and subscriptions. Drizzle Kit manages schema migrations.
