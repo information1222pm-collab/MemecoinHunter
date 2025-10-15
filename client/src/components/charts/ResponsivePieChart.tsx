@@ -1,6 +1,7 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { generateColorPalette, formatChartCurrency, formatChartPercentage } from '@/lib/chart-utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { memo } from 'react';
 
 interface ResponsivePieChartProps {
   data: Array<{ name: string; value: number; [key: string]: any }>;
@@ -14,7 +15,7 @@ interface ResponsivePieChartProps {
   testId?: string;
 }
 
-export function ResponsivePieChart({
+export const ResponsivePieChart = memo(function ResponsivePieChart({
   data,
   height = 300,
   innerRadius = 0,
@@ -113,4 +114,4 @@ export function ResponsivePieChart({
       </ResponsiveContainer>
     </div>
   );
-}
+});

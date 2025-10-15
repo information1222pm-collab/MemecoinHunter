@@ -1,6 +1,7 @@
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { formatChartCurrency, formatChartPercentage, formatChartDate } from '@/lib/chart-utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { memo } from 'react';
 
 interface ResponsiveAreaChartProps {
   data: Array<any>;
@@ -16,7 +17,7 @@ interface ResponsiveAreaChartProps {
   testId?: string;
 }
 
-export function ResponsiveAreaChart({
+export const ResponsiveAreaChart = memo(function ResponsiveAreaChart({
   data,
   xKey,
   yKey,
@@ -137,4 +138,4 @@ export function ResponsiveAreaChart({
       </ResponsiveContainer>
     </div>
   );
-}
+});

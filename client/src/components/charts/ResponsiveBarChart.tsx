@@ -1,6 +1,7 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell } from 'recharts';
 import { formatChartCurrency, formatChartPercentage, generateColorPalette, truncateLabel, getValueColor } from '@/lib/chart-utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { memo } from 'react';
 
 interface ResponsiveBarChartProps {
   data: Array<any>;
@@ -17,7 +18,7 @@ interface ResponsiveBarChartProps {
   testId?: string;
 }
 
-export function ResponsiveBarChart({
+export const ResponsiveBarChart = memo(function ResponsiveBarChart({
   data,
   xKey,
   yKey,
@@ -158,4 +159,4 @@ export function ResponsiveBarChart({
       </ResponsiveContainer>
     </div>
   );
-}
+});

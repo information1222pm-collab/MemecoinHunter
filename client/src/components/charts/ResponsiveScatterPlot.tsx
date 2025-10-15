@@ -1,6 +1,7 @@
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ZAxis, Cell } from 'recharts';
 import { formatChartCurrency, formatChartPercentage, generateColorPalette } from '@/lib/chart-utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { memo } from 'react';
 
 interface ResponsiveScatterPlotProps {
   data: Array<any>;
@@ -18,7 +19,7 @@ interface ResponsiveScatterPlotProps {
   testId?: string;
 }
 
-export function ResponsiveScatterPlot({
+export const ResponsiveScatterPlot = memo(function ResponsiveScatterPlot({
   data,
   xKey,
   yKey,
@@ -146,4 +147,4 @@ export function ResponsiveScatterPlot({
       </ResponsiveContainer>
     </div>
   );
-}
+});

@@ -1,11 +1,15 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import compression from "compression";
 
 const app = express();
 
 // Trust proxy for rate limiting in Replit environment (CRITICAL SECURITY FIX)
 app.set('trust proxy', 1);
+
+// Enable response compression for better performance
+app.use(compression());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));

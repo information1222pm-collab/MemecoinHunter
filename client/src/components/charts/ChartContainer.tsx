@@ -3,6 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { memo } from 'react';
 
 interface ChartContainerProps {
   title: string;
@@ -17,7 +18,7 @@ interface ChartContainerProps {
   actions?: React.ReactNode;
 }
 
-export function ChartContainer({
+export const ChartContainer = memo(function ChartContainer({
   title,
   children,
   isLoading = false,
@@ -66,4 +67,4 @@ export function ChartContainer({
       </CardContent>
     </Card>
   );
-}
+});

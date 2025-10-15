@@ -1,6 +1,7 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { createHistogramBins, getValueColor } from '@/lib/chart-utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { memo } from 'react';
 
 interface ResponsiveHistogramProps {
   data: number[];
@@ -14,7 +15,7 @@ interface ResponsiveHistogramProps {
   testId?: string;
 }
 
-export function ResponsiveHistogram({
+export const ResponsiveHistogram = memo(function ResponsiveHistogram({
   data,
   binCount = 10,
   height = 300,
@@ -99,4 +100,4 @@ export function ResponsiveHistogram({
       </ResponsiveContainer>
     </div>
   );
-}
+});

@@ -1,5 +1,5 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, decimal, integer, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, decimal, integer, timestamp, boolean, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -36,7 +36,10 @@ export const tokens = pgTable("tokens", {
   priceChange24h: decimal("price_change_24h", { precision: 8, scale: 4 }),
   isActive: boolean("is_active").default(true),
   lastUpdated: timestamp("last_updated").defaultNow(),
-});
+}, (table) => ({
+  symbolIdx: index("tokens_symbol_idx").on(table.symbol),
+  isActiveIdx: index("tokens_is_active_idx").on(table.isActive),
+}));
 
 export const portfolios = pgTable("portfolios", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -52,7 +55,10 @@ export const portfolios = pgTable("portfolios", {
   riskLevel: text("risk_level").default("balanced"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  userIdIdx: index("portfolios_user_id_idx").on(table.userId),
+  autoTradingEnabledIdx: index("portfolios_auto_trading_enabled_idx").on(table.autoTradingEnabled),
+}));
 
 export const trades = pgTable("trades", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -68,7 +74,13 @@ export const trades = pgTable("trades", {
   status: text("status").default("completed"), // 'pending', 'completed', 'cancelled'
   createdAt: timestamp("created_at").defaultNow(),
   closedAt: timestamp("closed_at"), // When trade was closed
-});
+}, (table) => ({
+  portfolioIdIdx: index("trades_portfolio_id_idx").on(table.portfolioId),
+  tokenIdIdx: index("trades_token_id_idx").on(table.tokenId),
+  patternIdIdx: index("trades_pattern_id_idx").on(table.patternId),
+  statusIdx: index("trades_status_idx").on(table.status),
+  createdAtIdx: index("trades_created_at_idx").on(table.createdAt),
+}));
 
 export const positions = pgTable("positions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -79,7 +91,10 @@ export const positions = pgTable("positions", {
   currentValue: decimal("current_value", { precision: 20, scale: 2 }),
   unrealizedPnL: decimal("unrealized_pnl", { precision: 20, scale: 2 }),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  portfolioIdIdx: index("positions_portfolio_id_idx").on(table.portfolioId),
+  tokenIdIdx: index("positions_token_id_idx").on(table.tokenId),
+}));
 
 export const scanAlerts = pgTable("scan_alerts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -89,7 +104,11 @@ export const scanAlerts = pgTable("scan_alerts", {
   confidence: integer("confidence"), // 0-100
   isRead: boolean("is_read").default(false),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  tokenIdIdx: index("scan_alerts_token_id_idx").on(table.tokenId),
+  isReadIdx: index("scan_alerts_is_read_idx").on(table.isRead),
+  createdAtIdx: index("scan_alerts_created_at_idx").on(table.createdAt),
+}));
 
 export const priceHistory = pgTable("price_history", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -97,7 +116,11 @@ export const priceHistory = pgTable("price_history", {
   price: decimal("price", { precision: 20, scale: 8 }).notNull(),
   volume: decimal("volume", { precision: 20, scale: 2 }),
   timestamp: timestamp("timestamp").defaultNow(),
-});
+}, (table) => ({
+  tokenIdIdx: index("price_history_token_id_idx").on(table.tokenId),
+  timestampIdx: index("price_history_timestamp_idx").on(table.timestamp),
+  tokenTimestampIdx: index("price_history_token_timestamp_idx").on(table.tokenId, table.timestamp),
+}));
 
 export const patterns = pgTable("patterns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -108,7 +131,11 @@ export const patterns = pgTable("patterns", {
   timeframe: text("timeframe").notNull(), // '1h', '4h', '1d', '1w'
   metadata: jsonb("metadata"), // Additional pattern data
   detectedAt: timestamp("detected_at").defaultNow(),
-});
+}, (table) => ({
+  tokenIdIdx: index("patterns_token_id_idx").on(table.tokenId),
+  patternTypeIdx: index("patterns_pattern_type_idx").on(table.patternType),
+  detectedAtIdx: index("patterns_detected_at_idx").on(table.detectedAt),
+}));
 
 export const subscriptions = pgTable("subscriptions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -174,7 +201,11 @@ export const auditLog = pgTable("audit_log", {
   userAgent: text("user_agent"),
   success: boolean("success").notNull(),
   timestamp: timestamp("timestamp").defaultNow(),
-});
+}, (table) => ({
+  userIdIdx: index("audit_log_user_id_idx").on(table.userId),
+  actionIdx: index("audit_log_action_idx").on(table.action),
+  timestampIdx: index("audit_log_timestamp_idx").on(table.timestamp),
+}));
 
 // Trading Risk Settings per User
 export const riskSettings = pgTable("risk_settings", {
@@ -203,7 +234,11 @@ export const alertRules = pgTable("alert_rules", {
   lastTriggeredAt: timestamp("last_triggered_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  userIdIdx: index("alert_rules_user_id_idx").on(table.userId),
+  tokenIdIdx: index("alert_rules_token_id_idx").on(table.tokenId),
+  isEnabledIdx: index("alert_rules_is_enabled_idx").on(table.isEnabled),
+}));
 
 // Alert Events (history of triggered alerts)
 export const alertEvents = pgTable("alert_events", {
