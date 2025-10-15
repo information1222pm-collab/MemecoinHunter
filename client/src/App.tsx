@@ -10,7 +10,10 @@ import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import { InstantLoader } from "@/components/loading/instant-loader";
 import { lazy, Suspense, useEffect } from "react";
 
-const CryptoBackground = lazy(() => import("@/components/background/CryptoBackground").then(m => ({ default: m.CryptoBackground })));
+const CryptoBackground = lazy(async () => {
+  const module = await import("@/components/background/CryptoBackground");
+  return { default: module.CryptoBackground };
+});
 
 const Home = lazy(() => import("@/pages/home"));
 const Dashboard = lazy(() => import("@/pages/dashboard"));
