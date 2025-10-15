@@ -6,6 +6,8 @@ import { mlAnalyzer } from './ml-analyzer';
 import { patternPerformanceAnalyzer } from './pattern-performance-analyzer';
 import { exchangeService } from './exchange-service';
 import { MarketHealthAnalyzer } from './market-health';
+import { chartAnalyzer } from './chart-analyzer';
+import { dynamicExitStrategy } from './dynamic-exit-strategy';
 import type { Token, Pattern, InsertTrade } from '@shared/schema';
 import type { ExchangeTradingSignal } from './exchange-service';
 
@@ -358,6 +360,40 @@ class AutoTrader extends EventEmitter {
     const portfolioState = this.enabledPortfolios.get(portfolioId);
     if (!portfolioState) return null;
     
+    // ENHANCED: Get price history for chart analysis
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const history = await storage.getPriceHistory(token.id, sevenDaysAgo);
+    
+    // Get chart-based entry/exit signal for additional confirmation
+    let chartSignal = null;
+    let tradeQuality = null;
+    
+    if (history.length >= 50) {
+      chartSignal = chartAnalyzer.generateEntryExitSignal(history);
+      tradeQuality = dynamicExitStrategy.assessTradeQuality(currentPrice, history, confidence);
+      
+      // ENHANCED: Adjust confidence based on chart analysis
+      if (chartSignal.action === 'buy' && tradeQuality.recommendation === 'strong_buy') {
+        confidence = Math.min(confidence + 15, 95); // Boost confidence for strong chart alignment
+        console.log(`📈 CHART-ANALYZER: Strong buy signal confirmed - confidence boosted to ${confidence.toFixed(1)}%`);
+      } else if (chartSignal.action === 'sell' || tradeQuality.recommendation === 'avoid') {
+        confidence = Math.max(confidence - 15, 50); // Reduce confidence for conflicting signals
+        console.log(`⚠️ CHART-ANALYZER: Bearish chart signal detected - confidence reduced to ${confidence.toFixed(1)}%`);
+      }
+      
+      // CRITICAL FIX: Always validate risk-reward ratio, reject if poor or missing
+      if (!chartSignal.riskRewardRatio || chartSignal.riskRewardRatio < 1.5) {
+        console.log(`⚠️ CHART-ANALYZER: Poor/missing risk-reward ratio (${chartSignal.riskRewardRatio?.toFixed(2) || '0'}:1) - trade rejected`);
+        return null; // Reject trade with poor or missing R:R
+      }
+      
+      console.log(`✅ CHART-ANALYZER: Trade approved with ${chartSignal.riskRewardRatio.toFixed(2)}:1 risk-reward ratio`);
+    } else {
+      // CRITICAL FIX: Require chart analysis for pattern trades
+      console.log(`⚠️ CHART-ANALYZER: Insufficient price history (${history.length} < 50 points) - trade rejected for safety`);
+      return null;
+    }
+    
     // Strong bullish patterns - BUY signals (only when not in sell-only mode)
     const bullishPatterns = [
       'enhanced_bull_flag',
@@ -413,13 +449,27 @@ class AutoTrader extends EventEmitter {
     
     // Regular buy signals when not in sell-only mode
     if (!portfolioState.sellOnlyMode && bullishPatterns.includes(pattern.patternType)) {
+      // ENHANCED: Add chart analysis reasoning to the signal
+      let enhancedReason = `🤖 [Portfolio ${portfolioId}] ${pattern.patternType} detected (${confidence.toFixed(1)}% confidence)`;
+      
+      if (chartSignal && tradeQuality) {
+        enhancedReason += ` | Chart: ${tradeQuality.recommendation.toUpperCase()}`;
+        if (chartSignal.riskRewardRatio > 0) {
+          enhancedReason += ` | R:R ${chartSignal.riskRewardRatio.toFixed(2)}:1`;
+        }
+        if (chartSignal.supportLevels.length > 0) {
+          enhancedReason += ` | Support: $${chartSignal.supportLevels[0].toFixed(6)}`;
+        }
+      }
+      
       return {
         tokenId: token.id,
         type: 'buy',
         confidence,
         source: `ML Pattern: ${pattern.patternType}`,
         price: currentPrice,
-        reason: `🤖 [Portfolio ${portfolioId}] ${pattern.patternType} detected (${confidence.toFixed(1)}% confidence)`
+        reason: enhancedReason,
+        patternId: pattern.id
       };
     }
     
@@ -744,11 +794,43 @@ class AutoTrader extends EventEmitter {
           // Get current stage for this position (0 = none completed)
           const currentStage = this.positionStages.get(position.id) || 0;
           
+          // ENHANCED: Get chart-based exit signal for better decision making
+          const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+          const history = await storage.getPriceHistory(token.id, sevenDaysAgo);
+          
+          let chartBasedExit = false;
+          if (history.length >= 50) {
+            const chartSignal = chartAnalyzer.generateEntryExitSignal(history);
+            
+            // Check for strong bearish chart signals
+            if (chartSignal.action === 'sell' && chartSignal.confidence > 75) {
+              chartBasedExit = true;
+              console.log(`📉 CHART-ANALYZER: Bearish exit signal for ${token.symbol} - ${chartSignal.reasoning.join(', ')}`);
+            }
+            
+            // Check resistance levels for exit
+            if (chartSignal.resistanceLevels.length > 0) {
+              const nearResistance = chartSignal.resistanceLevels.some(r => 
+                Math.abs(currentPrice - r) / r < 0.015
+              );
+              if (nearResistance && profitLoss > 3) {
+                chartBasedExit = true;
+                console.log(`📉 CHART-ANALYZER: Price at resistance $${chartSignal.resistanceLevels[0].toFixed(6)} - taking profit on ${token.symbol}`);
+              }
+            }
+          }
+          
           // IMPROVED: Tighter stop-loss (5% instead of 8%)
           if (profitLoss <= -this.strategy.stopLossPercentage) {
             sellReason = `Stop-loss triggered at ${profitLoss.toFixed(1)}% loss`;
             sellTrigger = 'stop_loss';
             // Full sell on stop-loss, clear stage tracking
+            this.positionStages.delete(position.id);
+          }
+          // ENHANCED: Chart-based exit signal
+          else if (chartBasedExit && profitLoss > 2) {
+            sellReason = `Chart pattern exit signal at ${profitLoss.toFixed(1)}% gain`;
+            sellTrigger = 'chart_pattern_exit';
             this.positionStages.delete(position.id);
           }
           // IMPROVED: Multi-stage take-profit strategy with state tracking (6%, 10%, 15%)

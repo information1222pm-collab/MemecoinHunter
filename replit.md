@@ -39,7 +39,17 @@ Includes a robust token scanning system that automatically discovers and tracks 
 - **Performance Optimization**: 5-minute caching prevents excessive computation while maintaining market awareness, health checks run every 5 minutes
 - **Auto-Trader Integration**: All trades pass through market health validation before execution, ensuring trades only occur when market conditions support success
 
-Automated trading functionalities have comprehensive profitability improvements, including pattern performance gating (50%+ win rate, positive expectancy), a multi-stage take-profit strategy (30% at 6% gain, 40% at 10% gain, rest at 15% gain), improved risk management (5% stop-loss, cash floor enforcement, daily loss thresholds), and dynamic position sizing using Kelly Criterion calculations. Critical bug fixes include accurate portfolio position display, correct portfolio analytics calculations (total value, P&L, daily P&L), and live data updates for the dashboard and portfolio pages.
+**Advanced Chart Analysis System (Latest):**
+- **Support/Resistance Detection**: Identifies key price levels with strength scoring (0-100) based on touch count and volume. Automatically merges similar levels within 2% range and ranks by significance
+- **Chart Pattern Recognition**: Detects 8 major patterns including ascending/descending/symmetrical triangles, rising/falling wedges, channels (up/down), head & shoulders, and double top/bottom. Each pattern includes breakout targets, entry points, stop-loss levels, and risk-reward ratios
+- **Fibonacci Analysis**: Calculates retracement (23.6%, 38.2%, 50%, 61.8%, 78.6%) and extension levels (127.2%, 161.8%, 261.8%) for precise entry/exit targets. Automatically determines optimal entry zones and profit targets based on trend direction
+- **Pivot Point System**: Three calculation methods - Classic, Fibonacci, and Camarilla pivots for intraday trading levels. Provides multiple resistance/support levels for scalping and day trading strategies
+- **Dynamic Exit Strategy**: Volatility-based stop-loss adjustment (3-7% range), trend-strength trailing stops, and multi-target profit taking. Integrates support/resistance levels for optimal exit timing
+- **Risk-Reward Calculator**: Analyzes trade quality before execution with four-tier scoring (excellent ≥3:1, good ≥2:1, acceptable ≥1.5:1, poor <1.5:1). Automatically rejects trades below 1.5:1 R:R ratio
+- **Entry Signal Enhancement**: ML patterns now validated against chart analysis for confirmation. Confidence adjusted ±15% based on chart alignment. Trade quality assessment includes support proximity, pattern confirmation, and technical alignment scoring
+- **Exit Signal Enhancement**: Chart-based exits detect bearish patterns and resistance levels for early profit-taking. Monitors price action for optimal exit timing beyond fixed percentage targets
+
+Automated trading functionalities have comprehensive profitability improvements, including pattern performance gating (50%+ win rate, positive expectancy), a multi-stage take-profit strategy (30% at 6% gain, 40% at 10% gain, rest at 15% gain), improved risk management (5% stop-loss, cash floor enforcement, daily loss thresholds), and dynamic position sizing using Kelly Criterion calculations. Chart analysis integration ensures trades have favorable entry/exit points with proper risk-reward ratios. Critical bug fixes include accurate portfolio position display, correct portfolio analytics calculations (total value, P&L, daily P&L), and live data updates for the dashboard and portfolio pages.
 
 ## External Dependencies
 
