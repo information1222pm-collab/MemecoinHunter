@@ -1,7 +1,7 @@
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { formatChartCurrency, formatChartPercentage, formatChartDate } from '@/lib/chart-utils';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 
 interface ResponsiveAreaChartProps {
   data: Array<any>;
@@ -79,10 +79,19 @@ export const ResponsiveAreaChart = memo(function ResponsiveAreaChart({
     );
   };
 
+  // Memoize formatted data to prevent re-processing
+  const formattedData = useMemo(() => 
+    data.map((item) => ({
+      ...item,
+      displayValue: formatChartValue(item[yKey], formatType),
+    })),
+    [data, yKey, formatType]
+  );
+
   return (
     <div data-testid={testId}>
       <ResponsiveContainer width="100%" height={chartHeight}>
-        <AreaChart data={data} margin={{ top: 10, right: isMobile ? 10 : 30, left: isMobile ? 0 : 20, bottom: 0 }}>
+        <AreaChart data={formattedData} margin={{ top: 10, right: isMobile ? 10 : 30, left: isMobile ? 0 : 20, bottom: 0 }}>
           <defs>
             {yKeys.map((key, index) => (
               <linearGradient key={key} id={`gradient-${key}`} x1="0" y1="0" x2="0" y2="1">

@@ -76,9 +76,9 @@ export default function Portfolio() {
     };
   }>({
     queryKey: ['/api/portfolio'],
-    refetchInterval: 15000, // OPTIMIZED: 15s for faster portfolio updates
-    staleTime: 10000, // OPTIMIZED: 10s stale time for more frequent refreshes
-    retry: false, // Don't retry on 401 errors
+    refetchInterval: 45000, // 45s - portfolio doesn't change rapidly
+    staleTime: 30000,
+    retry: false,
   });
 
   const { data: trades, error: tradesError } = useQuery<Array<{
@@ -95,9 +95,9 @@ export default function Portfolio() {
     };
   }>>({
     queryKey: ['/api/portfolio/trades'],
-    refetchInterval: 20000, // OPTIMIZED: 20s for faster trade updates
-    staleTime: 15000, // OPTIMIZED: 15s stale time for more frequent refreshes
-    retry: false, // Don't retry on 401 errors
+    refetchInterval: 60000, // 60s - trade history is historical
+    staleTime: 45000,
+    retry: false,
   });
 
   // Check if user is authenticated (401 errors indicate unauthenticated)

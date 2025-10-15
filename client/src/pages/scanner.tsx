@@ -24,12 +24,14 @@ export default function Scanner() {
   
   const { data: scannerStatus } = useQuery({
     queryKey: ['/api/scanner/status'],
-    refetchInterval: 3000, // OPTIMIZED: 3s for near real-time scanner status
+    refetchInterval: 10000, // 10s - scanner status doesn't need 3s updates
+    staleTime: 8000,
   });
 
   const { data: alerts } = useQuery({
     queryKey: ['/api/alerts'],
-    refetchInterval: 10000, // OPTIMIZED: 10s for faster alert updates
+    refetchInterval: 30000, // 30s - alerts are less frequent
+    staleTime: 20000,
   });
 
   const { data: tokens } = useQuery<Array<{
@@ -42,7 +44,8 @@ export default function Scanner() {
     marketCap: string;
   }>>({
     queryKey: ['/api/tokens'],
-    refetchInterval: 15000, // OPTIMIZED: 15s for faster token price updates
+    refetchInterval: 30000, // 30s - token prices don't change that rapidly
+    staleTime: 20000,
   });
 
   // Scanner control mutations

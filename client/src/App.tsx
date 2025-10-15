@@ -69,6 +69,22 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
 
+  // Prefetch critical data for authenticated users
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Prefetch portfolio data
+      queryClient.prefetchQuery({
+        queryKey: ['/api/portfolio'],
+        staleTime: 30000,
+      });
+      // Prefetch scanner status
+      queryClient.prefetchQuery({
+        queryKey: ['/api/scanner/status'],
+        staleTime: 10000,
+      });
+    }
+  }, [isAuthenticated]);
+
   // Show loading state while checking authentication
   if (isLoading) {
     return (
