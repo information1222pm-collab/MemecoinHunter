@@ -2136,6 +2136,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Email endpoints
+  app.post("/api/email/test", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Email address is required" });
+      }
+
+      const { emailService } = await import('./services/email-service.js');
+      await emailService.sendTestEmail(email);
+      
+      res.json({ success: true, message: `Test email sent to ${email}` });
+    } catch (error) {
+      console.error('Error sending test email:', error);
+      res.status(500).json({ message: "Failed to send test email", error });
+    }
+  });
+
+  app.post("/api/email/performance-report", async (req, res) => {
+    try {
+      if (!req.session?.userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const portfolio = await storage.getPortfolioByUserId(user.id);
+      if (!portfolio) {
+        return res.status(404).json({ message: "Portfolio not found" });
+      }
+
+      const positions = await storage.getActivePositionsByPortfolio(portfolio.id);
+      const trades = await storage.getTradesByPortfolio(portfolio.id);
+      
+      const totalTrades = trades.length;
+      const winningTrades = trades.filter(t => {
+        const pnl = parseFloat(t.profitLoss || "0");
+        return pnl > 0;
+      }).length;
+      const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
+
+      const metrics = {
+        totalValue: parseFloat(portfolio.totalValue || "0"),
+        dailyPnL: parseFloat(portfolio.dailyPnL || "0"),
+        dailyPnLPercent: parseFloat(portfolio.dailyPnL || "0") / parseFloat(portfolio.totalValue || "1") * 100,
+        totalPnL: parseFloat(portfolio.totalPnL || "0"),
+        totalPnLPercent: parseFloat(portfolio.totalPnL || "0") / 10000 * 100, // Assuming $10k starting capital
+        winRate: winRate,
+        totalTrades: totalTrades,
+        activePositions: positions.length
+      };
+
+      const { emailService } = await import('./services/email-service.js');
+      await emailService.sendDailyPerformanceReport(
+        {
+          email: user.email || '',
+          firstName: user.firstName || undefined,
+          subscriptionTier: user.subscriptionTier || undefined
+        },
+        metrics
+      );
+
+      res.json({ success: true, message: "Performance report sent successfully" });
+    } catch (error) {
+      console.error('Error sending performance report:', error);
+      res.status(500).json({ message: "Failed to send performance report", error });
+    }
+  });
+
+  app.post("/api/email/feature-update", async (req, res) => {
+    try {
+      const { email, featureTitle, featureDescription, featureDetails } = req.body;
+      
+      if (!email || !featureTitle || !featureDescription) {
+        return res.status(400).json({ 
+          message: "Email, featureTitle, and featureDescription are required" 
+        });
+      }
+
+      const { emailService } = await import('./services/email-service.js');
+      await emailService.sendFeatureUpdateEmail(
+        { email, firstName: undefined },
+        featureTitle,
+        featureDescription,
+        featureDetails || []
+      );
+
+      res.json({ success: true, message: "Feature update email sent successfully" });
+    } catch (error) {
+      console.error('Error sending feature update:', error);
+      res.status(500).json({ message: "Failed to send feature update", error });
+    }
+  });
+
+  app.post("/api/email/send-all-performance-reports", async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      const { emailService } = await import('./services/email-service.js');
+      
+      let sentCount = 0;
+      let errorCount = 0;
+
+      for (const user of users) {
+        try {
+          if (!user.email) continue;
+
+          const portfolio = await storage.getPortfolioByUserId(user.id);
+          if (!portfolio) continue;
+
+          const positions = await storage.getActivePositionsByPortfolio(portfolio.id);
+          const trades = await storage.getTradesByPortfolio(portfolio.id);
+          
+          const totalTrades = trades.length;
+          const winningTrades = trades.filter(t => {
+            const pnl = parseFloat(t.profitLoss || "0");
+            return pnl > 0;
+          }).length;
+          const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
+
+          const metrics = {
+            totalValue: parseFloat(portfolio.totalValue || "0"),
+            dailyPnL: parseFloat(portfolio.dailyPnL || "0"),
+            dailyPnLPercent: parseFloat(portfolio.dailyPnL || "0") / parseFloat(portfolio.totalValue || "1") * 100,
+            totalPnL: parseFloat(portfolio.totalPnL || "0"),
+            totalPnLPercent: parseFloat(portfolio.totalPnL || "0") / 10000 * 100,
+            winRate: winRate,
+            totalTrades: totalTrades,
+            activePositions: positions.length
+          };
+
+          await emailService.sendDailyPerformanceReport(
+            {
+              email: user.email,
+              firstName: user.firstName || undefined,
+              subscriptionTier: user.subscriptionTier || undefined
+            },
+            metrics
+          );
+
+          sentCount++;
+        } catch (error) {
+          console.error(`Failed to send email to ${user.email}:`, error);
+          errorCount++;
+        }
+      }
+
+      res.json({ 
+        success: true, 
+        message: `Sent ${sentCount} performance reports, ${errorCount} failed` 
+      });
+    } catch (error) {
+      console.error('Error sending all performance reports:', error);
+      res.status(500).json({ message: "Failed to send performance reports", error });
+    }
+  });
+
   async function processCliCommand(command: string): Promise<string> {
     const parts = command.split(' ');
     const cmd = parts[0];
