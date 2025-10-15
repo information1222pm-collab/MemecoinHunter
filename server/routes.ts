@@ -863,6 +863,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all available risk levels
+  app.get("/api/risk-levels", requireAuth, async (_req, res) => {
+    try {
+      const { getAllRiskLevels } = await import('./services/risk-levels.js');
+      const riskLevels = getAllRiskLevels();
+      res.json(riskLevels);
+    } catch (error) {
+      console.error('[API] Error fetching risk levels:', error);
+      res.status(500).json({ message: "Failed to fetch risk levels", error });
+    }
+  });
+
+  // Update portfolio risk level
+  app.patch("/api/portfolio/risk-level", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const { riskLevel } = req.body;
+      const { isValidRiskLevel } = await import('./services/risk-levels.js');
+      
+      if (!isValidRiskLevel(riskLevel)) {
+        return res.status(400).json({ 
+          message: "Invalid risk level", 
+          allowedValues: ['conservative', 'moderate', 'balanced', 'aggressive', 'very_aggressive']
+        });
+      }
+
+      const portfolio = await storage.getPortfolioByUserId(userId);
+      if (!portfolio) {
+        return res.status(404).json({ message: "Portfolio not found" });
+      }
+
+      // Update the portfolio risk level
+      const updatedPortfolio = await storage.updatePortfolio(portfolio.id, { riskLevel });
+      
+      // Clear the auto-trader's risk config cache so it picks up the new level
+      const { autoTrader } = await import('./services/auto-trader.js');
+      autoTrader['clearRiskConfigCache'](portfolio.id);
+      
+      res.json({
+        message: `Risk level updated to ${riskLevel}`,
+        portfolio: updatedPortfolio
+      });
+    } catch (error) {
+      console.error('[API] Error updating risk level:', error);
+      res.status(500).json({ message: "Failed to update risk level", error });
+    }
+  });
+
   // Demo default portfolio route for testing
   app.get("/api/portfolio/default", async (req, res) => {
     try {
