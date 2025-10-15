@@ -79,7 +79,7 @@ export function SubscriptionModal({ isOpen, onClose }: SubscriptionModalProps) {
     {
       id: "enterprise",
       name: t("subscription.enterprise"),
-      price: 99,
+      price: 99.99,
       features: [
         t("subscription.features.unlimitedScanning"),
         t("subscription.features.customML"),
@@ -87,21 +87,12 @@ export function SubscriptionModal({ isOpen, onClose }: SubscriptionModalProps) {
         t("subscription.features.whiteLabel"),
         t("subscription.features.dedicatedSupport"),
       ],
-      buttonText: t("subscription.contact"),
+      buttonText: t("subscription.choose"),
       popular: false,
     },
   ];
 
   const handleSelectPlan = (planId: string) => {
-    if (planId === "enterprise") {
-      // Handle contact sales
-      toast({
-        title: "Contact Sales",
-        description: "Please contact our sales team for enterprise pricing.",
-      });
-      return;
-    }
-    
     checkoutMutation.mutate(planId);
   };
 
