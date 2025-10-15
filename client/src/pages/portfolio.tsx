@@ -70,7 +70,7 @@ export default function Portfolio() {
       };
     };
   }>({
-    queryKey: ['/api/portfolio', 'default'],
+    queryKey: ['/api/portfolio'],
     refetchInterval: 15000, // OPTIMIZED: 15s for faster portfolio updates
     staleTime: 10000, // OPTIMIZED: 10s stale time for more frequent refreshes
     retry: false, // Don't retry on 401 errors
@@ -89,7 +89,7 @@ export default function Portfolio() {
       name: string;
     };
   }>>({
-    queryKey: ['/api/portfolio', 'default', 'trades'],
+    queryKey: ['/api/portfolio/trades'],
     refetchInterval: 20000, // OPTIMIZED: 20s for faster trade updates
     staleTime: 15000, // OPTIMIZED: 15s stale time for more frequent refreshes
     retry: false, // Don't retry on 401 errors
@@ -119,8 +119,8 @@ export default function Portfolio() {
     switch (type) {
       case 'trade_executed':
         // Invalidate portfolio and trades data when a new trade is executed
-        queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default', 'trades'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/portfolio'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/portfolio/trades'] });
         break;
       
       case 'portfolio_update':
