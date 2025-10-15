@@ -6,6 +6,15 @@ MemeCoin Hunter is a comprehensive memecoin trading platform designed for real-t
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
+## Testing Credentials
+**Standard Test Account:**
+- **Email**: testuser@example.com
+- **Password**: TestPassword123!
+- **Username**: test_user
+- **Portfolio**: $10,000.00 starting balance (Main Portfolio)
+
+Use these credentials consistently for all testing and development work.
+
 ## System Architecture
 
 ### Frontend
