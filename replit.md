@@ -23,6 +23,13 @@ The platform supports password-based and Google OAuth authentication via Replit 
 ### Payment and Subscription System
 The platform features a complete Stripe-powered subscription system with three membership tiers: Basic ($9/month), Pro ($29/month), and Enterprise ($99/month). Stripe Checkout handles secure payment processing with automatic recurring billing. The system includes subscription management endpoints for creating, updating, and canceling subscriptions, with webhook support for automated subscription lifecycle handling. Real money trading features are restricted to Enterprise tier subscribers with verified broker API keys.
 
+**Security Features:**
+- Server-side price validation using PLAN_PRICE_MAPPING prevents price manipulation attacks
+- Price IDs stored in environment variables (STRIPE_PRICE_BASIC, STRIPE_PRICE_PRO, STRIPE_PRICE_ENTERPRISE)
+- Frontend cannot forge plan/price mismatches - backend validates all checkout requests
+- CSRF protection on all payment endpoints
+- Stripe API key validation on startup
+
 ### Technical Implementations
 A robust token scanning system utilizes CoinGecko APIs for discovering trending memecoins. The Enhanced ML Pattern Analysis System analyzes 7 days of price history, incorporates advanced technical indicators (ATR, ADX, OBV, Ichimoku Cloud), recognizes price action patterns (V-shaped reversals, accumulation), and performs order flow analysis. An Ensemble ML Scoring system combines signals with weighted confidence. The Market Health Analyzer evaluates five key metrics (volatility, trend, breadth, volume, correlation) to provide a health score, enabling intelligent trade gating and dynamic position sizing. The Advanced Chart Analysis System detects support/resistance levels, chart patterns (triangles, wedges, channels, H&S, double top/bottom), Fibonacci levels, and pivot points. It also features a dynamic exit strategy, risk-reward calculator, and entry/exit signal enhancements. Automated trading functionalities include pattern performance gating, a multi-stage take-profit strategy, improved risk management (5% stop-loss, cash floor, daily loss thresholds), and dynamic position sizing using Kelly Criterion calculations. Aggressive Trading Mode provides increased position sizing, relaxed market health thresholds, and lower confidence/risk-reward requirements. Portfolio management features include reset functionality, user-specific endpoints, and real-time updates via WebSocket. An Email Communication System, integrated with Resend, sends daily performance reports and feature update notifications with dark-themed HTML templates. IP-Based Visitor Tracking detects first-time visitors to trigger the onboarding demo.
 
