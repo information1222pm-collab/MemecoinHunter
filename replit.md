@@ -34,6 +34,10 @@ Primary database is PostgreSQL, accessed via Drizzle ORM and hosted on Neon. The
 ### Authentication and Authorization
 Supports dual authentication: password-based and OAuth (Google Login via Replit Auth). Every new user receives $10,000 in virtual trading money. Account linking is supported by email. Security measures include Zod validation, CORS, CSRF protection, and secure OAuth token management. New users are automatically logged in after registration with session persistence.
 
+**Recent Authentication Fixes:**
+- Fixed Google OAuth empty user session bug by properly extracting and storing userId, email, firstName, lastName from Replit Auth claims
+- Fixed OAuth error redirect loop by redirecting errors to root page with error parameters instead of /api/login
+
 ### Technical Implementations
 Includes a robust token scanning system that automatically discovers and tracks trending memecoins using CoinGecko APIs, significantly expanding tracked coins and lowering discovery thresholds for more opportunities.
 
@@ -64,6 +68,13 @@ Includes a robust token scanning system that automatically discovers and tracks 
 - **Exit Signal Enhancement**: Chart-based exits detect bearish patterns and resistance levels for early profit-taking. Monitors price action for optimal exit timing beyond fixed percentage targets
 
 Automated trading functionalities have comprehensive profitability improvements, including pattern performance gating (50%+ win rate, positive expectancy), a multi-stage take-profit strategy (30% at 8% gain, 40% at 12% gain, rest at 18% gain), improved risk management (5% stop-loss, cash floor enforcement, daily loss thresholds), and dynamic position sizing using 2x Kelly Criterion calculations. Chart analysis integration ensures trades have favorable entry/exit points with proper risk-reward ratios (minimum 1.2:1). Critical bug fixes include accurate portfolio position display, correct portfolio analytics calculations (total value, P&L, daily P&L), and live data updates for the dashboard and portfolio pages.
+
+**Portfolio Management Features:**
+- Portfolio reset functionality with custom starting capital (minimum $100, accessible in Settings page)
+- Atomic portfolio reset: deletes all positions, resets P&L values to zero, preserves trade history for reference
+- User-specific portfolio endpoints: `/api/portfolio` for authenticated user's portfolio, `/api/portfolio/trades` for trade history
+- Real-time portfolio updates via WebSocket for instant position and balance changes
+- Comprehensive portfolio analytics including risk metrics, top performers, and diversification analysis
 
 **Aggressive Trading Mode (Latest):**
 - **2x Kelly Position Sizing**: Doubled position sizes from Kelly Criterion (15% → 30% maximum) for higher profit potential
