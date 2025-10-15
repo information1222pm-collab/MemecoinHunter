@@ -18,6 +18,7 @@ import { riskReportsService } from "./services/risk-reports";
 import { alertService } from "./services/alert-service";
 import { marketHealthAnalyzer } from "./services/market-health";
 import { dataCleanupService } from "./services/data-cleanup";
+import { cacheService } from "./services/cache-service";
 import { insertUserSchema, insertTradeSchema, insertTokenSchema, insertAlertRuleSchema } from "@shared/schema";
 import { z } from "zod";
 import * as bcrypt from "bcrypt";
@@ -723,10 +724,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Token routes
+  // Token routes - Optimized with caching for <1s load time
   app.get("/api/tokens", async (req, res) => {
     try {
-      const tokens = await storage.getActiveTokens();
+      const cacheKey = 'active_tokens';
+      
+      // Try to get from cache first
+      let tokens = cacheService.get(cacheKey);
+      
+      if (!tokens) {
+        // Cache miss - fetch from database and cache for 3 seconds
+        tokens = await storage.getActiveTokens();
+        cacheService.set(cacheKey, tokens, 3000); // 3s TTL for fresh price data
+      }
+      
       res.json(tokens);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch tokens", error });
@@ -1882,51 +1893,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/analytics/all", async (req, res) => {
     try {
-      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
-      if (!demoUser) {
-        const saltRounds = 12;
-        const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
-        demoUser = await storage.createUser({
-          username: "demo_user",
-          email: "demo@memehunter.app",
-          password: hashedDemoPassword,
-          subscriptionTier: "pro",
-          language: "en"
-        });
-      }
+      const cacheKey = 'analytics_all';
       
-      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
-      if (!portfolio) {
-        portfolio = await storage.createPortfolio({
-          userId: demoUser.id,
-          totalValue: "10000.00",
-          dailyPnL: "0.00",
-          totalPnL: "0.00",
-          winRate: "0.00"
-        });
-      }
+      // Try to get from cache first
+      let transformed = cacheService.get(cacheKey);
+      
+      if (!transformed) {
+        // Cache miss - compute analytics
+        let demoUser = await storage.getUserByEmail("demo@memehunter.app");
+        if (!demoUser) {
+          const saltRounds = 12;
+          const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
+          demoUser = await storage.createUser({
+            username: "demo_user",
+            email: "demo@memehunter.app",
+            password: hashedDemoPassword,
+            subscriptionTier: "pro",
+            language: "en"
+          });
+        }
+        
+        let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+        if (!portfolio) {
+          portfolio = await storage.createPortfolio({
+            userId: demoUser.id,
+            totalValue: "10000.00",
+            dailyPnL: "0.00",
+            totalPnL: "0.00",
+            winRate: "0.00"
+          });
+        }
 
-      const allMetrics = await tradingAnalyticsService.getAllMetrics(portfolio.id);
-      
-      // Transform data to match dashboard contract
-      const transformed = {
-        pnl: allMetrics.pnl,
-        winLoss: {
-          ...allMetrics.winLoss,
-          avgWin: allMetrics.winLoss.averageWin,
-          avgLoss: allMetrics.winLoss.averageLoss,
-        },
-        holdTime: {
-          avgHoldTime: allMetrics.holdTime.averageHoldTimeMs / (1000 * 60 * 60), // Convert ms to hours
-          avgWinHoldTime: allMetrics.holdTime.averageWinHoldTimeMs / (1000 * 60 * 60),
-          avgLossHoldTime: allMetrics.holdTime.averageLossHoldTimeMs / (1000 * 60 * 60),
-          totalClosedTrades: allMetrics.holdTime.totalClosedTrades,
-        },
-        strategies: allMetrics.strategies.map(s => ({
-          ...s,
-          roiPercent: s.roi, // Rename roi to roiPercent
-        })),
-      };
+        const allMetrics = await tradingAnalyticsService.getAllMetrics(portfolio.id);
+        
+        // Transform data to match dashboard contract
+        transformed = {
+          pnl: allMetrics.pnl,
+          winLoss: {
+            ...allMetrics.winLoss,
+            avgWin: allMetrics.winLoss.averageWin,
+            avgLoss: allMetrics.winLoss.averageLoss,
+          },
+          holdTime: {
+            avgHoldTime: allMetrics.holdTime.averageHoldTimeMs / (1000 * 60 * 60), // Convert ms to hours
+            avgWinHoldTime: allMetrics.holdTime.averageWinHoldTimeMs / (1000 * 60 * 60),
+            avgLossHoldTime: allMetrics.holdTime.averageLossHoldTimeMs / (1000 * 60 * 60),
+            totalClosedTrades: allMetrics.holdTime.totalClosedTrades,
+          },
+          strategies: allMetrics.strategies.map(s => ({
+            ...s,
+            roiPercent: s.roi, // Rename roi to roiPercent
+          })),
+        };
+        
+        // Cache for 5 seconds
+        cacheService.set(cacheKey, transformed, 5000);
+      }
       
       res.json(transformed);
     } catch (error) {

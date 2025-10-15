@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { storage } from '../storage';
+import { cacheService } from './cache-service';
 import type { InsertPriceHistory, InsertToken } from '@shared/schema';
 
 interface PriceUpdate {
@@ -431,6 +432,9 @@ class PriceFeedService extends EventEmitter {
           priceChange24h: coin.price_change_percentage_24h.toString(),
           marketCap: coin.market_cap.toString(),
         });
+        
+        // Invalidate token cache for instant updates
+        cacheService.invalidate('active_tokens');
         
         // Save price history
         await storage.createPriceHistory({
