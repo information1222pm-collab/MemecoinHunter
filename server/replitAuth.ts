@@ -92,6 +92,10 @@ export async function setupAuth(app: Express) {
     verified: passport.AuthenticateCallback
   ) => {
     const claims = tokens.claims();
+    if (!claims) {
+      return verified(new Error("No claims in token"));
+    }
+    
     const user: any = {
       id: claims["sub"],
       email: claims["email"],
@@ -142,7 +146,7 @@ export async function setupAuth(app: Express) {
           return res.redirect("/?error=no_user");
         }
         
-        req.logIn(user, async (loginErr) => {
+        req.logIn(user, (loginErr) => {
           if (loginErr) {
             console.error(`[OAUTH] Login error:`, loginErr);
             return res.redirect("/?error=login_failed");
@@ -150,13 +154,6 @@ export async function setupAuth(app: Express) {
           
           // CRITICAL FIX: Store userId in session for app authentication
           (req.session as any).userId = user.id;
-          
-          // Ensure default portfolio exists for new OAuth users
-          try {
-            await storage.ensureDefaultPortfolio(user.id);
-          } catch (portfolioErr) {
-            console.error(`[OAUTH] Portfolio creation error:`, portfolioErr);
-          }
           
           console.log(`[OAUTH] Successfully authenticated user ${user.id}`);
           return res.redirect("/");
