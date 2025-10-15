@@ -336,7 +336,17 @@ export function DemoModal({ isOpen, onClose }: DemoModalProps) {
     // Mark as complete in both localStorage and server (IP-based tracking)
     localStorage.setItem('demo_completed', 'true');
     try {
-      await fetch('/api/visitor/demo-complete', { method: 'POST' });
+      const { getCsrfToken } = await import('@/lib/auth-utils');
+      const csrfToken = await getCsrfToken();
+      
+      await fetch('/api/visitor/demo-complete', { 
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ _csrf: csrfToken }),
+        credentials: 'include'
+      });
     } catch (error) {
       console.error('Error marking demo complete:', error);
     }

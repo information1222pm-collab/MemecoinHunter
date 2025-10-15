@@ -66,7 +66,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use([
     '/api/auth/login', '/api/auth/register', '/api/auth/logout',
     '/api/portfolio', '/api/trades', '/api/positions', '/api/alerts', '/api/price-alerts',
-    '/api/api-keys', '/api/settings', '/api/auto-trader'
+    '/api/api-keys', '/api/settings', '/api/auto-trader',
+    '/api/email', '/api/visitor/demo-complete'
   ].map(path => [path, path + '/*']).flat(), csrfProtection);
 
   // Rate Limiting for Security (CRITICAL SECURITY FIX)
