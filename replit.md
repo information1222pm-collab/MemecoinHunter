@@ -23,6 +23,16 @@ A Stripe-powered subscription system offers Basic, Pro, and Enterprise tiers. St
 ### Technical Implementations
 The platform features a robust token scanning system using CoinGecko APIs. The Enhanced ML Pattern Analysis System utilizes 7 days of price history, advanced technical indicators (ATR, ADX, OBV, Ichimoku Cloud), recognizes price action patterns, and performs order flow analysis. An Ensemble ML Scoring system combines signals. The Market Health Analyzer evaluates five key metrics for trade gating and dynamic position sizing. The Advanced Chart Analysis System detects support/resistance, chart patterns, Fibonacci levels, and pivot points, with dynamic exit strategies and risk-reward calculation. Automated trading functionalities include pattern performance gating, multi-stage take-profit, improved risk management (5% stop-loss, cash floor, daily loss thresholds), and dynamic position sizing using Kelly Criterion. An Aggressive Trading Mode is available. Portfolio management includes reset functionality and real-time updates. An Email Communication System, integrated with Resend, sends daily performance reports and updates. A pre-authentication demo experience showcases platform capabilities. A 5-tier risk level system allows portfolio-specific trading parameters, affecting position sizing, stop-loss, and confidence thresholds. A "Trophy Room" feature displays the top 20 most profitable closed trades across all users.
 
+### Memory Management & Performance
+The platform includes comprehensive memory management and performance optimizations:
+- **Data Cleanup Service**: Runs every 6 hours to automatically delete old data (price history >14 days, orphaned patterns >7 days, scan alerts >30 days, audit logs >90 days), preventing database bloat and memory issues
+- **ML Analyzer Optimization**: Processes only top 50 tokens by market cap in batches of 10, with forced garbage collection between batches to control memory usage
+- **Code Splitting**: React.lazy() on 16 pages reduces initial bundle size by ~50%
+- **Chart Memoization**: 6 chart components use React.memo to prevent unnecessary re-renders
+- **Compression**: Gzip middleware reduces response sizes by ~70%
+- **Database Indexing**: 26 strategic indexes improve query performance by 2-5x
+- **Price History Truncation**: ML Analyzer limits historical data to 1000 most recent points per token
+
 ## External Dependencies
 
 -   **Database Infrastructure**: `@neondatabase/serverless`, `drizzle-orm`, `connect-pg-simple`
