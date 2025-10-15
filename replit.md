@@ -35,6 +35,16 @@ The platform includes comprehensive memory management and performance optimizati
 - **Database Indexing**: 26 strategic indexes improve query performance by 2-5x
 - **Price History Truncation**: ML Analyzer limits historical data to 1000 most recent points per token
 
+### Routing & Navigation
+- **Billing Route**: The `/billing` route redirects to `/subscription` for unified subscription management (October 2025)
+- **Auto-Trading Toggle**: Portfolio-level auto-trading control with real-time monitoring of 38 portfolios, fixed dynamic import issues for reliable service initialization
+
+### Chart Behavior & Data Display
+Charts display data based on actual trading activity and applied filters:
+- **Empty State Behavior**: Charts appear empty when filters exclude all data, user has no closed trades, or viewing a portfolio with no trading history
+- **Data Requirements**: Journal and Analytics charts require closed trades; Portfolio charts need active positions or historical data
+- **Filter Impact**: Date range, outcome, strategy, and token filters can restrict displayed data
+
 ## External Dependencies
 
 -   **Database Infrastructure**: `@neondatabase/serverless`, `drizzle-orm`, `connect-pg-simple`
