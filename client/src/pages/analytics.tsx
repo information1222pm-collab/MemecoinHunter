@@ -500,7 +500,7 @@ export default function Analytics() {
                 <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
                 <span className="text-sm text-blue-500">You're viewing demo analytics data. Sign in to see your actual trading performance.</span>
               </div>
-              <Button variant="outline" size="sm" className="border-blue-500/20 text-blue-500 hover:bg-blue-500/10">
+              <Button variant="outline" size="sm" className="border-blue-500/20 text-blue-500 hover:bg-blue-500/10" data-testid="button-sign-in">
                 Sign In
               </Button>
             </div>
