@@ -91,9 +91,15 @@ export async function setupAuth(app: Express) {
     tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
     verified: passport.AuthenticateCallback
   ) => {
-    const user = {};
+    const claims = tokens.claims();
+    const user: any = {
+      id: claims["sub"],
+      email: claims["email"],
+      firstName: claims["first_name"],
+      lastName: claims["last_name"],
+    };
     updateUserSession(user, tokens);
-    await upsertUser(tokens.claims());
+    await upsertUser(claims);
     verified(null, user);
   };
 
@@ -128,21 +134,31 @@ export async function setupAuth(app: Express) {
       (err: any, user: any, info: any) => {
         if (err) {
           console.error(`[OAUTH] Authentication error:`, err);
-          return res.redirect("/api/login?error=auth_failed");
+          return res.redirect("/?error=auth_failed");
         }
         
         if (!user) {
           console.error(`[OAUTH] No user returned. Info:`, info);
-          return res.redirect("/api/login?error=no_user");
+          return res.redirect("/?error=no_user");
         }
         
-        req.logIn(user, (loginErr) => {
+        req.logIn(user, async (loginErr) => {
           if (loginErr) {
             console.error(`[OAUTH] Login error:`, loginErr);
-            return res.redirect("/api/login?error=login_failed");
+            return res.redirect("/?error=login_failed");
           }
           
-          console.log(`[OAUTH] Successfully authenticated user`);
+          // CRITICAL FIX: Store userId in session for app authentication
+          (req.session as any).userId = user.id;
+          
+          // Ensure default portfolio exists for new OAuth users
+          try {
+            await storage.ensureDefaultPortfolio(user.id);
+          } catch (portfolioErr) {
+            console.error(`[OAUTH] Portfolio creation error:`, portfolioErr);
+          }
+          
+          console.log(`[OAUTH] Successfully authenticated user ${user.id}`);
           return res.redirect("/");
         });
       }
