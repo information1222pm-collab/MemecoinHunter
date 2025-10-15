@@ -30,9 +30,19 @@ import { setupAuth } from "./replitAuth";
 import Stripe from "stripe";
 
 if (!process.env.STRIPE_SECRET_KEY) {
+  console.error('❌ STRIPE_SECRET_KEY environment variable is not set');
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
 }
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+// Validate the key format (should start with sk_test_ or sk_live_)
+const stripeKey = process.env.STRIPE_SECRET_KEY.trim();
+if (!stripeKey.startsWith('sk_')) {
+  console.error('❌ Invalid STRIPE_SECRET_KEY format. Key should start with sk_test_ or sk_live_');
+  throw new Error('Invalid STRIPE_SECRET_KEY format');
+}
+
+console.log('✅ Stripe SDK initialized with key:', stripeKey.substring(0, 10) + '...');
+const stripe = new Stripe(stripeKey);
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
