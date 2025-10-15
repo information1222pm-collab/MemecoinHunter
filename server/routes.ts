@@ -683,6 +683,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get authenticated user's trades
+  app.get("/api/portfolio/trades", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const portfolio = await storage.getPortfolioByUserId(userId);
+      if (!portfolio) {
+        return res.status(404).json({ message: "Portfolio not found" });
+      }
+
+      const trades = await storage.getTradesByPortfolio(portfolio.id);
+      
+      // Enrich trades with token information
+      const enrichedTrades = await Promise.all(trades.map(async trade => {
+        const token = await storage.getToken(trade.tokenId);
+        return {
+          ...trade,
+          token: {
+            symbol: token?.symbol || 'Unknown',
+            name: token?.name || 'Unknown Token'
+          }
+        };
+      }));
+
+      res.json(enrichedTrades);
+    } catch (error) {
+      console.error('[API] Error fetching user trades:', error);
+      res.status(500).json({ message: "Failed to fetch trades", error });
+    }
+  });
+
   // Reset portfolio with custom starting capital
   app.post("/api/portfolio/reset", requireAuth, async (req, res) => {
     try {
