@@ -632,6 +632,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Portfolio routes
+  // Get authenticated user's portfolio
+  app.get("/api/portfolio", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const portfolio = await storage.getPortfolioByUserId(userId);
+      if (!portfolio) {
+        return res.status(404).json({ message: "Portfolio not found" });
+      }
+      
+      const positions = await storage.getPositionsByPortfolio(portfolio.id);
+      
+      // Filter out closed positions (amount = 0)
+      const activePositions = positions.filter(p => parseFloat(p.amount) > 0);
+      
+      // Get enhanced analytics from position tracker
+      const portfolioAnalytics = await positionTracker.getPortfolioAnalytics(portfolio.id);
+      const positionAnalytics = await positionTracker.getPositionAnalytics(portfolio.id);
+      
+      // Merge position data with analytics (only for active positions)
+      const enhancedPositions = await Promise.all(activePositions.map(async position => {
+        const analytics = positionAnalytics.find(a => a.positionId === position.id);
+        const token = await storage.getToken(position.tokenId);
+        
+        return {
+          ...position,
+          analytics: analytics || null,
+          token: { 
+            symbol: token?.symbol || analytics?.tokenSymbol || 'Unknown',
+            name: token?.name || `${analytics?.tokenSymbol || 'Unknown'} Token`,
+            currentPrice: token?.currentPrice || '0'
+          }
+        };
+      }));
+      
+      // totalValue now already includes cash balance (updated by position tracker)
+      res.json({ 
+        ...portfolio,
+        positions: enhancedPositions,
+        analytics: portfolioAnalytics
+      });
+    } catch (error) {
+      console.error('[API] Error fetching user portfolio:', error);
+      res.status(500).json({ message: "Failed to fetch portfolio", error });
+    }
+  });
+
   // Demo default portfolio route for testing
   app.get("/api/portfolio/default", async (req, res) => {
     try {
