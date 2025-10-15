@@ -70,12 +70,19 @@ interface NewlyLaunchedCoin {
   price_change_percentage_24h: number;
 }
 
+interface CachedResponse {
+  data: any;
+  timestamp: number;
+}
+
 class PriceFeedService extends EventEmitter {
   private isRunning = false;
   private updateInterval?: NodeJS.Timeout;
   private readonly API_BASE = 'https://api.coingecko.com/api/v3';
-  private readonly RATE_LIMIT_DELAY = 2500; // 2.5 seconds between requests to avoid rate limits
+  private readonly RATE_LIMIT_DELAY = 4500; // INCREASED: 4.5 seconds between requests to avoid rate limits (was 2.5s)
+  private readonly CACHE_TTL = 300000; // 5 minutes cache TTL
   private lastRequestTime = 0;
+  private responseCache = new Map<string, CachedResponse>(); // Response caching layer
   
   // EXPANDED: Comprehensive list of memecoins and trending tokens to track (200+ coins)
   private readonly TRACKED_COINS = [
@@ -441,11 +448,49 @@ class PriceFeedService extends EventEmitter {
     }
   }
 
+  /**
+   * Check cache before making API request
+   * Returns cached data if available and not expired
+   */
+  private getCachedResponse(cacheKey: string): any | null {
+    const cached = this.responseCache.get(cacheKey);
+    if (!cached) return null;
+    
+    const now = Date.now();
+    const age = now - cached.timestamp;
+    
+    if (age > this.CACHE_TTL) {
+      // Cache expired, remove it
+      this.responseCache.delete(cacheKey);
+      return null;
+    }
+    
+    console.log(`📦 Using cached response for ${cacheKey} (age: ${Math.floor(age/1000)}s)`);
+    return cached.data;
+  }
+
+  /**
+   * Store response in cache
+   */
+  private setCachedResponse(cacheKey: string, data: any): void {
+    this.responseCache.set(cacheKey, {
+      data,
+      timestamp: Date.now()
+    });
+  }
+
   private async fetchCoinsData(retryCount = 0): Promise<CoinGeckoToken[]> {
     const maxRetries = 3;
     const baseDelay = 2000; // 2 seconds base delay
     
     try {
+      // Check cache first
+      const cacheKey = 'coins_markets';
+      const cachedData = this.getCachedResponse(cacheKey);
+      if (cachedData) {
+        return cachedData;
+      }
+
       await this.respectRateLimit();
       
       // Enhanced URL with more data fields
@@ -473,7 +518,7 @@ class PriceFeedService extends EventEmitter {
       }
       
       const data = await response.json();
-      return data.map((coin: any) => ({
+      const formattedData = data.map((coin: any) => ({
         id: coin.id,
         symbol: coin.symbol,
         name: coin.name,
@@ -496,6 +541,11 @@ class PriceFeedService extends EventEmitter {
         high_24h: coin.high_24h,
         low_24h: coin.low_24h,
       }));
+
+      // Store in cache for future requests
+      this.setCachedResponse(cacheKey, formattedData);
+      
+      return formattedData;
     } catch (error) {
       // If we've exhausted retries or hit a non-retryable error, rethrow
       if (retryCount >= maxRetries || !(error instanceof Error && error.message.includes('429'))) {
