@@ -46,8 +46,8 @@ class AutoTrader extends EventEmitter {
     minConfidence: 75, // Dynamic minimum confidence
     maxPositionSize: 1000, // $1000 max per position (will use dynamic sizing from RiskManager)
     stopLossPercentage: 5, // IMPROVED: Tighter 5% stop loss for better risk-reward
-    takeProfitPercentage: 15, // 15% final take profit
-    takeProfitStages: [6, 10, 15], // IMPROVED: Multi-stage take-profit (sell portions at each level)
+    takeProfitPercentage: 18, // AGGRESSIVE: 18% final take profit (increased from 15%)
+    takeProfitStages: [8, 12, 18], // AGGRESSIVE: Multi-stage take-profit (increased from 6%, 10%, 15%)
     sellOnlyTakeProfit: 5, // More aggressive take profit when in sell-only mode
     minCashPercentage: 10, // IMPROVED: Minimum 10% cash buffer required
     maxDailyLossPercentage: 5, // IMPROVED: Pause trading if daily loss exceeds 5%
