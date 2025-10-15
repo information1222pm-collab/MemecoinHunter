@@ -49,7 +49,14 @@ Includes a robust token scanning system that automatically discovers and tracks 
 - **Entry Signal Enhancement**: ML patterns now validated against chart analysis for confirmation. Confidence adjusted ±15% based on chart alignment. Trade quality assessment includes support proximity, pattern confirmation, and technical alignment scoring
 - **Exit Signal Enhancement**: Chart-based exits detect bearish patterns and resistance levels for early profit-taking. Monitors price action for optimal exit timing beyond fixed percentage targets
 
-Automated trading functionalities have comprehensive profitability improvements, including pattern performance gating (50%+ win rate, positive expectancy), a multi-stage take-profit strategy (30% at 6% gain, 40% at 10% gain, rest at 15% gain), improved risk management (5% stop-loss, cash floor enforcement, daily loss thresholds), and dynamic position sizing using Kelly Criterion calculations. Chart analysis integration ensures trades have favorable entry/exit points with proper risk-reward ratios. Critical bug fixes include accurate portfolio position display, correct portfolio analytics calculations (total value, P&L, daily P&L), and live data updates for the dashboard and portfolio pages.
+Automated trading functionalities have comprehensive profitability improvements, including pattern performance gating (50%+ win rate, positive expectancy), a multi-stage take-profit strategy (30% at 8% gain, 40% at 12% gain, rest at 18% gain), improved risk management (5% stop-loss, cash floor enforcement, daily loss thresholds), and dynamic position sizing using 2x Kelly Criterion calculations. Chart analysis integration ensures trades have favorable entry/exit points with proper risk-reward ratios (minimum 1.2:1). Critical bug fixes include accurate portfolio position display, correct portfolio analytics calculations (total value, P&L, daily P&L), and live data updates for the dashboard and portfolio pages.
+
+**Aggressive Trading Mode (Latest):**
+- **2x Kelly Position Sizing**: Doubled position sizes from Kelly Criterion (15% → 30% maximum) for higher profit potential
+- **Relaxed Market Health Thresholds**: Lowered trading barriers (trade_cautiously: 40-60, minimize_trading: 20-40, trade_normally: 60+) to enable more opportunities
+- **Lower Confidence Requirements**: Reduced minimum confidence from 75-90% to 75-82% across market conditions
+- **Reduced Risk-Reward Requirement**: Lowered minimum R:R ratio from 1.5:1 to 1.2:1 for more trade entries
+- **Higher Take-Profit Targets**: Increased exit levels to 8%, 12%, 18% (from 6%, 10%, 15%) for larger gains per trade
 
 ## External Dependencies
 
