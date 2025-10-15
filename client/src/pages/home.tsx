@@ -102,32 +102,37 @@ export default function Home() {
     }
   }, [user, toast]);
 
-  // Check if visitor has seen the demo (IP-based tracking)
+  // Show demo to first-time visitors BEFORE requiring authentication
   useEffect(() => {
-    const checkVisitor = async () => {
-      try {
-        const response = await fetch('/api/visitor/check');
-        const data = await response.json();
-        
-        if (!data.hasSeenDemo) {
-          // Show demo after a short delay for better UX
-          setTimeout(() => {
-            setShowDemo(true);
-          }, 1000);
-        }
-      } catch (error) {
-        console.error('Error checking visitor status:', error);
-        // Fallback to localStorage if API fails
-        const demoCompleted = localStorage.getItem('demo_completed');
-        if (!demoCompleted) {
-          setTimeout(() => {
-            setShowDemo(true);
-          }, 1000);
+    const checkAndShowDemo = async () => {
+      // First check localStorage (doesn't require auth)
+      const demoCompleted = localStorage.getItem('demo_completed');
+      
+      if (!demoCompleted) {
+        // Show demo immediately for first-time visitors
+        setTimeout(() => {
+          setShowDemo(true);
+        }, 1000);
+      } else {
+        // If localStorage says completed, verify with server (for IP tracking)
+        try {
+          const response = await fetch('/api/visitor/check');
+          const data = await response.json();
+          
+          if (!data.hasSeenDemo) {
+            // Server doesn't know about this visitor, show demo
+            setTimeout(() => {
+              setShowDemo(true);
+            }, 1000);
+          }
+        } catch (error) {
+          console.error('Error checking visitor status:', error);
+          // If API fails, trust localStorage
         }
       }
     };
     
-    checkVisitor();
+    checkAndShowDemo();
   }, []);
 
   const { data: scannerStatus } = useQuery<{

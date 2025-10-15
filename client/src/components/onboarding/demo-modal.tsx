@@ -16,7 +16,10 @@ import {
   Activity,
   Coins,
   LineChart,
-  Bot
+  Bot,
+  Trophy,
+  Award,
+  Medal
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -193,6 +196,78 @@ export function DemoModal({ isOpen, onClose }: DemoModalProps) {
                 <Badge variant="outline" className="text-xs">Market Health</Badge>
               </div>
             </div>
+          </div>
+        </div>
+      )
+    },
+    {
+      title: "Trophy Room",
+      subtitle: "Celebrate Top Performing Trades",
+      content: (
+        <div className="space-y-4">
+          <div className="text-center mb-6">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-yellow-500 to-orange-500 mb-3">
+              <Trophy className="w-8 h-8 text-white" />
+            </div>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              System-wide leaderboard showcasing the most profitable trades across all portfolios
+            </p>
+          </div>
+
+          {/* Top 3 Podium-Style Cards */}
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="order-2 p-4 rounded-xl bg-gradient-to-br from-yellow-500/20 to-yellow-500/5 border-2 border-yellow-500/30">
+              <Medal className="w-8 h-8 text-yellow-400 mx-auto mb-2" />
+              <div className="text-center">
+                <div className="text-xs text-yellow-400 font-semibold mb-1">#1 GOLD</div>
+                <div className="text-lg font-bold text-yellow-400">+1,523%</div>
+                <div className="text-xs text-muted-foreground mt-1">POL Trade</div>
+              </div>
+            </div>
+
+            <div className="order-1 p-4 rounded-xl bg-gradient-to-br from-gray-400/20 to-gray-400/5 border-2 border-gray-400/30">
+              <Medal className="w-7 h-7 text-gray-300 mx-auto mb-2" />
+              <div className="text-center">
+                <div className="text-xs text-gray-300 font-semibold mb-1">#2 SILVER</div>
+                <div className="text-base font-bold text-gray-300">+892%</div>
+                <div className="text-xs text-muted-foreground mt-1">SHIB Trade</div>
+              </div>
+            </div>
+
+            <div className="order-3 p-4 rounded-xl bg-gradient-to-br from-orange-600/20 to-orange-600/5 border-2 border-orange-600/30">
+              <Medal className="w-7 h-7 text-orange-400 mx-auto mb-2" />
+              <div className="text-center">
+                <div className="text-xs text-orange-400 font-semibold mb-1">#3 BRONZE</div>
+                <div className="text-base font-bold text-orange-400">+654%</div>
+                <div className="text-xs text-muted-foreground mt-1">DOGE Trade</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Stats Overview */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="p-3 rounded-lg bg-secondary/50 text-center">
+              <Award className="w-5 h-5 text-emerald-400 mx-auto mb-1" />
+              <div className="text-sm font-bold text-emerald-400">$8,118</div>
+              <div className="text-xs text-muted-foreground">Top Profit</div>
+            </div>
+            <div className="p-3 rounded-lg bg-secondary/50 text-center">
+              <BarChart3 className="w-5 h-5 text-blue-400 mx-auto mb-1" />
+              <div className="text-sm font-bold text-blue-400">+723%</div>
+              <div className="text-xs text-muted-foreground">Avg Return</div>
+            </div>
+            <div className="p-3 rounded-lg bg-secondary/50 text-center">
+              <TrendingUp className="w-5 h-5 text-purple-400 mx-auto mb-1" />
+              <div className="text-sm font-bold text-purple-400">POL</div>
+              <div className="text-xs text-muted-foreground">Top Token</div>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-xl bg-gradient-to-r from-orange-500/10 to-yellow-500/10 border border-orange-500/20">
+            <p className="text-sm text-center text-muted-foreground">
+              <Trophy className="w-4 h-4 inline-block mr-1 text-yellow-400" />
+              Top 20 most profitable trades displayed in real-time
+            </p>
           </div>
         </div>
       )
