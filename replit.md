@@ -31,6 +31,14 @@ Includes a robust token scanning system that automatically discovers and tracks 
 - **Ensemble ML Scoring**: Combines multiple pattern signals with weighted confidence scoring (80%+ threshold) for high-quality buy signals, incorporating trend strength bonuses from ADX (>25) and Ichimoku cloud alignment for +10% confidence boost
 - **ML Feature Enhancement**: Expanded feature set includes 10 technical indicators (vs previous 5), 6 sentiment features (vs previous 5), and advanced pattern recognition for superior signal accuracy
 
+**Market Health Analyzer System:**
+- **Multi-Dimensional Market Analysis**: Evaluates 5 key market metrics - volatility levels, trend direction, market breadth (% tokens trending up), volume health, and cross-asset correlation
+- **Health Scoring (0-100 scale)**: Weighted combination of metrics provides comprehensive market health score: Healthy (80+), Caution (60-80), Minimize (40-60), Halt (<40)
+- **Intelligent Trade Gating**: Blocks trades during unfavorable market conditions based on health score and pattern confidence thresholds
+- **Dynamic Position Sizing**: Automatically adjusts position sizes (0.5x-1.0x multiplier) based on market health to reduce risk during uncertain conditions
+- **Performance Optimization**: 5-minute caching prevents excessive computation while maintaining market awareness, health checks run every 5 minutes
+- **Auto-Trader Integration**: All trades pass through market health validation before execution, ensuring trades only occur when market conditions support success
+
 Automated trading functionalities have comprehensive profitability improvements, including pattern performance gating (50%+ win rate, positive expectancy), a multi-stage take-profit strategy (30% at 6% gain, 40% at 10% gain, rest at 15% gain), improved risk management (5% stop-loss, cash floor enforcement, daily loss thresholds), and dynamic position sizing using Kelly Criterion calculations. Critical bug fixes include accurate portfolio position display, correct portfolio analytics calculations (total value, P&L, daily P&L), and live data updates for the dashboard and portfolio pages.
 
 ## External Dependencies
