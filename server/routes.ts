@@ -724,21 +724,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Token routes - Optimized with caching for <1s load time
+  // Token routes - Optimized with stale-while-revalidate for <1s load time
   app.get("/api/tokens", async (req, res) => {
     try {
       const cacheKey = 'active_tokens';
       
-      // Try to get from cache first
+      // Try to get from cache first (even if stale)
       let tokens = cacheService.get(cacheKey);
       
-      if (!tokens) {
-        // Cache miss - fetch from database and cache for 3 seconds
+      if (tokens) {
+        // Cache hit - return immediately
+        res.json(tokens);
+        
+        // If stale, refresh in background (non-blocking)
+        if (cacheService.isStale(cacheKey)) {
+          storage.getActiveTokens()
+            .then(freshTokens => {
+              cacheService.set(cacheKey, freshTokens, 3000);
+            })
+            .catch(err => console.error('Background token refresh failed:', err));
+        }
+      } else {
+        // Cache miss (first time) - fetch from database synchronously
         tokens = await storage.getActiveTokens();
         cacheService.set(cacheKey, tokens, 3000); // 3s TTL for fresh price data
+        res.json(tokens);
       }
-      
-      res.json(tokens);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch tokens", error });
     }
@@ -1895,11 +1906,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const cacheKey = 'analytics_all';
       
-      // Try to get from cache first
+      // Try to get from cache first (even if stale)
       let transformed = cacheService.get(cacheKey);
       
-      if (!transformed) {
-        // Cache miss - compute analytics
+      if (transformed) {
+        // Cache hit - return immediately
+        res.json(transformed);
+        
+        // If stale, refresh in background (non-blocking)
+        if (cacheService.isStale(cacheKey)) {
+          (async () => {
+            try {
+              let demoUser = await storage.getUserByEmail("demo@memehunter.app");
+              if (!demoUser) {
+                const saltRounds = 12;
+                const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
+                demoUser = await storage.createUser({
+                  username: "demo_user",
+                  email: "demo@memehunter.app",
+                  password: hashedDemoPassword,
+                  subscriptionTier: "pro",
+                  language: "en"
+                });
+              }
+              
+              let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+              if (!portfolio) {
+                portfolio = await storage.createPortfolio({
+                  userId: demoUser.id,
+                  totalValue: "10000.00",
+                  dailyPnL: "0.00",
+                  totalPnL: "0.00",
+                  winRate: "0.00"
+                });
+              }
+
+              const allMetrics = await tradingAnalyticsService.getAllMetrics(portfolio.id);
+              
+              const freshData = {
+                pnl: allMetrics.pnl,
+                winLoss: {
+                  ...allMetrics.winLoss,
+                  avgWin: allMetrics.winLoss.averageWin,
+                  avgLoss: allMetrics.winLoss.averageLoss,
+                },
+                holdTime: {
+                  avgHoldTime: allMetrics.holdTime.averageHoldTimeMs / (1000 * 60 * 60),
+                  avgWinHoldTime: allMetrics.holdTime.averageWinHoldTimeMs / (1000 * 60 * 60),
+                  avgLossHoldTime: allMetrics.holdTime.averageLossHoldTimeMs / (1000 * 60 * 60),
+                  totalClosedTrades: allMetrics.holdTime.totalClosedTrades,
+                },
+                strategies: allMetrics.strategies.map(s => ({
+                  ...s,
+                  roiPercent: s.roi,
+                })),
+              };
+              
+              cacheService.set(cacheKey, freshData, 5000);
+            } catch (err) {
+              console.error('Background analytics refresh failed:', err);
+            }
+          })();
+        }
+      } else {
+        // Cache miss (first time) - compute analytics synchronously
         let demoUser = await storage.getUserByEmail("demo@memehunter.app");
         if (!demoUser) {
           const saltRounds = 12;
@@ -1926,7 +1996,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const allMetrics = await tradingAnalyticsService.getAllMetrics(portfolio.id);
         
-        // Transform data to match dashboard contract
         transformed = {
           pnl: allMetrics.pnl,
           winLoss: {
@@ -1935,22 +2004,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             avgLoss: allMetrics.winLoss.averageLoss,
           },
           holdTime: {
-            avgHoldTime: allMetrics.holdTime.averageHoldTimeMs / (1000 * 60 * 60), // Convert ms to hours
+            avgHoldTime: allMetrics.holdTime.averageHoldTimeMs / (1000 * 60 * 60),
             avgWinHoldTime: allMetrics.holdTime.averageWinHoldTimeMs / (1000 * 60 * 60),
             avgLossHoldTime: allMetrics.holdTime.averageLossHoldTimeMs / (1000 * 60 * 60),
             totalClosedTrades: allMetrics.holdTime.totalClosedTrades,
           },
           strategies: allMetrics.strategies.map(s => ({
             ...s,
-            roiPercent: s.roi, // Rename roi to roiPercent
+            roiPercent: s.roi,
           })),
         };
         
-        // Cache for 5 seconds
         cacheService.set(cacheKey, transformed, 5000);
+        res.json(transformed);
       }
-      
-      res.json(transformed);
     } catch (error) {
       console.error('Error fetching all analytics metrics:', error);
       res.status(500).json({ message: "Failed to fetch all analytics metrics", error });

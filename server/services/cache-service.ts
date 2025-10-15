@@ -22,6 +22,7 @@ class CacheService {
     });
   }
 
+  // Get with stale-while-revalidate: returns stale data immediately, marks for refresh
   get<T>(key: string): T | null {
     const entry = this.cache.get(key);
     
@@ -32,13 +33,23 @@ class CacheService {
     const now = Date.now();
     const age = now - entry.timestamp;
 
-    // Check if cache entry has expired
-    if (age > entry.ttl) {
-      this.cache.delete(key);
-      return null;
+    // Always return cached data if it exists (even if stale)
+    // TTL is just for tracking age, not for deletion
+    return entry.data as T;
+  }
+
+  // Check if entry is stale (needs refresh)
+  isStale(key: string): boolean {
+    const entry = this.cache.get(key);
+    
+    if (!entry) {
+      return false; // No entry = not stale, it's missing
     }
 
-    return entry.data as T;
+    const now = Date.now();
+    const age = now - entry.timestamp;
+
+    return age > entry.ttl;
   }
 
   has(key: string): boolean {

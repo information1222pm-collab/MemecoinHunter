@@ -433,8 +433,8 @@ class PriceFeedService extends EventEmitter {
           marketCap: coin.market_cap.toString(),
         });
         
-        // Invalidate token cache for instant updates
-        cacheService.invalidate('active_tokens');
+        // NOTE: Don't invalidate cache here - let TTL expire naturally for better performance
+        // Cache invalidation on every price update defeats the caching purpose
         
         // Save price history
         await storage.createPriceHistory({
