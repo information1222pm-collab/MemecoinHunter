@@ -254,7 +254,7 @@ export class MarketHealthAnalyzer {
         recommendation: 'trade_cautiously',
         factors: factors.length > 0 ? factors : ['Moderate market conditions', 'Reduced position sizes advised']
       };
-    } else if (healthScore >= 30 || factors.length <= 2) {
+    } else if (healthScore >= 30 && factors.length <= 2) {
       return {
         recommendation: 'minimize_trading',
         factors: factors.length > 0 ? factors : ['Poor market conditions', 'Minimal trading activity']
