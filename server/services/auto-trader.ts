@@ -8,6 +8,7 @@ import { exchangeService } from './exchange-service';
 import { MarketHealthAnalyzer } from './market-health';
 import { chartAnalyzer } from './chart-analyzer';
 import { dynamicExitStrategy } from './dynamic-exit-strategy';
+import { getRiskLevelConfig, type RiskLevel, type RiskLevelConfig } from './risk-levels';
 import type { Token, Pattern, InsertTrade } from '@shared/schema';
 import type { ExchangeTradingSignal } from './exchange-service';
 
@@ -42,18 +43,42 @@ class AutoTrader extends EventEmitter {
   private marketHealthAnalyzer = new MarketHealthAnalyzer(storage);
   private healthCheckInterval?: NodeJS.Timeout;
   
+  // Risk level configurations cache
+  private riskConfigs = new Map<string, RiskLevelConfig>();
+  
   private strategy = {
-    minConfidence: 75, // Dynamic minimum confidence
+    minConfidence: 75, // Dynamic minimum confidence (now overridden by risk level)
     maxPositionSize: 1000, // $1000 max per position (will use dynamic sizing from RiskManager)
-    stopLossPercentage: 5, // IMPROVED: Tighter 5% stop loss for better risk-reward
-    takeProfitPercentage: 18, // AGGRESSIVE: 18% final take profit (increased from 15%)
-    takeProfitStages: [8, 12, 18], // AGGRESSIVE: Multi-stage take-profit (increased from 6%, 10%, 15%)
+    stopLossPercentage: 5, // IMPROVED: Tighter 5% stop loss for better risk-reward (now overridden by risk level)
+    takeProfitPercentage: 18, // AGGRESSIVE: 18% final take profit (increased from 15%) (now overridden by risk level)
+    takeProfitStages: [8, 12, 18], // AGGRESSIVE: Multi-stage take-profit (increased from 6%, 10%, 15%) (now overridden by risk level)
     sellOnlyTakeProfit: 5, // More aggressive take profit when in sell-only mode
-    minCashPercentage: 10, // IMPROVED: Minimum 10% cash buffer required
-    maxDailyLossPercentage: 5, // IMPROVED: Pause trading if daily loss exceeds 5%
-    minPatternWinRate: 0.5, // IMPROVED: Require 50%+ win rate for pattern
+    minCashPercentage: 10, // IMPROVED: Minimum 10% cash buffer required (now overridden by risk level)
+    maxDailyLossPercentage: 5, // IMPROVED: Pause trading if daily loss exceeds 5% (now overridden by risk level)
+    minPatternWinRate: 0.5, // IMPROVED: Require 50%+ win rate for pattern (now overridden by risk level)
     minPatternExpectancy: 0.5, // IMPROVED: Require positive expectancy (avg gain > avg loss)
   };
+  
+  private async getRiskConfig(portfolioId: string): Promise<RiskLevelConfig> {
+    // Check cache first
+    if (this.riskConfigs.has(portfolioId)) {
+      return this.riskConfigs.get(portfolioId)!;
+    }
+    
+    // Fetch portfolio and get risk level
+    const portfolio = await storage.getPortfolio(portfolioId);
+    const riskLevel = (portfolio?.riskLevel || 'balanced') as RiskLevel;
+    const config = getRiskLevelConfig(riskLevel);
+    
+    // Cache the config
+    this.riskConfigs.set(portfolioId, config);
+    
+    return config;
+  }
+  
+  private clearRiskConfigCache(portfolioId: string) {
+    this.riskConfigs.delete(portfolioId);
+  }
 
   async start() {
     if (this.isActive) return;
@@ -381,9 +406,10 @@ class AutoTrader extends EventEmitter {
         console.log(`⚠️ CHART-ANALYZER: Bearish chart signal detected - confidence reduced to ${confidence.toFixed(1)}%`);
       }
       
-      // AGGRESSIVE MODE: Lowered R:R requirement from 1.5:1 to 1.2:1
-      if (!chartSignal.riskRewardRatio || chartSignal.riskRewardRatio < 1.2) {
-        console.log(`⚠️ CHART-ANALYZER: Poor/missing risk-reward ratio (${chartSignal.riskRewardRatio?.toFixed(2) || '0'}:1) - trade rejected`);
+      // DYNAMIC RISK LEVEL: Check risk-reward ratio based on portfolio risk level
+      const riskConfig = await this.getRiskConfig(portfolioId);
+      if (!chartSignal.riskRewardRatio || chartSignal.riskRewardRatio < riskConfig.minRiskRewardRatio) {
+        console.log(`⚠️ CHART-ANALYZER: Poor/missing risk-reward ratio (${chartSignal.riskRewardRatio?.toFixed(2) || '0'}:1 < ${riskConfig.minRiskRewardRatio}:1 required for ${riskConfig.displayName}) - trade rejected`);
         return null; // Reject trade with poor or missing R:R
       }
       
@@ -530,10 +556,11 @@ class AutoTrader extends EventEmitter {
       const totalPnL = parseFloat(portfolio.totalPnL || '0');
       const dailyPnL = parseFloat(portfolio.dailyPnL || '0');
       
-      // IMPROVED: Check daily loss threshold (5% of starting capital)
-      const dailyLossThreshold = startingCapital * (this.strategy.maxDailyLossPercentage / 100);
+      // DYNAMIC RISK LEVEL: Check daily loss threshold based on portfolio risk level
+      const riskConfig = await this.getRiskConfig(portfolioId);
+      const dailyLossThreshold = startingCapital * (riskConfig.maxDailyLossPercentage / 100);
       if (dailyPnL < -dailyLossThreshold) {
-        console.log(`🛑 [Portfolio ${portfolioId}] DAILY LOSS LIMIT EXCEEDED: ${dailyPnL.toFixed(2)} < -$${dailyLossThreshold.toFixed(2)}`);
+        console.log(`🛑 [Portfolio ${portfolioId}] DAILY LOSS LIMIT EXCEEDED (${riskConfig.displayName} mode): ${dailyPnL.toFixed(2)} < -$${dailyLossThreshold.toFixed(2)}`);
         console.log(`🔴 [Portfolio ${portfolioId}] Trading paused for today to prevent further losses`);
         return;
       }
@@ -559,13 +586,13 @@ class AutoTrader extends EventEmitter {
       
       console.log(`💡 [Portfolio ${portfolioId}] Dynamic position sizing: $${tradeValue.toFixed(2)} (${positionSizing.riskLevel} risk, ${positionSizing.reasoning})`);
       
-      // IMPROVED: Enforce 10% minimum cash floor
-      const minCashRequired = totalValue * (this.strategy.minCashPercentage / 100);
+      // DYNAMIC RISK LEVEL: Enforce minimum cash floor based on portfolio risk level
+      const minCashRequired = totalValue * (riskConfig.minCashPercentage / 100);
       const cashAfterTrade = availableCash - tradeValue;
       
       if (cashAfterTrade < minCashRequired) {
-        console.log(`🚫 [Portfolio ${portfolioId}] CASH FLOOR PROTECTION: Trade would leave $${cashAfterTrade.toFixed(2)} (< $${minCashRequired.toFixed(2)} required)`);
-        console.log(`💰 [Portfolio ${portfolioId}] Maintaining ${this.strategy.minCashPercentage}% cash buffer for risk management`);
+        console.log(`🚫 [Portfolio ${portfolioId}] CASH FLOOR PROTECTION (${riskConfig.displayName} mode): Trade would leave $${cashAfterTrade.toFixed(2)} (< $${minCashRequired.toFixed(2)} required)`);
+        console.log(`💰 [Portfolio ${portfolioId}] Maintaining ${riskConfig.minCashPercentage}% cash buffer for risk management`);
         return;
       }
       
@@ -820,8 +847,9 @@ class AutoTrader extends EventEmitter {
             }
           }
           
-          // IMPROVED: Tighter stop-loss (5% instead of 8%)
-          if (profitLoss <= -this.strategy.stopLossPercentage) {
+          // DYNAMIC RISK LEVEL: Apply stop-loss based on portfolio risk level
+          const riskConfig = await this.getRiskConfig(portfolioId);
+          if (profitLoss <= -riskConfig.stopLossPercentage) {
             sellReason = `Stop-loss triggered at ${profitLoss.toFixed(1)}% loss`;
             sellTrigger = 'stop_loss';
             // Full sell on stop-loss, clear stage tracking
@@ -833,24 +861,24 @@ class AutoTrader extends EventEmitter {
             sellTrigger = 'chart_pattern_exit';
             this.positionStages.delete(position.id);
           }
-          // IMPROVED: Multi-stage take-profit strategy with state tracking (6%, 10%, 15%)
+          // DYNAMIC RISK LEVEL: Multi-stage take-profit strategy based on portfolio risk level
           // Only execute next stage if previous stages are complete
-          else if (profitLoss >= this.strategy.takeProfitStages[2] && currentStage < 3) {
-            // Stage 3: 15%+ gain - sell remaining position
-            sellReason = `Take-profit Stage 3: ${profitLoss.toFixed(1)}% gain (final exit)`;
+          else if (profitLoss >= riskConfig.takeProfitStages[2] && currentStage < 3) {
+            // Stage 3: Final take-profit - sell remaining position
+            sellReason = `Take-profit Stage 3 (${riskConfig.displayName}): ${profitLoss.toFixed(1)}% gain (final exit at ${riskConfig.takeProfitStages[2]}%+)`;
             sellTrigger = 'take_profit_stage_3';
             this.positionStages.set(position.id, 3);
           }
-          else if (profitLoss >= this.strategy.takeProfitStages[1] && currentStage < 2) {
-            // Stage 2: 10%+ gain - sell 40% of position (lock in more profit)
-            sellReason = `Take-profit Stage 2: ${profitLoss.toFixed(1)}% gain (partial exit 40%)`;
+          else if (profitLoss >= riskConfig.takeProfitStages[1] && currentStage < 2) {
+            // Stage 2: Mid take-profit - sell 40% of position
+            sellReason = `Take-profit Stage 2 (${riskConfig.displayName}): ${profitLoss.toFixed(1)}% gain (partial exit 40% at ${riskConfig.takeProfitStages[1]}%+)`;
             sellTrigger = 'take_profit_stage_2';
             partialSellPercent = 0.4;
             this.positionStages.set(position.id, 2);
           }
-          else if (profitLoss >= this.strategy.takeProfitStages[0] && currentStage < 1) {
-            // Stage 1: 6%+ gain - sell 30% of position (lock in initial profit)
-            sellReason = `Take-profit Stage 1: ${profitLoss.toFixed(1)}% gain (partial exit 30%)`;
+          else if (profitLoss >= riskConfig.takeProfitStages[0] && currentStage < 1) {
+            // Stage 1: Initial take-profit - sell 30% of position
+            sellReason = `Take-profit Stage 1 (${riskConfig.displayName}): ${profitLoss.toFixed(1)}% gain (partial exit 30% at ${riskConfig.takeProfitStages[0]}%+)`;
             sellTrigger = 'take_profit_stage_1';
             partialSellPercent = 0.3;
             this.positionStages.set(position.id, 1);
