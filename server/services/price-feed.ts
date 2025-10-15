@@ -342,12 +342,12 @@ class PriceFeedService extends EventEmitter {
     // Delay first price update to avoid overwhelming API on startup
     setTimeout(() => {
       this.updatePrices();
-    }, 10000); // Wait 10 seconds before first update
+    }, 5000); // Wait 5 seconds before first update (faster startup)
     
-    // Update prices every 45 seconds (increased from 30 to reduce API pressure)
+    // OPTIMIZED: Update prices every 20 seconds for faster real-time data
     this.updateInterval = setInterval(() => {
       this.updatePrices();
-    }, 45000);
+    }, 20000);
     
     
     // Run coin discovery every 5 minutes
