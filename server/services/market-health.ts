@@ -1,4 +1,4 @@
-import { IStorage } from '../storage';
+import { IStorage, storage } from '../storage';
 
 interface MarketHealthMetrics {
   healthScore: number; // 0-100, higher is healthier
