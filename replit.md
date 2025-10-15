@@ -22,10 +22,23 @@ Built with React 18 and TypeScript, using Vite for development. Styling is handl
 ### Backend
 Developed with Express.js and TypeScript (ESM configuration), providing a RESTful API and WebSocket support. Key background services include a Token Scanner, an ML Pattern Analyzer, and a Price Feed Service. The WebSocket server manages real-time client connections.
 
-**Optimized Service Intervals:**
-- Price Feed Service: 20s update interval (reduced from 45s) for faster market data
-- Position Tracker: 15s update interval (reduced from 30s) for more responsive portfolio updates
-- WebSocket price broadcasting: Instant price updates pushed to all connected clients
+**Real-Time Price Streaming Infrastructure (LATEST - October 2025):**
+- **Streaming Price Gateway**: WebSocket-based real-time price feeds with <1s latency (replaces traditional 20s polling)
+- **Primary Provider**: Coinbase WebSocket API (wss://ws-feed.exchange.coinbase.com)
+  - Supports 32+ major tokens (BTC, ETH, SOL, DOGE, SHIB, XRP, NEAR, AAVE, ARB, etc.)
+  - No geo-blocking restrictions
+  - Sub-second price updates with tick-level granularity
+- **Fallback Provider**: Binance WebSocket API (wss://stream.binance.com:9443/stream) 
+  - Auto-switches on Coinbase failure
+  - Supports 45+ trading pairs
+- **Hybrid Architecture**: Exchange WebSocket for listed tokens, CoinGecko API fallback for unlisted tokens
+- **Event-Driven Updates**: Price changes emit real-time events to auto-trader, ML analyzer, and WebSocket clients
+- **Database Integration**: Async non-blocking price history writes for ML pattern analysis
+
+**Legacy Service Intervals (still active for non-exchange tokens):**
+- Price Feed Service: 20s update interval (CoinGecko fallback)
+- Position Tracker: 15s update interval (pending event-driven refactor)
+- WebSocket price broadcasting: Instant relay of streaming exchange data
 - Market health analysis: Real-time calculation with 5-minute caching
 
 ### Data Storage
