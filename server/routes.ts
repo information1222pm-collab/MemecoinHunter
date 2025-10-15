@@ -32,20 +32,30 @@ import { db } from "./db";
 import { trades, patterns } from "@shared/schema";
 import { and, desc, gt, isNotNull, sql } from "drizzle-orm";
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  console.error('❌ STRIPE_SECRET_KEY environment variable is not set');
-  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
-}
+// Stripe configuration - optional, subscription features will be disabled if not configured
+let stripe: Stripe | null = null;
+let stripeEnabled = false;
 
-// Validate the key format (should start with sk_test_ or sk_live_)
-const stripeKey = process.env.STRIPE_SECRET_KEY.trim();
-if (!stripeKey.startsWith('sk_')) {
-  console.error('❌ Invalid STRIPE_SECRET_KEY format. Key should start with sk_test_ or sk_live_');
-  throw new Error('Invalid STRIPE_SECRET_KEY format');
+if (process.env.STRIPE_SECRET_KEY) {
+  const stripeKey = process.env.STRIPE_SECRET_KEY.trim();
+  
+  // Validate the key format (should start with sk_test_ or sk_live_)
+  if (stripeKey.startsWith('sk_')) {
+    try {
+      stripe = new Stripe(stripeKey);
+      stripeEnabled = true;
+      console.log('✅ Stripe SDK initialized with key:', stripeKey.substring(0, 10) + '...');
+    } catch (error) {
+      console.warn('⚠️ Failed to initialize Stripe SDK:', error);
+      console.warn('⚠️ Subscription features will be disabled');
+    }
+  } else {
+    console.warn('⚠️ Invalid STRIPE_SECRET_KEY format. Key should start with sk_test_ or sk_live_');
+    console.warn('⚠️ Subscription features will be disabled');
+  }
+} else {
+  console.warn('⚠️ STRIPE_SECRET_KEY not configured. Subscription features will be disabled');
 }
-
-console.log('✅ Stripe SDK initialized with key:', stripeKey.substring(0, 10) + '...');
-const stripe = new Stripe(stripeKey);
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -1303,6 +1313,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Stripe Checkout Session Creation
   app.post("/api/create-checkout-session", requireAuth, async (req, res) => {
     try {
+      if (!stripeEnabled || !stripe) {
+        return res.status(503).json({ error: 'Subscription service is not available. Please contact support.' });
+      }
+
       const { _csrf, ...requestData } = req.body;
       const { plan } = requestData;
       const user = req.user;
@@ -1360,6 +1374,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create or update subscription after successful payment
   app.post("/api/create-subscription", requireAuth, async (req, res) => {
     try {
+      if (!stripeEnabled || !stripe) {
+        return res.status(503).json({ error: 'Subscription service is not available. Please contact support.' });
+      }
+
       const { _csrf, ...requestData } = req.body;
       const { sessionId } = requestData;
       const user = req.user;
