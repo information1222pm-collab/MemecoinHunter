@@ -506,7 +506,6 @@ export default function Journal() {
                   height={300}
                   showGrid={true}
                   formatType="number"
-                  color="hsl(262, 73%, 65%)"
                   colors={['hsl(262, 73%, 65%)']}
                   testId="histogram-hold-time"
                 />
