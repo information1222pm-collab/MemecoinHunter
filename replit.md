@@ -35,9 +35,15 @@ Developed with Express.js and TypeScript (ESM configuration), providing a RESTfu
 - **Event-Driven Updates**: Price changes emit real-time events to auto-trader, ML analyzer, and WebSocket clients
 - **Database Integration**: Async non-blocking price history writes for ML pattern analysis
 
+**Real-Time Portfolio Tracking (Event-Driven - October 2025):**
+- **Event-Driven Position Updates**: Portfolio values recalculate immediately on price tick events (<250ms latency)
+- **Smart Throttling**: 250ms batching per portfolio prevents update storms while maintaining real-time responsiveness
+- **Token-Portfolio Cache**: O(1) lookups via cached mapping, refreshed every 30s for new positions
+- **Backup Polling**: 30s fallback sweep ensures no missed updates
+- **WebSocket Broadcasting**: Instant portfolio_updated events to subscribed users with sub-second delivery
+
 **Legacy Service Intervals (still active for non-exchange tokens):**
 - Price Feed Service: 20s update interval (CoinGecko fallback)
-- Position Tracker: 15s update interval (pending event-driven refactor)
 - WebSocket price broadcasting: Instant relay of streaming exchange data
 - Market health analysis: Real-time calculation with 5-minute caching
 
