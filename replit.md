@@ -50,6 +50,7 @@ A robust token scanning system utilizes CoinGecko APIs for discovering trending 
 -   **Real-time Communication**: `ws`, `WebSocket API`
 -   **Validation and Utilities**: `zod`, `date-fns`, `clsx`, `tailwind-merge`
 -   **Email Service**: `Resend API`
+-   **Task Scheduling**: `node-cron` for automated daily email sending
 -   **Payment Processing**: `Stripe API` for subscription management
 -   **Market Data APIs**: `Coinbase WebSocket API`, `Binance WebSocket API`, `CoinGecko API`
 
@@ -78,6 +79,9 @@ A robust token scanning system utilizes CoinGecko APIs for discovering trending 
 - Feature update notifications
 - Subscription upsell content for non-Enterprise users
 - Dark-themed HTML email templates via Resend
+- **Automated Email Scheduler**: Uses node-cron to send daily emails at 9:00 AM UTC
+- **Dynamic URL Generation**: All email links use actual deployment domain (no hardcoded URLs)
+- **Graceful Integration**: Scheduler starts on server init, runs alongside Position Tracker
 
 ### IP-Based Visitor Tracking ✅
 - First-time visitor detection for demo modal
