@@ -41,6 +41,7 @@ export interface IStorage {
   getAllPortfolios(): Promise<Portfolio[]>;
   createPortfolio(portfolio: InsertPortfolio): Promise<Portfolio>;
   updatePortfolio(id: string, updates: Partial<InsertPortfolio>): Promise<Portfolio>;
+  resetPortfolio(portfolioId: string, startingCapital: string): Promise<Portfolio>;
 
   // Trade operations
   getTrade(id: string): Promise<Trade | undefined>;
@@ -243,6 +244,28 @@ export class DatabaseStorage implements IStorage {
 
   async updatePortfolio(id: string, updates: Partial<InsertPortfolio>): Promise<Portfolio> {
     const [portfolio] = await db.update(portfolios).set(updates).where(eq(portfolios.id, id)).returning();
+    return portfolio;
+  }
+
+  async resetPortfolio(portfolioId: string, startingCapital: string): Promise<Portfolio> {
+    // Delete all positions for this portfolio
+    await db.delete(positions).where(eq(positions.portfolioId, portfolioId));
+    
+    // Reset portfolio values with new starting capital
+    const [portfolio] = await db.update(portfolios)
+      .set({
+        startingCapital,
+        cashBalance: startingCapital,
+        totalValue: "0",
+        realizedPnL: "0",
+        dailyPnL: "0",
+        totalPnL: "0",
+        winRate: "0",
+        updatedAt: new Date(),
+      })
+      .where(eq(portfolios.id, portfolioId))
+      .returning();
+    
     return portfolio;
   }
 
