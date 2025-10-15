@@ -581,10 +581,13 @@ class RiskManager extends EventEmitter {
     const kellyFraction = (winProbability * rewardRiskRatio - lossProbability) / rewardRiskRatio;
     
     // Scale by risk per trade and convert to percentage
-    const kellyPercentage = (kellyFraction / riskPerTrade) * 100;
+    let kellyPercentage = (kellyFraction / riskPerTrade) * 100;
     
-    // Cap at reasonable limits for crypto (more volatile than traditional assets)
-    return Math.max(0, Math.min(kellyPercentage, 15));
+    // AGGRESSIVE MODE: Use 2x Kelly for higher returns (increased risk)
+    kellyPercentage = kellyPercentage * 2;
+    
+    // Cap at higher limits for aggressive trading (increased from 15% to 30%)
+    return Math.max(0, Math.min(kellyPercentage, 30));
   }
 
   private getAvailableCapacity(positions: Position[], portfolioValue: number, riskLimits: RiskLimits): number {
