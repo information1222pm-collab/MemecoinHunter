@@ -253,7 +253,7 @@ export default function Journal() {
                       <div>
                         <p className="text-sm text-muted-foreground">Win Rate</p>
                         <p className="text-2xl font-bold text-green-400" data-testid="text-win-rate">
-                          {stats?.winRate?.toFixed(1) || 0}%
+                          {(stats?.closedPositions || 0) === 0 ? 'N/A' : `${stats?.winRate?.toFixed(1)}%`}
                         </p>
                       </div>
                       <div className="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center">
@@ -261,7 +261,10 @@ export default function Journal() {
                       </div>
                     </div>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      {stats?.winCount || 0}W / {stats?.lossCount || 0}L / {stats?.breakevenCount || 0}BE
+                      {(stats?.closedPositions || 0) === 0 
+                        ? 'No closed trades yet' 
+                        : `${stats?.winCount || 0}W / ${stats?.lossCount || 0}L / ${stats?.breakevenCount || 0}BE`
+                      }
                     </div>
                   </>
                 )}
@@ -283,9 +286,9 @@ export default function Journal() {
                         <p className="text-sm text-muted-foreground">Avg Return</p>
                         <p className={cn(
                           "text-2xl font-bold",
-                          (stats?.averageReturn || 0) >= 0 ? "text-green-400" : "text-red-400"
+                          (stats?.closedPositions || 0) === 0 ? "text-gray-400" : (stats?.averageReturn || 0) >= 0 ? "text-green-400" : "text-red-400"
                         )} data-testid="text-avg-return">
-                          {formatPercentage(stats?.averageReturn || 0)}
+                          {(stats?.closedPositions || 0) === 0 ? 'N/A' : formatPercentage(stats?.averageReturn || 0)}
                         </p>
                       </div>
                       <div className="w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center">
@@ -293,7 +296,7 @@ export default function Journal() {
                       </div>
                     </div>
                     <div className="mt-2 text-xs text-muted-foreground">
-                      Per trade average
+                      {(stats?.closedPositions || 0) === 0 ? 'No data available' : 'Per trade average'}
                     </div>
                   </>
                 )}
