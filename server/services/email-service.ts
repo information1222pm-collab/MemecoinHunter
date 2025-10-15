@@ -170,6 +170,7 @@ export class EmailService {
   }
 
   async sendFeatureUpdateEmail(user: UserInfo, featureTitle: string, featureDescription: string, featureDetails: string[]): Promise<void> {
+    const appUrl = this.getAppUrl();
     const htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -228,7 +229,7 @@ export class EmailService {
           <!-- CTA -->
           <tr>
             <td style="padding: 0 40px 30px; text-align: center;">
-              <a href="https://cryptohobby.app" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%); color: #ffffff; text-decoration: none; font-weight: 600; border-radius: 8px; font-size: 16px;">Try It Now</a>
+              <a href="${appUrl}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%); color: #ffffff; text-decoration: none; font-weight: 600; border-radius: 8px; font-size: 16px;">Try It Now</a>
             </td>
           </tr>
 
@@ -236,8 +237,8 @@ export class EmailService {
           <tr>
             <td style="padding: 30px 40px; text-align: center; border-top: 1px solid #262626;">
               <p style="margin: 0; font-size: 14px; color: #6b7280;">
-                <a href="https://cryptohobby.app" style="color: #8b5cf6; text-decoration: none;">Visit Dashboard</a> | 
-                <a href="https://cryptohobby.app/settings" style="color: #8b5cf6; text-decoration: none;">Settings</a>
+                <a href="${appUrl}" style="color: #8b5cf6; text-decoration: none;">Visit Dashboard</a> | 
+                <a href="${appUrl}/settings" style="color: #8b5cf6; text-decoration: none;">Settings</a>
               </p>
               <p style="margin: 12px 0 0; font-size: 12px; color: #6b7280;">
                 © ${new Date().getFullYear()} MemeCoin Hunter. All rights reserved.
@@ -264,6 +265,27 @@ export class EmailService {
       console.error(`❌ Failed to send feature update to ${user.email}:`, error);
       throw error;
     }
+  }
+
+  async sendDemoPerformanceReport(email: string): Promise<void> {
+    const demoMetrics: PortfolioMetrics = {
+      totalValue: 12543.87,
+      dailyPnL: 543.87,
+      dailyPnLPercent: 4.53,
+      totalPnL: 2543.87,
+      totalPnLPercent: 25.44,
+      winRate: 68.5,
+      totalTrades: 47,
+      activePositions: 12
+    };
+
+    const demoUser: UserInfo = {
+      email: email,
+      firstName: 'Trader',
+      subscriptionTier: 'basic' // Shows upgrade incentive
+    };
+
+    await this.sendDailyPerformanceReport(demoUser, demoMetrics);
   }
 
   async sendTestEmail(email: string): Promise<void> {

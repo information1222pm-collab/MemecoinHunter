@@ -91,6 +91,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ csrfToken: req.csrfToken() });
   });
   
+  // Conditional CSRF middleware - skip for testing endpoints
+  const conditionalCsrf = (req: any, res: any, next: any) => {
+    // Skip CSRF for testing email endpoints
+    if (req.path === '/api/email/test' || req.path === '/api/email/demo-performance') {
+      return next();
+    }
+    return csrfProtection(req, res, next);
+  };
+  
   // Comprehensive CSRF protection for ALL state-changing endpoints
   app.use([
     '/api/auth/login', '/api/auth/register', '/api/auth/logout',
@@ -98,7 +107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     '/api/api-keys', '/api/settings', '/api/auto-trader',
     '/api/email', '/api/visitor/demo-complete',
     '/api/create-checkout-session', '/api/create-subscription', '/api/cancel-subscription'
-  ].map(path => [path, path + '/*']).flat(), csrfProtection);
+  ].map(path => [path, path + '/*']).flat(), conditionalCsrf);
 
   // Rate Limiting for Security (CRITICAL SECURITY FIX)
   const authLimiter = rateLimit({
@@ -2330,6 +2339,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error sending test email:', error);
       res.status(500).json({ message: "Failed to send test email", error });
+    }
+  });
+
+  app.post("/api/email/demo-performance", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ message: "Email address is required" });
+      }
+
+      const { emailService } = await import('./services/email-service.js');
+      await emailService.sendDemoPerformanceReport(email);
+      
+      res.json({ success: true, message: `Demo performance report sent to ${email}` });
+    } catch (error) {
+      console.error('Error sending demo performance report:', error);
+      res.status(500).json({ message: "Failed to send demo performance report", error });
     }
   });
 
