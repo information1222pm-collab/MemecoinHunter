@@ -1,5 +1,6 @@
 import { EventEmitter } from 'events';
 import { storage } from '../storage';
+import { getRiskLevelConfig, type RiskLevel } from './risk-levels';
 import type { Portfolio, Position, Trade, Token } from '@shared/schema';
 
 interface RiskMetrics {
@@ -153,10 +154,23 @@ class RiskManager extends EventEmitter {
       }
 
       const portfolioValue = parseFloat(portfolio.totalValue || '0');
-      const riskLimits = this.defaultRiskLimits;
+      
+      // DYNAMIC RISK LEVEL: Get portfolio-specific risk configuration
+      const riskLevel = (portfolio.riskLevel || 'balanced') as RiskLevel;
+      const riskConfig = getRiskLevelConfig(riskLevel);
+      
+      // Use dynamic risk limits based on portfolio's risk level
+      const riskLimits = {
+        maxPositionSize: riskConfig.maxPositionSizePercent,
+        stopLossPercentage: riskConfig.stopLossPercentage,
+        maxConcentration: riskConfig.maxConcentration,
+        maxOpenPositions: riskConfig.maxOpenPositions,
+        maxDailyLoss: riskConfig.maxDailyLossPercentage,
+        maxDrawdown: 20,
+      };
 
-      // Base position size (Kelly Criterion adapted for stop loss)
-      const kellyPercentage = this.calculateKellyPercentage(confidence, riskLimits.stopLossPercentage);
+      // Base position size (Kelly Criterion adapted for stop loss, with risk level multiplier)
+      const kellyPercentage = this.calculateKellyPercentage(confidence, riskLimits.stopLossPercentage) * riskConfig.kellyMultiplier;
       
       // Risk-adjusted position size as percentage
       const availableCapacity = this.getAvailableCapacity(positions, portfolioValue, riskLimits);
@@ -166,9 +180,9 @@ class RiskManager extends EventEmitter {
         availableCapacity
       );
 
-      // Token-specific volatility adjustment
+      // Token-specific volatility adjustment (tolerance based on risk level)
       const tokenVolatility = await this.getTokenVolatility(tokenId);
-      const volatilityAdjustment = this.calculateVolatilityAdjustment(tokenVolatility);
+      const volatilityAdjustment = this.calculateVolatilityAdjustment(tokenVolatility, riskConfig.volatilityTolerance);
       
       const finalPercentage = riskAdjustedPercentage * volatilityAdjustment;
       
@@ -180,21 +194,18 @@ class RiskManager extends EventEmitter {
       const maxDollarAmount = (riskLimits.maxPositionSize / 100) * portfolioValue;
       const maxTokenAmount = maxDollarAmount / entryPrice;
 
-      // Determine risk level
-      const riskLevel = this.determineRiskLevel(finalPercentage, tokenVolatility, confidence);
+      // Determine position risk category for display (map from portfolio risk level)
+      const positionRiskCategory: 'low' | 'medium' | 'high' = 
+        riskLevel === 'conservative' || riskLevel === 'moderate' ? 'low' :
+        riskLevel === 'balanced' ? 'medium' : 'high';
 
-      // Generate reasoning
-      const reasoning = this.generatePositionSizingReasoning(
-        kellyPercentage,
-        volatilityAdjustment,
-        confidence,
-        tokenVolatility
-      );
+      // Generate reasoning with risk level context
+      const reasoning = `Kelly Criterion suggests ${(kellyPercentage * 100).toFixed(0)}% allocation. Pattern confidence: ${(confidence * 100).toFixed(0)}%.`;
 
       return {
         maxPositionSize: maxTokenAmount,
         recommendedSize: Math.max(0, tokenAmount),
-        riskLevel,
+        riskLevel: positionRiskCategory,
         reasoning,
       };
     } catch (error) {
@@ -624,10 +635,11 @@ class RiskManager extends EventEmitter {
     }
   }
 
-  private calculateVolatilityAdjustment(volatility: number): number {
-    // Reduce position size for high volatility tokens
-    if (volatility > 15) return 0.5; // High volatility
-    if (volatility > 10) return 0.7; // Medium volatility
+  private calculateVolatilityAdjustment(volatility: number, tolerance: number = 1.0): number {
+    // Reduce position size for high volatility tokens (adjusted by risk tolerance)
+    const adjustedThreshold = tolerance; // Higher tolerance = accept more volatility
+    if (volatility > 15 / adjustedThreshold) return 0.5; // High volatility
+    if (volatility > 10 / adjustedThreshold) return 0.7; // Medium volatility
     if (volatility > 5) return 0.85; // Low-medium volatility
     return 1.0; // Low volatility
   }
