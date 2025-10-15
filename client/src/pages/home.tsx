@@ -57,16 +57,32 @@ export default function Home() {
   const { t } = useLanguage();
   const [showDemo, setShowDemo] = useState(false);
 
-  // Check if user has seen the demo
+  // Check if visitor has seen the demo (IP-based tracking)
   useEffect(() => {
-    const demoCompleted = localStorage.getItem('demo_completed');
-    if (!demoCompleted) {
-      // Show demo after a short delay for better UX
-      const timer = setTimeout(() => {
-        setShowDemo(true);
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
+    const checkVisitor = async () => {
+      try {
+        const response = await fetch('/api/visitor/check');
+        const data = await response.json();
+        
+        if (!data.hasSeenDemo) {
+          // Show demo after a short delay for better UX
+          setTimeout(() => {
+            setShowDemo(true);
+          }, 1000);
+        }
+      } catch (error) {
+        console.error('Error checking visitor status:', error);
+        // Fallback to localStorage if API fails
+        const demoCompleted = localStorage.getItem('demo_completed');
+        if (!demoCompleted) {
+          setTimeout(() => {
+            setShowDemo(true);
+          }, 1000);
+        }
+      }
+    };
+    
+    checkVisitor();
   }, []);
 
   const { data: scannerStatus } = useQuery<{

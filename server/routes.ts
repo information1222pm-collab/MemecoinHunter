@@ -621,6 +621,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Visitor tracking for IP-based demo
+  app.get("/api/visitor/check", async (req, res) => {
+    try {
+      const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
+      const userAgent = req.get('user-agent') || '';
+      
+      let visitor = await storage.getVisitorByIp(ipAddress);
+      
+      if (!visitor) {
+        // Create new visitor record
+        visitor = await storage.createVisitor({
+          ipAddress,
+          userAgent,
+          hasSeenDemo: false,
+          visitCount: 1
+        });
+      } else {
+        // Update last visit time and increment visit count
+        await storage.updateVisitorLastVisit(ipAddress);
+      }
+      
+      res.json({ 
+        hasSeenDemo: visitor.hasSeenDemo,
+        isNewVisitor: visitor.visitCount === 1
+      });
+    } catch (error) {
+      console.error('Error checking visitor:', error);
+      res.status(500).json({ error: 'Failed to check visitor status' });
+    }
+  });
+
+  app.post("/api/visitor/demo-complete", async (req, res) => {
+    try {
+      const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
+      
+      await storage.updateVisitorDemo(ipAddress, true);
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error marking demo complete:', error);
+      res.status(500).json({ error: 'Failed to update visitor status' });
+    }
+  });
+
   // Token routes
   app.get("/api/tokens", async (req, res) => {
     try {

@@ -211,6 +211,17 @@ export const alertEvents = pgTable("alert_events", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Visitor Tracking for IP-based Demo
+export const visitors = pgTable("visitors", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ipAddress: text("ip_address").notNull().unique(),
+  hasSeenDemo: boolean("has_seen_demo").default(false),
+  firstVisit: timestamp("first_visit").defaultNow(),
+  lastVisit: timestamp("last_visit").defaultNow(),
+  visitCount: integer("visit_count").default(1),
+  userAgent: text("user_agent"),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ one, many }) => ({
   portfolio: one(portfolios),
@@ -365,6 +376,12 @@ export const insertAlertEventSchema = createInsertSchema(alertEvents).omit({
   createdAt: true,
 });
 
+export const insertVisitorSchema = createInsertSchema(visitors).omit({
+  id: true,
+  firstVisit: true,
+  lastVisit: true,
+});
+
 export const insertPositionSchema = createInsertSchema(positions).omit({
   id: true,
   updatedAt: true,
@@ -505,3 +522,6 @@ export type InsertAlertRule = z.infer<typeof insertAlertRuleSchema>;
 
 export type AlertEvent = typeof alertEvents.$inferSelect;
 export type InsertAlertEvent = z.infer<typeof insertAlertEventSchema>;
+
+export type Visitor = typeof visitors.$inferSelect;
+export type InsertVisitor = z.infer<typeof insertVisitorSchema>;

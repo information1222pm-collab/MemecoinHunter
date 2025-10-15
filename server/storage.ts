@@ -2,14 +2,15 @@ import {
   users, tokens, portfolios, trades, positions, scanAlerts, 
   priceHistory, patterns, subscriptions, patternPerformance, mlLearningParams, auditLog,
   exchangeConfig, exchangeTrades, exchangeBalances, tradingConfig, apiKeys,
-  alertRules, alertEvents,
+  alertRules, alertEvents, visitors,
   type User, type InsertUser, type UpsertUser, type Token, type InsertToken,
   type Portfolio, type InsertPortfolio, type Trade, type InsertTrade,
   type Position, type InsertPosition, type ScanAlert, type InsertScanAlert,
   type PriceHistory, type InsertPriceHistory, type Pattern, type InsertPattern,
   type Subscription, type InsertSubscription, type PatternPerformance, type InsertPatternPerformance,
   type MLLearningParams, type InsertMLLearningParams,
-  type AlertRule, type InsertAlertRule, type AlertEvent, type InsertAlertEvent
+  type AlertRule, type InsertAlertRule, type AlertEvent, type InsertAlertEvent,
+  type Visitor, type InsertVisitor
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -118,6 +119,12 @@ export interface IStorage {
   createAlertEvent(data: InsertAlertEvent): Promise<AlertEvent>;
   getAlertHistory(userId: string, limit?: number): Promise<AlertEvent[]>;
   getAlertRule(id: string): Promise<AlertRule | undefined>;
+  
+  // Visitor tracking operations
+  getVisitorByIp(ipAddress: string): Promise<Visitor | undefined>;
+  createVisitor(data: InsertVisitor): Promise<Visitor>;
+  updateVisitorDemo(ipAddress: string, hasSeenDemo: boolean): Promise<void>;
+  updateVisitorLastVisit(ipAddress: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -687,6 +694,32 @@ export class DatabaseStorage implements IStorage {
   async getAlertRule(id: string): Promise<AlertRule | undefined> {
     const [alert] = await db.select().from(alertRules).where(eq(alertRules.id, id));
     return alert || undefined;
+  }
+
+  // Visitor tracking operations
+  async getVisitorByIp(ipAddress: string): Promise<Visitor | undefined> {
+    const [visitor] = await db.select().from(visitors).where(eq(visitors.ipAddress, ipAddress));
+    return visitor || undefined;
+  }
+
+  async createVisitor(data: InsertVisitor): Promise<Visitor> {
+    const [visitor] = await db.insert(visitors).values(data).returning();
+    return visitor;
+  }
+
+  async updateVisitorDemo(ipAddress: string, hasSeenDemo: boolean): Promise<void> {
+    await db.update(visitors)
+      .set({ hasSeenDemo, lastVisit: new Date() })
+      .where(eq(visitors.ipAddress, ipAddress));
+  }
+
+  async updateVisitorLastVisit(ipAddress: string): Promise<void> {
+    await db.update(visitors)
+      .set({ 
+        lastVisit: new Date(),
+        visitCount: sql`${visitors.visitCount} + 1`
+      })
+      .where(eq(visitors.ipAddress, ipAddress));
   }
 }
 

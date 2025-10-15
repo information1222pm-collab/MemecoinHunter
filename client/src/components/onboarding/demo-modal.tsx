@@ -332,11 +332,21 @@ export function DemoModal({ isOpen, onClose }: DemoModalProps) {
     }
   ];
 
-  const handleNext = () => {
+  const markDemoComplete = async () => {
+    // Mark as complete in both localStorage and server (IP-based tracking)
+    localStorage.setItem('demo_completed', 'true');
+    try {
+      await fetch('/api/visitor/demo-complete', { method: 'POST' });
+    } catch (error) {
+      console.error('Error marking demo complete:', error);
+    }
+  };
+
+  const handleNext = async () => {
     if (step < steps.length - 1) {
       setStep(step + 1);
     } else {
-      localStorage.setItem('demo_completed', 'true');
+      await markDemoComplete();
       onClose();
     }
   };
@@ -347,8 +357,8 @@ export function DemoModal({ isOpen, onClose }: DemoModalProps) {
     }
   };
 
-  const handleSkip = () => {
-    localStorage.setItem('demo_completed', 'true');
+  const handleSkip = async () => {
+    await markDemoComplete();
     onClose();
   };
 
