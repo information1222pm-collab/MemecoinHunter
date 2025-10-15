@@ -873,7 +873,7 @@ export default function Home() {
                 Platform Overview
               </h2>
               <p className="text-lg text-muted-foreground max-w-4xl mx-auto leading-relaxed">
-                CryptoHobby is a cutting-edge <strong className="text-primary">paper trading and analysis platform</strong> specialized in memecoin pattern recognition and trading strategy development. Built with institutional-grade technology, the platform combines real-time market scanning, machine learning pattern detection, and comprehensive risk management tools in a <strong className="text-primary">100% simulated trading environment</strong>.
+                MemeCoin Hunter is a cutting-edge <strong className="text-primary">paper trading and analysis platform</strong> specialized in memecoin pattern recognition and trading strategy development. Built with institutional-grade technology, the platform combines real-time market scanning, machine learning pattern detection, and comprehensive risk management tools in a <strong className="text-primary">100% simulated trading environment</strong>.
               </p>
               <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
                 <Badge className="bg-purple-500/20 text-purple-400 border-purple-500/30 px-4 py-2">
@@ -1418,7 +1418,7 @@ export default function Home() {
             <div className="text-center mt-12 p-8 glass-card rounded-2xl bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-blue-500/10 border-2 border-purple-500/20">
               <h3 className="text-2xl font-bold mb-3">Ready to Start Trading?</h3>
               <p className="text-muted-foreground mb-6 max-w-2xl mx-auto">
-                Join CryptoHobby today and experience professional-grade memecoin trading tools with zero risk. Get $10,000 in virtual capital and access to all premium features for free.
+                Join MemeCoin Hunter today and experience professional-grade memecoin trading tools with zero risk. Get $10,000 in virtual capital and access to all premium features for free.
               </p>
               <div className="flex flex-wrap gap-4 justify-center">
                 <Badge className="bg-green-500/20 text-green-400 border-green-500/30 px-6 py-3 text-base">

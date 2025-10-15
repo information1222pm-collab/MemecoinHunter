@@ -1,7 +1,7 @@
-# CryptoHobby - Memecoin Trading Platform
+# MemeCoin Hunter - Memecoin Trading Platform
 
 ## Overview
-CryptoHobby is a comprehensive memecoin trading platform designed for real-time market scanning, portfolio management, and pattern analysis with integrated trading capabilities. It aims to help users identify trading opportunities in the volatile memecoin market through automated token scanning and machine learning pattern detection, featuring a dark-themed UI and multilingual support. Authenticated users receive $10,000 in virtual trading capital and access to all features free of charge.
+MemeCoin Hunter is a comprehensive memecoin trading platform designed for real-time market scanning, portfolio management, and pattern analysis with integrated trading capabilities. It aims to help users identify trading opportunities in the volatile memecoin market through automated token scanning and machine learning pattern detection, featuring a dark-themed UI and multilingual support. Authenticated users receive $10,000 in virtual trading capital and access to all features free of charge.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.

@@ -1522,7 +1522,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Stakeholder Report routes
   app.get("/api/stakeholder-report", async (req, res) => {
     try {
-      const reportPath = join(process.cwd(), "CryptoHobby_Stakeholder_Report_Q4_2025.md");
+      const reportPath = join(process.cwd(), "MemeCoin_Hunter_Stakeholder_Report_Q4_2025.md");
       const reportContent = await readFile(reportPath, "utf-8");
       
       // Get current system stats for dynamic updates

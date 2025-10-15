@@ -119,7 +119,7 @@ export default function SignIn() {
     },
     onSuccess: async () => {
       toast({
-        title: "Welcome to CryptoHobby!",
+        title: "Welcome to MemeCoin Hunter!",
         description: "Your account has been created and you've been logged in automatically.",
       });
       // Refetch auth status to update the UI

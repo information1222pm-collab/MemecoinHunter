@@ -33,7 +33,7 @@ export function DemoModal({ isOpen, onClose }: DemoModalProps) {
 
   const steps = [
     {
-      title: "Welcome to CryptoHobby",
+      title: "Welcome to MemeCoin Hunter",
       subtitle: "Your AI-Powered Memecoin Trading Platform",
       content: (
         <div className="space-y-6">

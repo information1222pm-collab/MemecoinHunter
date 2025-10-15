@@ -20,7 +20,7 @@ interface UserInfo {
 }
 
 export class EmailService {
-  private fromEmail = 'CryptoHobby <onboarding@resend.dev>';
+  private fromEmail = 'MemeCoin Hunter <onboarding@resend.dev>';
 
   async sendDailyPerformanceReport(user: UserInfo, metrics: PortfolioMetrics): Promise<void> {
     const isEnterprise = user.subscriptionTier === 'enterprise';
@@ -133,7 +133,7 @@ export class EmailService {
                 <a href="https://cryptohobby.app/settings" style="color: #10b981; text-decoration: none;">Settings</a>
               </p>
               <p style="margin: 12px 0 0; font-size: 12px; color: #6b7280;">
-                © ${new Date().getFullYear()} CryptoHobby. All rights reserved.
+                © ${new Date().getFullYear()} MemeCoin Hunter. All rights reserved.
               </p>
             </td>
           </tr>
@@ -188,7 +188,7 @@ export class EmailService {
           <tr>
             <td style="padding: 30px 40px;">
               <p style="margin: 0; font-size: 16px; color: #d1d5db;">Hello ${user.firstName || 'Trader'},</p>
-              <p style="margin: 16px 0 0; font-size: 16px; color: #d1d5db;">We're excited to announce a new feature on CryptoHobby!</p>
+              <p style="margin: 16px 0 0; font-size: 16px; color: #d1d5db;">We're excited to announce a new feature on MemeCoin Hunter!</p>
             </td>
           </tr>
 
@@ -230,7 +230,7 @@ export class EmailService {
                 <a href="https://cryptohobby.app/settings" style="color: #8b5cf6; text-decoration: none;">Settings</a>
               </p>
               <p style="margin: 12px 0 0; font-size: 12px; color: #6b7280;">
-                © ${new Date().getFullYear()} CryptoHobby. All rights reserved.
+                © ${new Date().getFullYear()} MemeCoin Hunter. All rights reserved.
               </p>
             </td>
           </tr>
@@ -275,7 +275,7 @@ export class EmailService {
               <h1 style="margin: 0; font-size: 28px; font-weight: bold; color: #10b981;">Email Service is Working!</h1>
               <p style="margin: 16px 0 0; font-size: 16px; color: #d1d5db;">Your Resend integration is successfully configured.</p>
               <p style="margin: 24px 0 0; font-size: 14px; color: #6b7280;">
-                CryptoHobby can now send daily performance reports and feature updates.
+                MemeCoin Hunter can now send daily performance reports and feature updates.
               </p>
             </td>
           </tr>
@@ -291,7 +291,7 @@ export class EmailService {
       await resend.emails.send({
         from: this.fromEmail,
         to: email,
-        subject: '✅ CryptoHobby Email Service Test',
+        subject: '✅ MemeCoin Hunter Email Service Test',
         html: htmlContent,
       });
       console.log(`✅ Test email sent to ${email}`);
