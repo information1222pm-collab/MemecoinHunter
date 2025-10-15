@@ -15,6 +15,7 @@ import { tradingAnalyticsService } from "./services/trading-analytics";
 import { tradeJournalService } from "./services/trade-journal";
 import { riskReportsService } from "./services/risk-reports";
 import { alertService } from "./services/alert-service";
+import { marketHealthAnalyzer } from "./services/market-health";
 import { insertUserSchema, insertTradeSchema, insertTokenSchema, insertAlertRuleSchema } from "@shared/schema";
 import { z } from "zod";
 import * as bcrypt from "bcrypt";
@@ -1354,6 +1355,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       res.status(500).json({ message: "Failed to log deployment", error });
+    }
+  });
+
+  // Market Health Endpoint
+  app.get("/api/market-health", async (req, res) => {
+    try {
+      const health = await marketHealthAnalyzer.analyzeMarketHealth();
+      res.json(health);
+    } catch (error) {
+      console.error('[API] Error fetching market health:', error);
+      res.status(500).json({ 
+        message: "Failed to fetch market health", 
+        error,
+        // Return default health on error
+        healthScore: 60,
+        recommendation: 'caution',
+        factors: ['Error fetching market data'],
+        volatility: 0,
+        trend: 'neutral',
+        breadth: 0,
+        volumeHealth: 0,
+        correlation: 0,
+        timestamp: new Date().toISOString()
+      });
     }
   });
 

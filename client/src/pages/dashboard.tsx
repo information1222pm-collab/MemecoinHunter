@@ -17,7 +17,10 @@ import {
   Clock, 
   PieChart, 
   BarChart3, 
-  Award 
+  Award,
+  Activity,
+  Shield,
+  AlertTriangle
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWebSocket } from "@/hooks/use-websocket";
@@ -89,6 +92,22 @@ function DashboardContent() {
   const { data: exposureData, isLoading: exposureLoading } = useQuery<ExposureData>({
     queryKey: ['/api/risk/exposure'],
     refetchInterval: 30000, // Reduced polling since WebSocket will handle real-time updates
+  });
+
+  // Fetch market health data with auto-refresh
+  const { data: marketHealth } = useQuery<{
+    healthScore: number;
+    recommendation: string;
+    trend: string;
+    volatility: number;
+    breadth: number;
+    volumeHealth: number;
+    correlation: number;
+    factors: string[];
+    timestamp: string;
+  }>({
+    queryKey: ['/api/market-health'],
+    refetchInterval: 30000, // Update every 30 seconds
   });
 
   const isLoading = analyticsLoading || exposureLoading;
@@ -409,6 +428,68 @@ function DashboardContent() {
                     </div>
                     <div className="mt-2 text-xs text-muted-foreground" data-testid="text-strategy-trades">
                       {topStrategy.trades} trades
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Card 7 - Market Health */}
+            <Card data-testid="card-market-health" className="backdrop-blur-md bg-card/50 border-white/10">
+              <CardContent className="p-6">
+                {!marketHealth ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-8 w-32" />
+                    <Skeleton className="h-4 w-full" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Market Health</p>
+                        <p 
+                          className={`text-2xl font-bold ${
+                            marketHealth.healthScore >= 80 ? 'text-green-400' :
+                            marketHealth.healthScore >= 60 ? 'text-yellow-400' :
+                            marketHealth.healthScore >= 40 ? 'text-orange-400' : 'text-red-400'
+                          }`}
+                          data-testid="text-market-health-score"
+                        >
+                          {marketHealth.healthScore.toFixed(1)}/100
+                        </p>
+                      </div>
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                        marketHealth.healthScore >= 80 ? 'bg-green-400/10' :
+                        marketHealth.healthScore >= 60 ? 'bg-yellow-400/10' :
+                        marketHealth.healthScore >= 40 ? 'bg-orange-400/10' : 'bg-red-400/10'
+                      }`}>
+                        {marketHealth.recommendation === 'halt_trading' ? (
+                          <AlertTriangle className={`w-6 h-6 ${
+                            marketHealth.healthScore >= 40 ? 'text-orange-400' : 'text-red-400'
+                          }`} />
+                        ) : (
+                          <Activity className={`w-6 h-6 ${
+                            marketHealth.healthScore >= 80 ? 'text-green-400' :
+                            marketHealth.healthScore >= 60 ? 'text-yellow-400' : 'text-orange-400'
+                          }`} />
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-4 text-sm">
+                      <span 
+                        className={`font-medium uppercase ${
+                          marketHealth.recommendation === 'healthy' ? 'text-green-400' :
+                          marketHealth.recommendation === 'caution' ? 'text-yellow-400' :
+                          marketHealth.recommendation === 'minimize_trading' ? 'text-orange-400' : 'text-red-400'
+                        }`}
+                        data-testid="text-market-recommendation"
+                      >
+                        {marketHealth.recommendation.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <div className="mt-2 text-xs text-muted-foreground" data-testid="text-market-trend">
+                      Trend: {marketHealth.trend} | Volatility: {marketHealth.volatility.toFixed(1)}%
                     </div>
                   </>
                 )}

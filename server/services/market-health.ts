@@ -347,3 +347,6 @@ export class MarketHealthAnalyzer {
     }
   }
 }
+
+// Export singleton instance
+export const marketHealthAnalyzer = new MarketHealthAnalyzer();
