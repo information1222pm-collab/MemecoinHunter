@@ -171,6 +171,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/trades', requireAuth);
   app.use('/api/api-keys', requireAuth); // Full access for all users
   app.use('/api/audit-logs', requireAuth); // Full access for all users
+  app.use('/api/journal', requireAuth); // Trade journal requires authentication
 
   // Properly Authenticated WebSocket server (CRITICAL SECURITY FIX)
   const wss = new WebSocketServer({ noServer: true, perMessageDeflate: false });
@@ -1838,23 +1839,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Trade Journal Endpoints
   app.get("/api/journal/entries", async (req, res) => {
     try {
-      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
-      if (!demoUser) {
-        const saltRounds = 12;
-        const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
-        demoUser = await storage.createUser({
-          username: "demo_user",
-          email: "demo@memehunter.app",
-          password: hashedDemoPassword,
-          subscriptionTier: "pro",
-          language: "en"
-        });
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
       }
       
-      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+      let portfolio = await storage.getPortfolioByUserId(user.id);
       if (!portfolio) {
         portfolio = await storage.createPortfolio({
-          userId: demoUser.id,
+          userId: user.id,
           totalValue: "10000.00",
           dailyPnL: "0.00",
           totalPnL: "0.00",
@@ -1895,23 +1888,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/journal/stats", async (req, res) => {
     try {
-      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
-      if (!demoUser) {
-        const saltRounds = 12;
-        const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
-        demoUser = await storage.createUser({
-          username: "demo_user",
-          email: "demo@memehunter.app",
-          password: hashedDemoPassword,
-          subscriptionTier: "pro",
-          language: "en"
-        });
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
       }
       
-      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+      let portfolio = await storage.getPortfolioByUserId(user.id);
       if (!portfolio) {
         portfolio = await storage.createPortfolio({
-          userId: demoUser.id,
+          userId: user.id,
           totalValue: "10000.00",
           dailyPnL: "0.00",
           totalPnL: "0.00",
@@ -1929,23 +1914,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/journal/by-outcome/:outcome", async (req, res) => {
     try {
-      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
-      if (!demoUser) {
-        const saltRounds = 12;
-        const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
-        demoUser = await storage.createUser({
-          username: "demo_user",
-          email: "demo@memehunter.app",
-          password: hashedDemoPassword,
-          subscriptionTier: "pro",
-          language: "en"
-        });
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
       }
       
-      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+      let portfolio = await storage.getPortfolioByUserId(user.id);
       if (!portfolio) {
         portfolio = await storage.createPortfolio({
-          userId: demoUser.id,
+          userId: user.id,
           totalValue: "10000.00",
           dailyPnL: "0.00",
           totalPnL: "0.00",
@@ -1973,23 +1950,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/journal/by-strategy/:pattern", async (req, res) => {
     try {
-      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
-      if (!demoUser) {
-        const saltRounds = 12;
-        const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
-        demoUser = await storage.createUser({
-          username: "demo_user",
-          email: "demo@memehunter.app",
-          password: hashedDemoPassword,
-          subscriptionTier: "pro",
-          language: "en"
-        });
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
       }
       
-      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
+      let portfolio = await storage.getPortfolioByUserId(user.id);
       if (!portfolio) {
         portfolio = await storage.createPortfolio({
-          userId: demoUser.id,
+          userId: user.id,
           totalValue: "10000.00",
           dailyPnL: "0.00",
           totalPnL: "0.00",

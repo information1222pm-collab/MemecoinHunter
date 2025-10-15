@@ -46,6 +46,16 @@ A robust token scanning system utilizes CoinGecko APIs for discovering trending 
 
 ## Recent Updates (2025-10-15)
 
+### Critical Bug Fixes ✅
+- **Trade Journal User Authentication Fix**: Fixed critical bug where Trade Journal endpoints (/api/journal/entries, /api/journal/stats, /api/journal/by-outcome/:outcome, /api/journal/by-strategy/:pattern) were hardcoded to show trades for demo@memehunter.app user only. Implementation includes:
+  - Added `app.use('/api/journal', requireAuth)` middleware to ensure authentication
+  - Updated all journal endpoints to use `req.user.id` instead of hardcoded demo user
+  - Endpoints return 401 Unauthorized if user is not authenticated
+  - Portfolio retrieval now user-scoped via `storage.getPortfolioByUserId(user.id)`
+  - **Impact**: Trade Journal now displays trades specific to the logged-in user
+- **Enterprise Subscription**: Updated from "Contact Sales" to direct purchase at $99.99/month
+- **Stripe API Version Compatibility**: Removed future version override causing compile failures
+
 ### Stripe Payment Integration ✅
 - Implemented complete Stripe subscription payment system with Checkout Sessions
 - Added subscription tiers: Basic ($9), Pro ($29), Enterprise ($99) monthly plans
