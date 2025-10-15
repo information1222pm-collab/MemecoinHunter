@@ -45,6 +45,15 @@ class MLAnalyzer extends EventEmitter {
   private isRunning = false;
   private analysisInterval?: NodeJS.Timeout;
 
+  // FIX: Helper methods to avoid stack overflow with large arrays
+  private getMax(arr: number[]): number {
+    return arr.reduce((max, val) => val > max ? val : max, arr[0] || 0);
+  }
+
+  private getMin(arr: number[]): number {
+    return arr.reduce((min, val) => val < min ? val : min, arr[0] || 0);
+  }
+
   start() {
     if (this.isRunning) return;
     
@@ -92,9 +101,17 @@ class MLAnalyzer extends EventEmitter {
       
       // ENHANCED: Get price history for the last 7 days for better trend analysis
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      const history = await storage.getPriceHistory(token.id, sevenDaysAgo);
+      let history = await storage.getPriceHistory(token.id, sevenDaysAgo);
       
       console.log(`🔍 ML-ANALYZER: Found ${history.length} price history points for ${token.symbol}`);
+      
+      // FIX: Limit data to prevent stack overflow on large datasets
+      // Use only the most recent 1000 data points to avoid memory/stack issues
+      const MAX_DATA_POINTS = 1000;
+      if (history.length > MAX_DATA_POINTS) {
+        console.log(`🔍 ML-ANALYZER: Limiting ${token.symbol} data from ${history.length} to ${MAX_DATA_POINTS} most recent points`);
+        history = history.slice(-MAX_DATA_POINTS);
+      }
       
       // ENHANCED: Require more data points for better accuracy (increased from 20 to 50)
       if (history.length < 50) {
@@ -260,7 +277,7 @@ class MLAnalyzer extends EventEmitter {
     const earlier = prices.slice(-20, -10);
     
     // Check for initial strong upward movement
-    const initialMove = (Math.max(...earlier) - Math.min(...earlier)) / Math.min(...earlier);
+    const initialMove = (this.getMax(earlier) - this.getMin(earlier)) / this.getMin(earlier);
     
     // Check for consolidation in recent prices
     const recentVolatility = this.calculateVolatility(recent);
@@ -414,8 +431,8 @@ class MLAnalyzer extends EventEmitter {
     
     for (let i = period - 1; i < prices.length; i++) {
       const slice = prices.slice(i - period + 1, i + 1);
-      const highest = Math.max(...slice);
-      const lowest = Math.min(...slice);
+      const highest = this.getMax(slice);
+      const lowest = this.getMin(slice);
       const current = prices[i];
       
       if (highest === lowest) {
@@ -538,7 +555,7 @@ class MLAnalyzer extends EventEmitter {
     const calculateMidpoint = (data: number[], period: number, index: number): number => {
       if (index < period - 1) return 0;
       const slice = data.slice(index - period + 1, index + 1);
-      return (Math.max(...slice) + Math.min(...slice)) / 2;
+      return (this.getMax(slice) + this.getMin(slice)) / 2;
     };
     
     const tenkan: number[] = [];
@@ -549,21 +566,21 @@ class MLAnalyzer extends EventEmitter {
     
     for (let i = 0; i < highs.length; i++) {
       // Tenkan-sen (Conversion Line): (9-period high + 9-period low) / 2
-      const tenkanHigh = i >= tenkanPeriod - 1 ? Math.max(...highs.slice(i - tenkanPeriod + 1, i + 1)) : 0;
-      const tenkanLow = i >= tenkanPeriod - 1 ? Math.min(...lows.slice(i - tenkanPeriod + 1, i + 1)) : 0;
+      const tenkanHigh = i >= tenkanPeriod - 1 ? this.getMax(highs.slice(i - tenkanPeriod + 1, i + 1)) : 0;
+      const tenkanLow = i >= tenkanPeriod - 1 ? this.getMin(lows.slice(i - tenkanPeriod + 1, i + 1)) : 0;
       tenkan.push((tenkanHigh + tenkanLow) / 2);
       
       // Kijun-sen (Base Line): (26-period high + 26-period low) / 2
-      const kijunHigh = i >= kijunPeriod - 1 ? Math.max(...highs.slice(i - kijunPeriod + 1, i + 1)) : 0;
-      const kijunLow = i >= kijunPeriod - 1 ? Math.min(...lows.slice(i - kijunPeriod + 1, i + 1)) : 0;
+      const kijunHigh = i >= kijunPeriod - 1 ? this.getMax(highs.slice(i - kijunPeriod + 1, i + 1)) : 0;
+      const kijunLow = i >= kijunPeriod - 1 ? this.getMin(lows.slice(i - kijunPeriod + 1, i + 1)) : 0;
       kijun.push((kijunHigh + kijunLow) / 2);
       
       // Senkou Span A (Leading Span A): (Tenkan-sen + Kijun-sen) / 2, plotted 26 periods ahead
       senkouA.push((tenkan[i] + kijun[i]) / 2);
       
       // Senkou Span B (Leading Span B): (52-period high + 52-period low) / 2, plotted 26 periods ahead
-      const senkouBHigh = i >= senkouBPeriod - 1 ? Math.max(...highs.slice(i - senkouBPeriod + 1, i + 1)) : 0;
-      const senkouBLow = i >= senkouBPeriod - 1 ? Math.min(...lows.slice(i - senkouBPeriod + 1, i + 1)) : 0;
+      const senkouBHigh = i >= senkouBPeriod - 1 ? this.getMax(highs.slice(i - senkouBPeriod + 1, i + 1)) : 0;
+      const senkouBLow = i >= senkouBPeriod - 1 ? this.getMin(lows.slice(i - senkouBPeriod + 1, i + 1)) : 0;
       senkouB.push((senkouBHigh + senkouBLow) / 2);
       
       // Chikou Span (Lagging Span): Current closing price plotted 26 periods behind
@@ -724,7 +741,7 @@ class MLAnalyzer extends EventEmitter {
     const recentPrices = prices.slice(-10);
     const recentVolumes = volumes.slice(-10);
     
-    const priceRange = Math.max(...recentPrices) - Math.min(...recentPrices);
+    const priceRange = this.getMax(recentPrices) - this.getMin(recentPrices);
     const averageVolume = recentVolumes.reduce((sum, v) => sum + v, 0) / recentVolumes.length;
     const currentVolume = recentVolumes[recentVolumes.length - 1];
     
@@ -1274,8 +1291,9 @@ class MLAnalyzer extends EventEmitter {
   private calculateFibonacciLevels(prices: number[]): Record<number, number> {
     if (prices.length < 10) return {};
     
-    const high = Math.max(...prices);
-    const low = Math.min(...prices);
+    // FIX: Use reduce instead of spread operator to avoid stack overflow on large arrays
+    const high = prices.reduce((max, price) => price > max ? price : max, prices[0]);
+    const low = prices.reduce((min, price) => price < min ? price : min, prices[0]);
     const range = high - low;
     
     return {
@@ -1308,8 +1326,8 @@ class MLAnalyzer extends EventEmitter {
   private calculateExtensionTarget(prices: number[]): number {
     const fibLevels = this.calculateFibonacciLevels(prices);
     const currentPrice = prices[prices.length - 1];
-    const high = Math.max(...prices);
-    const low = Math.min(...prices);
+    const high = this.getMax(prices);
+    const low = this.getMin(prices);
     const range = high - low;
     
     // Calculate 1.618 extension
@@ -1348,8 +1366,8 @@ class MLAnalyzer extends EventEmitter {
   }
 
   private createPriceRanges(prices: number[], buckets: number): Array<{low: number; high: number}> {
-    const min = Math.min(...prices);
-    const max = Math.max(...prices);
+    const min = this.getMin(prices);
+    const max = this.getMax(prices);
     const range = max - min;
     const bucketSize = range / buckets;
     
@@ -1498,7 +1516,7 @@ class MLAnalyzer extends EventEmitter {
     if (peaks.length < 2 || valleys.length < 2) return 0;
     
     // Check if ratios approximate Fibonacci levels
-    const priceRange = Math.max(...prices) - Math.min(...prices);
+    const priceRange = this.getMax(prices) - this.getMin(prices);
     const avgMove = priceRange / (peaks.length + valleys.length);
     
     // Simplified accuracy based on how well moves align with expected ratios
@@ -1512,7 +1530,7 @@ class MLAnalyzer extends EventEmitter {
     if (!harmonicPattern) return currentPrice;
     
     // Project target based on pattern type
-    const range = Math.max(...prices) - Math.min(...prices);
+    const range = this.getMax(prices) - this.getMin(prices);
     
     return harmonicPattern.includes('bullish') 
       ? currentPrice + (range * 0.618)
@@ -1638,7 +1656,7 @@ class MLAnalyzer extends EventEmitter {
     
     // Breakout from Consolidation
     const recent5 = prices.slice(-5);
-    const consolidationRange = Math.max(...recent5) - Math.min(...recent5);
+    const consolidationRange = this.getMax(recent5) - this.getMin(recent5);
     const avgPrice = recent5.reduce((a, b) => a + b, 0) / 5;
     const breakoutSize = curr - avgPrice;
     
