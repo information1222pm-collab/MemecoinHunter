@@ -11,6 +11,19 @@ Preferred communication style: Simple, everyday language.
 ### Frontend
 Built with React 18 and TypeScript, using Vite for development. Styling is handled by Tailwind CSS with a custom dark theme and shadcn/ui for consistent components. State management uses TanStack Query for server state and React hooks for local state. Wouter is used for client-side routing. WebSocket integration provides real-time updates. The platform features a modern glassmorphism design system with a dark theme, utilizing Framer Motion for animations and transitions. The UI is responsive and optimized for a professional trading experience, including sophisticated icon-specific animations and micro-interactions throughout the sidebar, and prominent center-screen modal dialogs for trade notifications and milestones.
 
+**First-Time User Demo/Onboarding (October 2025):**
+- **Interactive Welcome Experience**: Comprehensive 5-step guided demo modal showcasing platform capabilities and performance metrics
+- **Performance Data Highlights**: Displays impressive system metrics (95%+ ML accuracy, <1s price latency, 100+ tokens monitored, 250ms portfolio updates)
+- **Feature Showcase**: 
+  - Step 1: Platform overview with key performance metrics
+  - Step 2: Real-time intelligence (AI patterns, streaming prices, chart analysis)
+  - Step 3: Automated trading engine (position sizing, take-profit strategy, risk management)
+  - Step 4: Performance highlights with visual progress indicators
+  - Step 5: Getting started guide with $10,000 starting balance confirmation
+- **User Control**: Skip functionality available on all steps, localStorage persistence prevents repeated displays
+- **Seamless Integration**: Auto-triggers 1 second after first login/registration, non-intrusive design with smooth Framer Motion animations
+- **Component Location**: `client/src/components/onboarding/demo-modal.tsx`
+
 **Optimized Real-Time Data Updates:**
 - Dashboard analytics: 15s refresh (analytics, exposure, market health)
 - Scanner status: 3s refresh for near real-time updates
