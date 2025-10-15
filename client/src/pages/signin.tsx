@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,6 +39,7 @@ export default function SignIn() {
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const { toast } = useToast();
   const { refetch } = useAuth();
+  const [, setLocation] = useLocation();
 
   // Check for OAuth errors in URL
   useEffect(() => {
@@ -88,12 +90,13 @@ export default function SignIn() {
         _csrf: csrfToken
       });
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({
         title: "Welcome back!",
         description: "You have successfully logged in.",
       });
-      refetch();
+      await refetch();
+      setLocation('/');
     },
     onError: (error: any) => {
       toast({
@@ -114,13 +117,14 @@ export default function SignIn() {
         _csrf: csrfToken
       });
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({
         title: "Welcome to CryptoHobby!",
         description: "Your account has been created and you've been logged in automatically.",
       });
       // Refetch auth status to update the UI
-      refetch();
+      await refetch();
+      setLocation('/');
     },
     onError: (error: any) => {
       toast({
