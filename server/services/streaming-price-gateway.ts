@@ -14,6 +14,17 @@ interface BinanceMiniTicker {
   q: string; // Total traded quote asset volume
 }
 
+interface CoinbaseTickerMessage {
+  type: 'ticker';
+  product_id: string; // Symbol (e.g., "BTC-USD")
+  price: string;
+  volume_24h: string;
+  high_24h: string;
+  low_24h: string;
+  open_24h: string;
+  time: string;
+}
+
 interface StreamPriceUpdate {
   tokenId: string;
   symbol: string;
@@ -28,19 +39,60 @@ interface StreamPriceUpdate {
 /**
  * Streaming Price Gateway - Real-time price feeds with <1s latency
  * 
- * Uses Binance WebSocket API for instant price updates instead of polling.
+ * Uses multiple exchange WebSocket APIs with auto-fallback:
+ * 1. Coinbase WebSocket (primary - reliable, no geo-blocking)
+ * 2. Binance WebSocket (fallback if Coinbase unavailable)
+ * 
  * Provides sub-second latency for all tracked tokens.
  */
 class StreamingPriceGateway extends EventEmitter {
   private isRunning = false;
   private connections = new Map<string, WebSocket>();
   private reconnectTimeouts = new Map<string, NodeJS.Timeout>();
+  private readonly COINBASE_WS_BASE = 'wss://ws-feed.exchange.coinbase.com';
   private readonly BINANCE_WS_BASE = 'wss://stream.binance.com:9443/stream';
   private readonly RECONNECT_DELAY = 5000; // 5 seconds
-  private readonly MAX_SYMBOLS_PER_CONNECTION = 200; // Binance limit
+  private readonly MAX_SYMBOLS_PER_CONNECTION = 200;
+  private currentProvider: 'coinbase' | 'binance' = 'coinbase'; // Start with Coinbase
   
-  // Symbol mapping: CoinGecko ID -> Binance trading pair
-  private readonly SYMBOL_MAP: Record<string, string> = {
+  // Symbol mapping for Coinbase: CoinGecko ID -> Coinbase product ID
+  private readonly COINBASE_SYMBOL_MAP: Record<string, string> = {
+    'bitcoin': 'BTC-USD',
+    'ethereum': 'ETH-USD',
+    'ripple': 'XRP-USD',
+    'cardano': 'ADA-USD',
+    'solana': 'SOL-USD',
+    'polkadot': 'DOT-USD',
+    'dogecoin': 'DOGE-USD',
+    'avalanche-2': 'AVAX-USD',
+    'shiba-inu': 'SHIB-USD',
+    'matic-network': 'MATIC-USD',
+    'litecoin': 'LTC-USD',
+    'uniswap': 'UNI-USD',
+    'chainlink': 'LINK-USD',
+    'near': 'NEAR-USD',
+    'stellar': 'XLM-USD',
+    'internet-computer': 'ICP-USD',
+    'aptos': 'APT-USD',
+    'the-graph': 'GRT-USD',
+    'apecoin': 'APE-USD',
+    'aave': 'AAVE-USD',
+    'eos': 'EOS-USD',
+    'filecoin': 'FIL-USD',
+    'sandbox': 'SAND-USD',
+    'decentraland': 'MANA-USD',
+    'axie-infinity': 'AXS-USD',
+    'maker': 'MKR-USD',
+    'sui': 'SUI-USD',
+    'arbitrum': 'ARB-USD',
+    'optimism': 'OP-USD',
+    'injective-protocol': 'INJ-USD',
+    'sei-network': 'SEI-USD',
+    'render-token': 'RENDER-USD',
+  };
+  
+  // Symbol mapping for Binance: CoinGecko ID -> Binance trading pair
+  private readonly BINANCE_SYMBOL_MAP: Record<string, string> = {
     'bitcoin': 'BTCUSDT',
     'ethereum': 'ETHUSDT',
     'binancecoin': 'BNBUSDT',
@@ -129,28 +181,26 @@ class StreamingPriceGateway extends EventEmitter {
     console.log('✅ Streaming Price Gateway stopped');
   }
   
+  private getSymbolMap() {
+    return this.currentProvider === 'coinbase' ? this.COINBASE_SYMBOL_MAP : this.BINANCE_SYMBOL_MAP;
+  }
+  
   private async buildTokenCache() {
     console.log('🔍 Building token ID cache...');
     
     // Get all tracked tokens from database
     const tokens = await storage.getAllTokens();
     
-    // Create reverse lookup: token symbol -> coingecko ID for matching
-    const symbolToCoinGecko: Record<string, string> = {};
-    for (const [cgId, binanceSymbol] of Object.entries(this.SYMBOL_MAP)) {
-      symbolToCoinGecko[cgId] = cgId;
-    }
+    const symbolMap = this.getSymbolMap();
     
     for (const token of tokens) {
-      // Try to find matching Binance symbol by looking up common mappings
-      // This is a simplified approach - match by symbol name
       const tokenSymbolLower = token.symbol.toLowerCase();
       
       // Direct mapping attempts
-      for (const [cgId, binanceSymbol] of Object.entries(this.SYMBOL_MAP)) {
+      for (const [cgId, exchangeSymbol] of Object.entries(symbolMap)) {
         if (cgId.includes(tokenSymbolLower) || tokenSymbolLower.includes(cgId.split('-')[0])) {
-          this.tokenIdCache.set(binanceSymbol, token.id);
-          console.log(`  📊 Mapped ${token.symbol} (${token.id}) -> ${binanceSymbol}`);
+          this.tokenIdCache.set(exchangeSymbol, token.id);
+          console.log(`  📊 Mapped ${token.symbol} (${token.id}) -> ${exchangeSymbol}`);
           break;
         }
       }
@@ -160,13 +210,71 @@ class StreamingPriceGateway extends EventEmitter {
   }
   
   private async connectToStreams() {
-    const symbols = Object.values(this.SYMBOL_MAP);
+    const symbolMap = this.getSymbolMap();
+    const symbols = Object.values(symbolMap);
     
     if (symbols.length === 0) {
       console.warn('⚠️  No symbols to track');
       return;
     }
     
+    if (this.currentProvider === 'coinbase') {
+      await this.connectToCoinbase(symbols);
+    } else {
+      await this.connectToBinance(symbols);
+    }
+  }
+  
+  private async connectToCoinbase(symbols: string[]) {
+    const wsUrl = this.COINBASE_WS_BASE;
+    
+    console.log(`⚡ Connecting to Coinbase WebSocket for ${symbols.length} symbols...`);
+    
+    const ws = new WebSocket(wsUrl);
+    this.connections.set('coinbase', ws);
+    
+    ws.on('open', () => {
+      console.log('✅ Connected to Coinbase WebSocket - Real-time feeds active');
+      
+      // Subscribe to ticker channel for all symbols
+      const subscribeMessage = {
+        type: 'subscribe',
+        product_ids: symbols,
+        channels: ['ticker']
+      };
+      ws.send(JSON.stringify(subscribeMessage));
+    });
+    
+    ws.on('message', (data: Buffer) => {
+      try {
+        const message = JSON.parse(data.toString()) as CoinbaseTickerMessage;
+        
+        if (message.type === 'ticker' && message.product_id) {
+          this.processCoinbaseMessage(message);
+        }
+      } catch (error) {
+        console.error('❌ Error parsing Coinbase message:', error);
+      }
+    });
+    
+    ws.on('error', (error) => {
+      console.error('❌ Coinbase WebSocket error:', error.message);
+      
+      // Try Binance as fallback
+      if (this.currentProvider === 'coinbase') {
+        console.log('⚠️  Switching to Binance as fallback provider...');
+        this.currentProvider = 'binance';
+        this.reconnectToProvider();
+      }
+    });
+    
+    ws.on('close', () => {
+      console.log('⚠️  Coinbase WebSocket connection closed - attempting reconnect...');
+      this.reconnectToProvider();
+    });
+  }
+  
+  private async connectToBinance(symbols: string[]) {
     // Binance allows multiple symbols in one stream
     // Format: btcusdt@miniTicker/ethusdt@miniTicker/...
     const streams = symbols.map(s => `${s.toLowerCase()}@miniTicker`).join('/');
@@ -175,7 +283,7 @@ class StreamingPriceGateway extends EventEmitter {
     console.log(`⚡ Connecting to Binance WebSocket for ${symbols.length} symbols...`);
     
     const ws = new WebSocket(wsUrl);
-    this.connections.set('combined', ws);
+    this.connections.set('binance', ws);
     
     ws.on('open', () => {
       console.log('✅ Connected to Binance WebSocket - Real-time feeds active');
@@ -199,16 +307,66 @@ class StreamingPriceGateway extends EventEmitter {
     });
     
     ws.on('close', () => {
-      console.warn('⚠️  WebSocket connection closed - attempting reconnect...');
-      this.connections.delete('combined');
+      console.warn('⚠️  Binance WebSocket connection closed - attempting reconnect...');
+      this.connections.delete('binance');
       
       if (this.isRunning) {
-        // Reconnect after delay
-        const timeout = setTimeout(() => {
-          this.connectToStreams();
-        }, this.RECONNECT_DELAY);
-        this.reconnectTimeouts.set('combined', timeout);
+        this.reconnectToProvider();
       }
+    });
+  }
+  
+  private reconnectToProvider() {
+    if (!this.isRunning) return;
+    
+    const timeout = setTimeout(async () => {
+      console.log(`🔄 Reconnecting to ${this.currentProvider}...`);
+      
+      // Clear old connections
+      this.connections.forEach((ws) => ws.close());
+      this.connections.clear();
+      
+      // Rebuild cache and reconnect
+      await this.buildTokenCache();
+      await this.connectToStreams();
+    }, this.RECONNECT_DELAY);
+    
+    this.reconnectTimeouts.set(this.currentProvider, timeout);
+  }
+  
+  private processCoinbaseMessage(message: CoinbaseTickerMessage) {
+    const symbol = message.product_id; // e.g., "BTC-USD"
+    const tokenId = this.tokenIdCache.get(symbol);
+    
+    if (!tokenId) {
+      // Token not in our database, skip
+      return;
+    }
+    
+    const currentPrice = parseFloat(message.price);
+    const openPrice = parseFloat(message.open_24h);
+    const change24h = openPrice > 0 ? ((currentPrice - openPrice) / openPrice) * 100 : 0;
+    
+    const update: StreamPriceUpdate = {
+      tokenId,
+      symbol: symbol.split('-')[0], // Convert BTC-USD -> BTC
+      price: currentPrice,
+      volume: parseFloat(message.volume_24h),
+      change24h,
+      high24h: parseFloat(message.high_24h),
+      low24h: parseFloat(message.low_24h),
+      timestamp: new Date(message.time).getTime(),
+    };
+    
+    // Cache the update
+    this.priceCache.set(tokenId, update);
+    
+    // Emit to listeners (will be broadcast via WebSocket)
+    this.emit('priceUpdate', update);
+    
+    // Update database asynchronously (non-blocking)
+    this.updateDatabase(update).catch(err => {
+      console.error(`❌ Database update failed for ${symbol}:`, err.message);
     });
   }
   
