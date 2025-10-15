@@ -17,6 +17,7 @@ import { tradeJournalService } from "./services/trade-journal";
 import { riskReportsService } from "./services/risk-reports";
 import { alertService } from "./services/alert-service";
 import { marketHealthAnalyzer } from "./services/market-health";
+import { dataCleanupService } from "./services/data-cleanup";
 import { insertUserSchema, insertTradeSchema, insertTokenSchema, insertAlertRuleSchema } from "@shared/schema";
 import { z } from "zod";
 import * as bcrypt from "bcrypt";
@@ -407,6 +408,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { SchedulerService } = await import('./services/scheduler-service.js');
     const schedulerService = new SchedulerService();
     schedulerService.startDailyEmailScheduler();
+    
+    // Start data cleanup service to prevent memory issues
+    console.log('🧹 Starting Data Cleanup Service...');
+    dataCleanupService.start();
   });
 
   // Set up real-time broadcasts with user scoping (CRITICAL SECURITY FIX)

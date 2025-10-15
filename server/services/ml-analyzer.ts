@@ -85,11 +85,33 @@ class MLAnalyzer extends EventEmitter {
     try {
       const tokens = await storage.getActiveTokens();
       
-      for (const token of tokens) {
-        await this.analyzeTokenPatterns(token);
+      // FIX: Analyze only top 50 tokens by market cap to prevent memory issues
+      // Process in batches of 10 to avoid overwhelming the system
+      const topTokens = tokens
+        .sort((a, b) => parseFloat(b.marketCap || '0') - parseFloat(a.marketCap || '0'))
+        .slice(0, 50); // Limit to top 50 tokens
+      
+      const BATCH_SIZE = 10;
+      for (let i = 0; i < topTokens.length; i += BATCH_SIZE) {
+        const batch = topTokens.slice(i, i + BATCH_SIZE);
+        
+        // Process batch sequentially to control memory usage
+        for (const token of batch) {
+          await this.analyzeTokenPatterns(token);
+        }
+        
+        // Force garbage collection between batches if available
+        if (global.gc && i + BATCH_SIZE < topTokens.length) {
+          global.gc();
+        }
+        
+        // Small delay between batches to allow system to breathe
+        if (i + BATCH_SIZE < topTokens.length) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
       }
       
-      console.log(`🧠 Analyzed patterns for ${tokens.length} tokens`);
+      console.log(`🧠 Analyzed patterns for ${topTokens.length} tokens (${tokens.length} total active)`);
     } catch (error) {
       console.error('Error analyzing patterns:', error);
     }
