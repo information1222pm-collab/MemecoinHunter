@@ -85,13 +85,13 @@ class MLAnalyzer extends EventEmitter {
     try {
       const tokens = await storage.getActiveTokens();
       
-      // FIX: Analyze only top 50 tokens by market cap to prevent memory issues
-      // Process in batches of 10 to avoid overwhelming the system
+      // FIX: Analyze only top 20 tokens by market cap to prevent memory issues
+      // Process in batches of 5 to avoid overwhelming the system
       const topTokens = tokens
         .sort((a, b) => parseFloat(b.marketCap || '0') - parseFloat(a.marketCap || '0'))
-        .slice(0, 50); // Limit to top 50 tokens
+        .slice(0, 20); // Limit to top 20 tokens (reduced from 50)
       
-      const BATCH_SIZE = 10;
+      const BATCH_SIZE = 5; // Reduced from 10
       for (let i = 0; i < topTokens.length; i += BATCH_SIZE) {
         const batch = topTokens.slice(i, i + BATCH_SIZE);
         
@@ -105,9 +105,9 @@ class MLAnalyzer extends EventEmitter {
           global.gc();
         }
         
-        // Small delay between batches to allow system to breathe
+        // Longer delay between batches to allow system to breathe and GC to complete
         if (i + BATCH_SIZE < topTokens.length) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Increased from 1000ms
         }
       }
       
