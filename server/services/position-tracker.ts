@@ -39,7 +39,7 @@ interface PortfolioAnalytics {
 class PositionTracker extends EventEmitter {
   private isRunning = false;
   private updateInterval?: NodeJS.Timeout;
-  private readonly UPDATE_FREQUENCY = 30000; // 30 seconds
+  private readonly UPDATE_FREQUENCY = 15000; // OPTIMIZED: 15 seconds for faster portfolio updates
 
   async start() {
     if (this.isRunning) return;
