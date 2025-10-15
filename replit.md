@@ -81,9 +81,10 @@ A robust token scanning system utilizes CoinGecko APIs for discovering trending 
 - Engagement-optimized posts, hashtags, and influencer outreach plan
 
 ### Trophy Room Feature ✅
-- Showcases top 20 most profitable closed trades across the application
+- **System-Wide Display**: Showcases top 20 most profitable closed trades across ALL portfolios and users
 - Award-style UI with podium ranks (gold/silver/bronze medals) for top 3 trades
-- Backend endpoint `/api/trophy-room` with proper data serialization (ISO date strings, numeric values)
+- Backend endpoint `/api/trophy-room` queries all trades using direct database access (not portfolio-scoped)
+- Proper data serialization (ISO date strings, numeric values) for frontend compatibility
 - Stats overview cards displaying top profit, average return, and best performer
 - Trophy/award-themed dark glassmorphism design with responsive layout
 - Multilingual navigation support (EN, ES, DE, JA, KO)
