@@ -21,7 +21,7 @@ PostgreSQL is the primary database, accessed via Drizzle ORM and hosted on Neon.
 The platform supports password-based and Google OAuth authentication via Replit Auth. New users automatically receive $10,000 in virtual trading capital. Security measures include Zod validation, CORS, CSRF protection, and secure OAuth token management.
 
 ### Payment and Subscription System
-The platform features a complete Stripe-powered subscription system with three membership tiers: Basic ($9/month), Pro ($29/month), and Enterprise ($99/month). Stripe Checkout handles secure payment processing with automatic recurring billing. The system includes subscription management endpoints for creating, updating, and canceling subscriptions, with webhook support for automated subscription lifecycle handling. Real money trading features are restricted to Enterprise tier subscribers with verified broker API keys.
+The platform features a complete Stripe-powered subscription system with three membership tiers: Basic ($9/month), Pro ($29/month), and Enterprise ($99.99/month). Stripe Checkout handles secure payment processing with automatic recurring billing. The system includes subscription management endpoints for creating, updating, and canceling subscriptions, with webhook support for automated subscription lifecycle handling. Real money trading features are restricted to Enterprise tier subscribers with verified broker API keys.
 
 **Security Features:**
 - Server-side price validation using PLAN_PRICE_MAPPING prevents price manipulation attacks

@@ -32,7 +32,7 @@ This guide will help you set up Stripe subscription products and prices for Cryp
 - **Name**: CryptoHobby Enterprise
 - **Description**: Unlimited scanning, custom ML, API access, and dedicated support
 - **Pricing Model**: Standard pricing  
-- **Price**: $99.00 USD
+- **Price**: $99.99 USD
 - **Billing Period**: Monthly (recurring)
 - Click **Add product**
 - **Copy the Price ID** (format: `price_xxxxx`) - you'll need this!
