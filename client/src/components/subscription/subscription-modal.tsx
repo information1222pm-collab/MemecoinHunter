@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/hooks/use-language";
 import { Check, Shield, RefreshCw, Info } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 
 interface SubscriptionModalProps {
   isOpen: boolean;
@@ -15,15 +16,21 @@ interface SubscriptionModalProps {
 export function SubscriptionModal({ isOpen, onClose }: SubscriptionModalProps) {
   const { t } = useLanguage();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   const subscriptionMutation = useMutation({
     mutationFn: async (plan: string) => {
+      if (!user?.id) {
+        throw new Error("User not authenticated");
+      }
       return await apiRequest("POST", "/api/subscription", {
-        userId: "default", // Would come from auth context
+        userId: user.id,
         plan,
       });
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/subscription'] });
       toast({
         title: "Subscription Updated",
         description: "Your subscription has been updated successfully.",
