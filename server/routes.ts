@@ -27,6 +27,12 @@ import cookie from "cookie";
 import rateLimit from "express-rate-limit";
 import signature from "cookie-signature";
 import { setupAuth } from "./replitAuth";
+import Stripe from "stripe";
+
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+}
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -67,7 +73,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     '/api/auth/login', '/api/auth/register', '/api/auth/logout',
     '/api/portfolio', '/api/trades', '/api/positions', '/api/alerts', '/api/price-alerts',
     '/api/api-keys', '/api/settings', '/api/auto-trader',
-    '/api/email', '/api/visitor/demo-complete'
+    '/api/email', '/api/visitor/demo-complete',
+    '/api/create-checkout-session', '/api/create-subscription', '/api/cancel-subscription'
   ].map(path => [path, path + '/*']).flat(), csrfProtection);
 
   // Rate Limiting for Security (CRITICAL SECURITY FIX)
@@ -1262,7 +1269,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Subscription routes
+  // Subscription routes with Stripe integration
   app.get("/api/subscription/:userId", async (req, res) => {
     try {
       const subscription = await storage.getSubscriptionByUserId(req.params.userId);
@@ -1272,38 +1279,148 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/subscription", async (req, res) => {
+  // Server-side plan to price ID mapping (SECURITY: Prevents price manipulation)
+  const PLAN_PRICE_MAPPING: Record<string, string> = {
+    'basic': process.env.STRIPE_PRICE_BASIC || 'price_basic_monthly',
+    'pro': process.env.STRIPE_PRICE_PRO || 'price_pro_monthly',
+    'enterprise': process.env.STRIPE_PRICE_ENTERPRISE || 'price_enterprise_monthly',
+  };
+
+  // Stripe Checkout Session Creation
+  app.post("/api/create-checkout-session", requireAuth, async (req, res) => {
     try {
-      const { userId, plan } = req.body;
-      
-      // Check if subscription already exists
-      let subscription;
-      try {
-        subscription = await storage.getSubscriptionByUserId(userId);
-      } catch (error) {
-        // No existing subscription found, create new one
+      const { _csrf, ...requestData } = req.body;
+      const { plan } = requestData;
+      const user = req.user;
+
+      if (!user?.email) {
+        return res.status(400).json({ error: 'User email required' });
       }
-      
+
+      // SECURITY: Validate plan and use server-side price ID
+      if (!PLAN_PRICE_MAPPING[plan]) {
+        return res.status(400).json({ error: 'Invalid plan selected' });
+      }
+      const priceId = PLAN_PRICE_MAPPING[plan];
+
+      // Check if customer already exists
+      let subscription = await storage.getSubscriptionByUserId(user.id);
+      let customerId = subscription?.stripeCustomerId;
+
+      if (!customerId) {
+        // Create new Stripe customer
+        const customer = await stripe.customers.create({
+          email: user.email,
+          metadata: {
+            userId: user.id,
+          },
+        });
+        customerId = customer.id;
+      }
+
+      // Create Checkout Session
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        mode: 'subscription',
+        line_items: [
+          {
+            price: priceId,
+            quantity: 1,
+          },
+        ],
+        success_url: `${process.env.REPLIT_DOMAINS?.split(',')[0] || 'http://localhost:5000'}/?success=true&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.REPLIT_DOMAINS?.split(',')[0] || 'http://localhost:5000'}/?canceled=true`,
+        metadata: {
+          userId: user.id,
+          plan,
+        },
+      });
+
+      res.json({ url: session.url, sessionId: session.id });
+    } catch (error: any) {
+      console.error('Checkout session error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Create or update subscription after successful payment
+  app.post("/api/create-subscription", requireAuth, async (req, res) => {
+    try {
+      const { _csrf, ...requestData } = req.body;
+      const { sessionId } = requestData;
+      const user = req.user;
+
+      // Retrieve the checkout session
+      const session = await stripe.checkout.sessions.retrieve(sessionId, {
+        expand: ['subscription'],
+      });
+
+      if (session.payment_status !== 'paid') {
+        return res.status(400).json({ error: 'Payment not completed' });
+      }
+
+      const stripeSubscription = session.subscription as Stripe.Subscription;
+      const plan = session.metadata?.plan || 'basic';
+
+      // Check if subscription already exists
+      let subscription = await storage.getSubscriptionByUserId(user.id);
+
       if (subscription) {
-        // Update existing subscription plan
+        // Update existing subscription
         subscription = await storage.updateSubscription(subscription.id, {
           plan,
-          currentPeriodStart: new Date(),
-          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+          stripeCustomerId: session.customer as string,
+          stripeSubscriptionId: stripeSubscription.id,
+          stripePriceId: stripeSubscription.items.data[0].price.id,
+          status: 'active',
+          currentPeriodStart: new Date(stripeSubscription.current_period_start * 1000),
+          currentPeriodEnd: new Date(stripeSubscription.current_period_end * 1000),
         });
       } else {
         // Create new subscription
         subscription = await storage.createSubscription({
-          userId,
+          userId: user.id,
           plan,
-          currentPeriodStart: new Date(),
-          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+          stripeCustomerId: session.customer as string,
+          stripeSubscriptionId: stripeSubscription.id,
+          stripePriceId: stripeSubscription.items.data[0].price.id,
+          status: 'active',
+          currentPeriodStart: new Date(stripeSubscription.current_period_start * 1000),
+          currentPeriodEnd: new Date(stripeSubscription.current_period_end * 1000),
         });
       }
-      
-      res.json(subscription);
-    } catch (error) {
-      res.status(400).json({ message: "Failed to update subscription", error });
+
+      res.json({ subscription, success: true });
+    } catch (error: any) {
+      console.error('Create subscription error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Cancel subscription
+  app.post("/api/cancel-subscription", requireAuth, async (req, res) => {
+    try {
+      const user = req.user;
+      const subscription = await storage.getSubscriptionByUserId(user.id);
+
+      if (!subscription?.stripeSubscriptionId) {
+        return res.status(404).json({ error: 'No active subscription found' });
+      }
+
+      // Cancel at period end
+      await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+        cancel_at_period_end: true,
+      });
+
+      // Update local subscription
+      const updated = await storage.updateSubscription(subscription.id, {
+        cancelAtPeriodEnd: true,
+      });
+
+      res.json({ subscription: updated, success: true });
+    } catch (error: any) {
+      console.error('Cancel subscription error:', error);
+      res.status(500).json({ error: error.message });
     }
   });
 

@@ -52,10 +52,55 @@ import {
   Radar
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Home() {
   const { t } = useLanguage();
   const [showDemo, setShowDemo] = useState(false);
+  const { toast } = useToast();
+  const { user } = useAuth();
+
+  // Handle Stripe checkout success
+  useEffect(() => {
+    const handleCheckoutSuccess = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const success = urlParams.get('success');
+      const sessionId = urlParams.get('session_id');
+
+      if (success === 'true' && sessionId && user) {
+        try {
+          const { getCsrfToken } = await import('@/lib/auth-utils');
+          const csrfToken = await getCsrfToken();
+          
+          await apiRequest("POST", "/api/create-subscription", {
+            _csrf: csrfToken,
+            sessionId,
+          });
+
+          toast({
+            title: "Subscription Activated!",
+            description: "Your subscription has been successfully activated. Welcome to premium features!",
+          });
+
+          // Clear URL parameters
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } catch (error) {
+          console.error('Error activating subscription:', error);
+          toast({
+            title: "Subscription Error",
+            description: "There was an issue activating your subscription. Please contact support.",
+            variant: "destructive",
+          });
+        }
+      }
+    };
+
+    if (user) {
+      handleCheckoutSuccess();
+    }
+  }, [user, toast]);
 
   // Check if visitor has seen the demo (IP-based tracking)
   useEffect(() => {

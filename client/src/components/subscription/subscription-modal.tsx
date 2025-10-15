@@ -19,28 +19,29 @@ export function SubscriptionModal({ isOpen, onClose }: SubscriptionModalProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const subscriptionMutation = useMutation({
+  const checkoutMutation = useMutation({
     mutationFn: async (plan: string) => {
       if (!user?.id) {
         throw new Error("User not authenticated");
       }
-      return await apiRequest("POST", "/api/subscription", {
-        userId: user.id,
+      const { getCsrfToken } = await import('@/lib/auth-utils');
+      const csrfToken = await getCsrfToken();
+      
+      return await apiRequest("POST", "/api/create-checkout-session", {
+        _csrf: csrfToken,
         plan,
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/subscription'] });
-      toast({
-        title: "Subscription Updated",
-        description: "Your subscription has been updated successfully.",
-      });
-      onClose();
+    onSuccess: (data: any) => {
+      // Redirect to Stripe Checkout
+      if (data.url) {
+        window.location.href = data.url;
+      }
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
-        title: "Subscription Error",
-        description: "Failed to update subscription. Please try again.",
+        title: "Checkout Error",
+        description: error.message || "Failed to start checkout. Please try again.",
         variant: "destructive",
       });
     },
@@ -101,7 +102,7 @@ export function SubscriptionModal({ isOpen, onClose }: SubscriptionModalProps) {
       return;
     }
     
-    subscriptionMutation.mutate(planId);
+    checkoutMutation.mutate(planId);
   };
 
   return (
@@ -157,10 +158,10 @@ export function SubscriptionModal({ isOpen, onClose }: SubscriptionModalProps) {
                   className="w-full"
                   variant={plan.popular ? "default" : "secondary"}
                   onClick={() => handleSelectPlan(plan.id)}
-                  disabled={subscriptionMutation.isPending}
+                  disabled={checkoutMutation.isPending}
                   data-testid={`button-select-${plan.id}`}
                 >
-                  {subscriptionMutation.isPending ? "Processing..." : plan.buttonText}
+                  {checkoutMutation.isPending ? "Processing..." : plan.buttonText}
                 </Button>
               </div>
             </div>
