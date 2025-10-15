@@ -2105,10 +2105,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       case 'alerts':
         const alerts = await storage.getUnreadAlerts();
         return `🚨 ${alerts.length} unread alerts`;
+      case 'portfolio':
+        try {
+          // Get portfolio summary for CLI display
+          const portfolios = await storage.getAllPortfolios();
+          if (!portfolios || portfolios.length === 0) {
+            return "📊 No portfolio data available\n💡 Create a portfolio to start trading";
+          }
+          const portfolio = portfolios[0]; // Get first portfolio
+          const totalValue = parseFloat(portfolio.totalValue || "0");
+          const dailyPnL = parseFloat(portfolio.dailyPnL || "0");
+          const totalPnL = parseFloat(portfolio.totalPnL || "0");
+          const winRate = parseFloat(portfolio.winRate || "0");
+          
+          return `💼 Portfolio Summary
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💰 Total Value: $${totalValue.toLocaleString()}
+📈 Total P&L: ${totalPnL >= 0 ? '+' : ''}$${totalPnL.toLocaleString()} (${totalPnL >= 0 ? '📈' : '📉'})
+📊 Daily P&L: ${dailyPnL >= 0 ? '+' : ''}$${dailyPnL.toLocaleString()}
+🎯 Win Rate: ${winRate.toFixed(1)}%
+💵 Cash Balance: $${parseFloat(portfolio.cashBalance || "0").toLocaleString()}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+        } catch (error) {
+          return "❌ Error fetching portfolio data";
+        }
       case 'risk':
         return "🛡️ Risk Management Status:\n📊 Portfolio risk: Monitored\n⚠️ Active stop-losses: Enabled\n🎯 Position limits: Enforced";
       case 'help':
-        return "Available commands:\n- scan: Start token scanning\n- status: Show scanner status\n- alerts: Show unread alerts\n- risk: Show risk management status\n- help: Show this help";
+        return "Available commands:\n- scan: Start token scanning\n- status: Show scanner status\n- alerts: Show unread alerts\n- portfolio: Show portfolio summary\n- risk: Show risk management status\n- help: Show this help";
       default:
         return `Unknown command: ${cmd}. Type 'help' for available commands.`;
     }
