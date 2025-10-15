@@ -85,13 +85,13 @@ function DashboardContent() {
   // Fetch analytics data with auto-refresh
   const { data: analyticsData, isLoading: analyticsLoading } = useQuery<AnalyticsData>({
     queryKey: ['/api/analytics/all'],
-    refetchInterval: 30000, // Reduced polling since WebSocket will handle real-time updates
+    refetchInterval: 15000, // OPTIMIZED: 15s for faster updates
   });
 
   // Fetch risk exposure data with auto-refresh
   const { data: exposureData, isLoading: exposureLoading } = useQuery<ExposureData>({
     queryKey: ['/api/risk/exposure'],
-    refetchInterval: 30000, // Reduced polling since WebSocket will handle real-time updates
+    refetchInterval: 15000, // OPTIMIZED: 15s for faster updates
   });
 
   // Fetch market health data with auto-refresh
@@ -107,7 +107,7 @@ function DashboardContent() {
     timestamp: string;
   }>({
     queryKey: ['/api/market-health'],
-    refetchInterval: 30000, // Update every 30 seconds
+    refetchInterval: 15000, // OPTIMIZED: 15s for faster market health updates
   });
 
   const isLoading = analyticsLoading || exposureLoading;
