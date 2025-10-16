@@ -113,23 +113,36 @@ export function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isPortrait, setIsPortrait] = useState(false);
   const [hoveredIcon, setHoveredIcon] = useState<string | null>(null);
   const [isHovering, setIsHovering] = useState(false);
   const [autoCollapse, setAutoCollapse] = useState(true);
 
-  // Check if mobile on mount and window resize
+  // Check if mobile and portrait mode on mount and window resize
   useEffect(() => {
-    const checkMobile = () => {
+    const checkMobileAndOrientation = () => {
       const mobile = window.innerWidth < 768;
+      const portrait = window.innerHeight > window.innerWidth;
+      
       setIsMobile(mobile);
-      if (mobile) {
+      setIsPortrait(portrait);
+      
+      // Auto-collapse on portrait mode
+      if (portrait && !mobile) {
+        setIsCollapsed(true);
+      } else if (mobile) {
         setIsCollapsed(false);
       }
     };
     
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    checkMobileAndOrientation();
+    window.addEventListener('resize', checkMobileAndOrientation);
+    window.addEventListener('orientationchange', checkMobileAndOrientation);
+    
+    return () => {
+      window.removeEventListener('resize', checkMobileAndOrientation);
+      window.removeEventListener('orientationchange', checkMobileAndOrientation);
+    };
   }, []);
 
   // Load collapsed state and auto-collapse preference from localStorage on mount (desktop only)
