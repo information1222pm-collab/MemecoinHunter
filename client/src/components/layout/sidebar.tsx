@@ -127,11 +127,15 @@ export function Sidebar() {
       setIsMobile(mobile);
       setIsPortrait(portrait);
       
-      // Auto-collapse on portrait mode
-      if (portrait && !mobile) {
+      // Auto-collapse on portrait mode (regardless of mobile or desktop)
+      if (portrait) {
         setIsCollapsed(true);
-      } else if (mobile) {
-        setIsCollapsed(false);
+      } else if (!mobile) {
+        // On landscape desktop, restore previous state if available
+        const savedState = localStorage.getItem('sidebar-collapsed');
+        if (savedState) {
+          setIsCollapsed(JSON.parse(savedState));
+        }
       }
     };
     
