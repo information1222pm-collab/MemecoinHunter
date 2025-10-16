@@ -25,10 +25,10 @@
   --input: hsl(220, 38%, 14%);
   --ring: hsl(180, 85%, 55%);
   --chart-1: hsl(180, 85%, 55%);
-  --chart-2: hsl(200, 80%, 60%);
-  --chart-3: hsl(340, 75%, 60%);
-  --chart-4: hsl(30, 80%, 60%);
-  --chart-5: hsl(220, 70%, 60%);
+  --chart-2: hsl(180, 70%, 45%);
+  --chart-3: hsl(180, 60%, 65%);
+  --chart-4: hsl(180, 75%, 40%);
+  --chart-5: hsl(180, 80%, 50%);
   --sidebar: hsl(220, 42%, 9%);
   --sidebar-foreground: hsl(210, 40%, 95%);
   --sidebar-primary: hsl(180, 85%, 55%);
@@ -44,11 +44,11 @@
   --price-up: hsl(142, 76%, 45%);
   --price-down: hsl(0, 84%, 65%);
 
-  /* Modern gradient colors */
-  --gradient-primary: linear-gradient(135deg, hsl(180, 85%, 55%) 0%, hsl(200, 90%, 60%) 100%);
-  --gradient-secondary: linear-gradient(135deg, hsl(200, 80%, 60%) 0%, hsl(180, 85%, 55%) 100%);
-  --gradient-success: linear-gradient(135deg, hsl(142, 76%, 36%) 0%, hsl(120, 100%, 40%) 100%);
-  --gradient-danger: linear-gradient(135deg, hsl(0, 84%, 60%) 0%, hsl(15, 100%, 55%) 100%);
+  /* Simplified gradient colors */
+  --gradient-primary: linear-gradient(135deg, hsl(180, 85%, 55%) 0%, hsl(180, 70%, 45%) 100%);
+  --gradient-secondary: linear-gradient(135deg, hsl(180, 70%, 45%) 0%, hsl(180, 85%, 55%) 100%);
+  --gradient-success: linear-gradient(135deg, hsl(142, 76%, 45%) 0%, hsl(142, 76%, 36%) 100%);
+  --gradient-danger: linear-gradient(135deg, hsl(0, 84%, 60%) 0%, hsl(0, 84%, 50%) 100%);
   
   /* Glass morphism */
   --glass-bg: hsla(220, 38%, 16%, 0.6);
@@ -105,8 +105,8 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
     background: 
-      radial-gradient(circle at 20% 80%, hsla(180, 85%, 55%, 0.12) 0%, transparent 50%),
-      radial-gradient(circle at 80% 20%, hsla(200, 90%, 60%, 0.12) 0%, transparent 50%),
+      radial-gradient(circle at 20% 80%, hsla(180, 85%, 55%, 0.08) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, hsla(180, 70%, 45%, 0.08) 0%, transparent 50%),
       hsl(var(--background));
     min-height: 100vh;
     font-size: 15px;
