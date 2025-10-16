@@ -541,45 +541,6 @@ export default function Home() {
             </motion.div>
           </motion.div>
 
-          {/* Interactive Action Center */}
-          <motion.div 
-            className="glass-ultra rounded-3xl p-8"
-            variants={itemVariants}
-            data-testid="card-action-center"
-          >
-            <div className="text-center mb-8">
-              <h3 className="text-3xl font-bold mb-2">Platform Control Center</h3>
-              <p className="text-muted-foreground">Navigate to key features and monitor system status</p>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { icon: Search, label: "Scanner", color: "from-green-400 to-emerald-500", testId: "button-scanner" },
-                { icon: DollarSign, label: "Portfolio", color: "from-blue-400 to-purple-500", testId: "button-portfolio" },
-                { icon: BarChart3, label: "Analytics", color: "from-purple-400 to-pink-500", testId: "button-analytics" },
-                { icon: Activity, label: "Terminal", color: "from-yellow-400 to-orange-500", testId: "button-terminal" }
-              ].map((action, index) => (
-                <motion.div
-                  key={index}
-                  whileHover={{ 
-                    scale: 1.05,
-                    rotateY: 5,
-                  }}
-                  whileTap={{ scale: 0.95 }}
-                  className="group cursor-pointer"
-                  data-testid={action.testId}
-                >
-                  <div className="glass-card p-6 text-center h-32 flex flex-col items-center justify-center space-y-3 hover-lift">
-                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-r ${action.color} p-2.5 group-hover:scale-110 transition-transform duration-300`}>
-                      <action.icon className="w-full h-full text-white" />
-                    </div>
-                    <span className="text-sm font-medium">{action.label}</span>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-
           {/* Stakeholder Report Section */}
           {stakeholderReport && (
             <motion.div 
