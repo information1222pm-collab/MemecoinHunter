@@ -15,6 +15,7 @@ import { getCsrfToken } from "@/lib/auth-utils";
 import { useAuth } from "@/hooks/use-auth";
 import { Eye, EyeOff, LogIn, UserPlus, TrendingUp } from "lucide-react";
 import { SiGoogle } from "react-icons/si";
+import { LoginLiveWallpaper } from "@/components/background/LoginLiveWallpaper";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -144,13 +145,9 @@ export default function SignIn() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-4">
-      {/* Background orbs */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-cyan-500/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}} />
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-60 h-60 bg-cyan-500/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}} />
-      </div>
+    <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden">
+      {/* Live Wallpaper Background */}
+      <LoginLiveWallpaper />
 
       <div className="relative z-10 w-full max-w-md">
         {/* Logo/Brand */}
