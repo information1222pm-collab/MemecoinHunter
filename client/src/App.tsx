@@ -7,7 +7,6 @@ import { LanguageProvider } from "@/contexts/language-context";
 import { RefreshIntervalProvider } from "@/hooks/use-refresh-interval";
 import { useAuth } from "@/hooks/use-auth";
 import { TradeAlertModal } from "@/components/trade-alert-modal";
-import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 import { InstantLoader } from "@/components/loading/instant-loader";
 import { lazy, Suspense, useEffect } from "react";
 
@@ -103,10 +102,7 @@ function Router() {
   return (
     <>
       {isAuthenticated && (
-        <>
-          <TradeAlertModal />
-          <MobileBottomNav />
-        </>
+        <TradeAlertModal />
       )}
       <Suspense fallback={<LoadingFallback />}>
         <Switch>
