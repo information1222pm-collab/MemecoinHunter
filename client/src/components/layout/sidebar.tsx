@@ -260,7 +260,7 @@ export function Sidebar() {
       {isMobile && (
         <motion.button
           onClick={toggleSidebar}
-          className="fixed top-4 left-4 z-50 md:hidden w-10 h-10 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white flex items-center justify-center shadow-lg"
+          className="fixed top-4 left-4 z-50 md:hidden w-10 h-10 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white flex items-center justify-center shadow-lg"
           data-testid="button-mobile-menu"
           whileHover={{ scale: 1.1, rotate: 90 }}
           whileTap={{ scale: 0.9 }}
@@ -316,18 +316,18 @@ export function Sidebar() {
           transition={{ type: "spring", stiffness: 400, damping: 10 }}
         >
           <motion.div 
-            className="w-12 h-12 rounded-2xl bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center relative overflow-hidden"
+            className="w-12 h-12 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-500 flex items-center justify-center relative overflow-hidden"
             animate={{ 
               boxShadow: [
-                "0 0 20px hsla(262, 73%, 65%, 0.3)",
-                "0 0 30px hsla(262, 73%, 65%, 0.5)",
-                "0 0 20px hsla(262, 73%, 65%, 0.3)"
+                "0 0 20px hsla(180, 73%, 65%, 0.3)",
+                "0 0 30px hsla(180, 73%, 65%, 0.5)",
+                "0 0 20px hsla(180, 73%, 65%, 0.3)"
               ]
             }}
             transition={{ duration: 2, repeat: Infinity }}
             whileHover={{ 
               scale: 1.1,
-              boxShadow: "0 0 40px hsla(262, 73%, 65%, 0.7)"
+              boxShadow: "0 0 40px hsla(180, 73%, 65%, 0.7)"
             }}
           >
             <motion.div
@@ -343,7 +343,7 @@ export function Sidebar() {
               <Users className="w-7 h-7 text-white relative z-10" />
             </motion.div>
             <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-pink-500 to-purple-500 opacity-50"
+              className="absolute inset-0 bg-gradient-to-r from-blue-500 to-cyan-500 opacity-50"
               animate={{ rotate: [0, 360] }}
               transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
             />
@@ -375,19 +375,19 @@ export function Sidebar() {
         <motion.button
           onClick={toggleSidebar}
           className={cn(
-            "absolute top-6 w-6 h-6 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white flex items-center justify-center shadow-lg transition-all duration-300 hover:scale-110 z-10 border-2 border-background",
+            "absolute top-6 w-6 h-6 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 text-white flex items-center justify-center shadow-lg transition-all duration-300 hover:scale-110 z-10 border-2 border-background",
             isMobile ? "right-4" : "-right-3"
           )}
           data-testid="button-sidebar-toggle"
           whileHover={{ 
             scale: 1.2,
-            boxShadow: "0 0 20px hsla(262, 73%, 65%, 0.6)"
+            boxShadow: "0 0 20px hsla(180, 73%, 65%, 0.6)"
           }}
           whileTap={{ scale: 0.9 }}
           animate={{
             boxShadow: [
               "0 4px 6px rgba(0,0,0,0.1)",
-              "0 6px 12px rgba(147, 51, 234, 0.3)",
+              "0 6px 12px rgba(6, 182, 212, 0.3)",
               "0 4px 6px rgba(0,0,0,0.1)"
             ]
           }}
@@ -446,7 +446,7 @@ export function Sidebar() {
                     {/* Active indicator with gradient */}
                     {isActive && (
                       <motion.div
-                        className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-2xl"
+                        className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 rounded-2xl"
                         layoutId="activeTab"
                         transition={{ type: "spring", stiffness: 500, damping: 30 }}
                       />
@@ -454,7 +454,7 @@ export function Sidebar() {
                     
                     {/* Hover effect with shimmer */}
                     <motion.div
-                      className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-2xl opacity-0 group-hover:opacity-100"
+                      className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 rounded-2xl opacity-0 group-hover:opacity-100"
                       transition={{ duration: 0.3 }}
                     >
                       <motion.div
@@ -572,7 +572,7 @@ export function Sidebar() {
                   >
                     {/* Hover effect */}
                     <motion.div
-                      className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-2xl opacity-0 group-hover:opacity-100"
+                      className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 rounded-2xl opacity-0 group-hover:opacity-100"
                       transition={{ duration: 0.3 }}
                     />
                     
@@ -597,13 +597,13 @@ export function Sidebar() {
                     </AnimatePresence>
                     {item.badge && (
                       <motion.span 
-                        className="ml-auto px-2 py-1 text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full font-medium relative z-10"
+                        className="ml-auto px-2 py-1 text-xs bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-full font-medium relative z-10"
                         data-testid="badge-pro"
                         animate={{ 
                           boxShadow: [
-                            "0 0 10px hsla(262, 73%, 65%, 0.3)",
-                            "0 0 20px hsla(262, 73%, 65%, 0.6)",
-                            "0 0 10px hsla(262, 73%, 65%, 0.3)"
+                            "0 0 10px hsla(180, 73%, 65%, 0.3)",
+                            "0 0 20px hsla(180, 73%, 65%, 0.6)",
+                            "0 0 10px hsla(180, 73%, 65%, 0.3)"
                           ]
                         }}
                         transition={{ duration: 2, repeat: Infinity }}
