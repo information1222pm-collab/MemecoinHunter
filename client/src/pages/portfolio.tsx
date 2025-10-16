@@ -338,7 +338,7 @@ export default function Portfolio() {
             <div className="flex items-center space-x-4">
               {/* Auto-Trading Toggle */}
               {isAuthenticated && portfolio && (
-                <div className="flex items-center space-x-3 px-3 py-2 rounded-lg border border-primary/20 bg-primary/5">
+                <div className="flex items-center space-x-3 px-3 py-2 rounded-lg border border-primary/20 bg-primary/5" data-testid="toggle-auto-trading">
                   <Bot className={cn(
                     "w-4 h-4 transition-colors",
                     portfolio.autoTradingEnabled ? "text-green-500" : "text-gray-500"

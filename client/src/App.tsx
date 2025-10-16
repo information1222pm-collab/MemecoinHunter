@@ -47,6 +47,17 @@ function AuthenticatedSignInRedirect() {
   return null; // Redirect happens immediately
 }
 
+function BillingRedirect() {
+  const [, setLocation] = useLocation();
+  
+  useEffect(() => {
+    // Redirect /billing to /subscription for unified subscription management
+    setLocation('/subscription');
+  }, [setLocation]);
+  
+  return null; // Redirect happens immediately
+}
+
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
   const { isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
@@ -142,7 +153,7 @@ function Router() {
             {() => <ProtectedRoute component={Subscription} />}
           </Route>
           <Route path="/billing">
-            {() => <ProtectedRoute component={Subscription} />}
+            <BillingRedirect />
           </Route>
           <Route path="/settings">
             {() => <ProtectedRoute component={Settings} />}
