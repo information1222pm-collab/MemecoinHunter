@@ -55,12 +55,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
+import { useRefreshInterval } from "@/hooks/use-refresh-interval";
 
 export default function Home() {
   const { t } = useLanguage();
   const [showDemo, setShowDemo] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { refreshInterval } = useRefreshInterval();
 
   // Handle Stripe checkout success
   useEffect(() => {
@@ -141,18 +143,18 @@ export default function Home() {
     lastScanTime: string;
   }>({
     queryKey: ['/api/scanner/status'],
-    refetchInterval: 5000,
+    refetchInterval: refreshInterval * 1000,
   });
 
   const { data: alerts } = useQuery({
     queryKey: ['/api/alerts'],
-    refetchInterval: 30000,
+    refetchInterval: refreshInterval * 1000,
   });
 
   const { data: portfolio } = useQuery({
     queryKey: ['/api/portfolio', 'default'],
-    refetchInterval: 30000, // Refetch every 30 seconds
-    staleTime: 15000, // Data stays fresh for 15 seconds
+    refetchInterval: refreshInterval * 1000,
+    staleTime: (refreshInterval * 1000) - 5000,
     retry: false, // Don't retry on 401 errors
   });
 
@@ -166,7 +168,7 @@ export default function Home() {
     };
   }>({
     queryKey: ['/api/stakeholder-report'],
-    refetchInterval: 300000, // Refresh every 5 minutes
+    refetchInterval: refreshInterval * 1000,
   });
 
   const { data: autoTraderPortfolio } = useQuery<{
@@ -191,7 +193,7 @@ export default function Home() {
     winRate: string;
   }>({
     queryKey: ['/api/auto-trader/portfolio'],
-    refetchInterval: 15000, // Refresh every 15 seconds
+    refetchInterval: refreshInterval * 1000,
   });
 
   // Calculate real performance data from live system APIs

@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWebSocket } from "@/hooks/use-websocket";
+import { useRefreshInterval } from "@/hooks/use-refresh-interval";
 import { useEffect, useMemo } from "react";
 
 interface AnalyticsData {
@@ -84,19 +85,20 @@ interface ExposureData {
 function DashboardContent() {
   const queryClient = useQueryClient();
   const { isConnected, lastMessage } = useWebSocket();
+  const { refreshInterval } = useRefreshInterval();
 
   // Fetch analytics data with auto-refresh
   const { data: analyticsData, isLoading: analyticsLoading } = useQuery<AnalyticsData>({
     queryKey: ['/api/analytics/all'],
-    refetchInterval: 60000, // 60s - analytics don't need rapid updates
-    staleTime: 45000,
+    refetchInterval: refreshInterval * 1000,
+    staleTime: (refreshInterval * 1000) - 5000,
   });
 
   // Fetch risk exposure data with auto-refresh
   const { data: exposureData, isLoading: exposureLoading } = useQuery<ExposureData>({
     queryKey: ['/api/risk/exposure'],
-    refetchInterval: 45000, // 45s - risk data is less time-sensitive
-    staleTime: 30000,
+    refetchInterval: refreshInterval * 1000,
+    staleTime: (refreshInterval * 1000) - 5000,
   });
 
   // Fetch market health data with auto-refresh
@@ -112,8 +114,8 @@ function DashboardContent() {
     timestamp: string;
   }>({
     queryKey: ['/api/market-health'],
-    refetchInterval: 45000, // 45s - market health updates less frequently
-    staleTime: 30000,
+    refetchInterval: refreshInterval * 1000,
+    staleTime: (refreshInterval * 1000) - 5000,
   });
 
   const isLoading = analyticsLoading || exposureLoading;

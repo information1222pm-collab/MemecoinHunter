@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { LanguageProvider } from "@/contexts/language-context";
+import { RefreshIntervalProvider } from "@/hooks/use-refresh-interval";
 import { useAuth } from "@/hooks/use-auth";
 import { TradeAlertModal } from "@/components/trade-alert-modal";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
@@ -172,13 +173,15 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <LanguageProvider>
-          <div className="dark relative min-h-screen">
-            <Suspense fallback={null}>
-              <CryptoBackground />
-            </Suspense>
-            <Toaster />
-            <Router />
-          </div>
+          <RefreshIntervalProvider>
+            <div className="dark relative min-h-screen">
+              <Suspense fallback={null}>
+                <CryptoBackground />
+              </Suspense>
+              <Toaster />
+              <Router />
+            </div>
+          </RefreshIntervalProvider>
         </LanguageProvider>
       </TooltipProvider>
     </QueryClientProvider>

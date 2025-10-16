@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "@/hooks/use-language";
 import { useWebSocket } from "@/hooks/use-websocket";
+import { useRefreshInterval } from "@/hooks/use-refresh-interval";
 import { Settings, Play, Pause, RefreshCw } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -21,17 +22,18 @@ export default function Scanner() {
   const { isConnected, lastMessage } = useWebSocket();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { refreshInterval } = useRefreshInterval();
   
   const { data: scannerStatus } = useQuery({
     queryKey: ['/api/scanner/status'],
-    refetchInterval: 10000, // 10s - scanner status doesn't need 3s updates
-    staleTime: 8000,
+    refetchInterval: refreshInterval * 1000,
+    staleTime: (refreshInterval * 1000) - 2000,
   });
 
   const { data: alerts } = useQuery({
     queryKey: ['/api/alerts'],
-    refetchInterval: 30000, // 30s - alerts are less frequent
-    staleTime: 20000,
+    refetchInterval: refreshInterval * 1000,
+    staleTime: (refreshInterval * 1000) - 5000,
   });
 
   const { data: tokens } = useQuery<Array<{
@@ -44,8 +46,8 @@ export default function Scanner() {
     marketCap: string;
   }>>({
     queryKey: ['/api/tokens'],
-    refetchInterval: 30000, // 30s - token prices don't change that rapidly
-    staleTime: 20000,
+    refetchInterval: refreshInterval * 1000,
+    staleTime: (refreshInterval * 1000) - 5000,
   });
 
   // Scanner control mutations

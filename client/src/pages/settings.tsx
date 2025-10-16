@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useLanguage } from "@/hooks/use-language";
+import { useRefreshInterval } from "@/hooks/use-refresh-interval";
 import { useState, useEffect } from "react";
 import { Settings as SettingsIcon, User, Bell, Shield, Globe, Palette, TestTube, RefreshCw, DollarSign, TrendingUp, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -190,6 +191,7 @@ function RiskLevelCard() {
 
 export default function Settings() {
   const { t, language, setLanguage } = useLanguage();
+  const { refreshInterval, setRefreshInterval } = useRefreshInterval();
   const { toast } = useToast();
   const { emitCustomEvent } = useWebSocket();
   const queryClient = useQueryClient();
@@ -396,7 +398,10 @@ export default function Settings() {
                 </div>
                 <div>
                   <Label htmlFor="refresh-interval">Refresh Interval</Label>
-                  <Select defaultValue="30">
+                  <Select 
+                    value={refreshInterval.toString()} 
+                    onValueChange={(value) => setRefreshInterval(parseInt(value, 10))}
+                  >
                     <SelectTrigger className="mt-1" data-testid="select-refresh-interval">
                       <SelectValue />
                     </SelectTrigger>
