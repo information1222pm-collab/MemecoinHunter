@@ -109,13 +109,13 @@
       radial-gradient(circle at 80% 20%, hsla(200, 90%, 60%, 0.12) 0%, transparent 50%),
       hsl(var(--background));
     min-height: 100vh;
-    font-size: 16px;
+    font-size: 15px;
   }
 
   /* Mobile-optimized typography */
   @media (max-width: 768px) {
     body {
-      font-size: 16px;
+      font-size: 15px;
       line-height: 1.6;
     }
     
