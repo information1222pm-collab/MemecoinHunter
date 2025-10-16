@@ -1,10 +1,38 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { useEffect, useState } from "react";
 
 export function InstantLoader() {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    // Simulate loading progress
+    const interval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(interval);
+          return 90;
+        }
+        return prev + Math.random() * 15;
+      });
+    }, 200);
+
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       <div className="fixed inset-0 bg-gradient-to-br from-background via-card to-background">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,rgba(0,220,220,0.05),transparent_70%)]" />
+        
+        {/* Loading Progress Bar */}
+        <div className="absolute top-0 left-0 right-0 h-1 bg-border/20 overflow-hidden z-50">
+          <div 
+            className="h-full bg-gradient-to-r from-cyan-500 via-blue-500 to-cyan-500 transition-all duration-300 ease-out relative"
+            style={{ width: `${progress}%` }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+          </div>
+        </div>
         
         <div className="relative h-full flex flex-col">
           <div className="border-b border-border/40 backdrop-blur-sm bg-card/30">
@@ -69,6 +97,9 @@ export function InstantLoader() {
               <div className="w-16 h-16 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
               <div className="text-sm font-medium text-muted-foreground">
                 Loading MemeCoin Hunter
+              </div>
+              <div className="text-xs font-mono text-primary/70">
+                {Math.round(progress)}%
               </div>
             </div>
           </div>

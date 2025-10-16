@@ -436,6 +436,15 @@
     }
   }
 
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
   .animate-float {
     animation: float 20s ease-in-out infinite;
   }
@@ -455,5 +464,9 @@
   .animate-gradient {
     background-size: 200% 200%;
     animation: gradient 15s ease infinite;
+  }
+
+  .animate-shimmer {
+    animation: shimmer 2s infinite;
   }
 }
