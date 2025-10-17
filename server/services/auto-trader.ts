@@ -24,7 +24,6 @@ interface TradingSignal {
 
 interface PortfolioState {
   portfolioId: string;
-  sellOnlyMode: boolean;
   sellingPositions: Set<string>;
   tradingStats: {
     totalTrades: number;
@@ -49,12 +48,8 @@ class AutoTrader extends EventEmitter {
   private strategy = {
     minConfidence: 75, // Dynamic minimum confidence (now overridden by risk level)
     maxPositionSize: 1000, // $1000 max per position (will use dynamic sizing from RiskManager)
-    stopLossPercentage: 5, // IMPROVED: Tighter 5% stop loss for better risk-reward (now overridden by risk level)
     takeProfitPercentage: 18, // AGGRESSIVE: 18% final take profit (increased from 15%) (now overridden by risk level)
     takeProfitStages: [8, 12, 18], // AGGRESSIVE: Multi-stage take-profit (increased from 6%, 10%, 15%) (now overridden by risk level)
-    sellOnlyTakeProfit: 5, // More aggressive take profit when in sell-only mode
-    minCashPercentage: 10, // IMPROVED: Minimum 10% cash buffer required (now overridden by risk level)
-    maxDailyLossPercentage: 5, // IMPROVED: Pause trading if daily loss exceeds 5% (now overridden by risk level)
     minPatternWinRate: 0.5, // IMPROVED: Require 50%+ win rate for pattern (now overridden by risk level)
     minPatternExpectancy: 0.5, // IMPROVED: Require positive expectancy (avg gain > avg loss)
   };
@@ -203,7 +198,6 @@ class AutoTrader extends EventEmitter {
       if (!this.enabledPortfolios.has(portfolioId)) {
         this.enabledPortfolios.set(portfolioId, {
           portfolioId,
-          sellOnlyMode: false,
           sellingPositions: new Set(),
           tradingStats: {
             totalTrades: 0,
@@ -251,7 +245,6 @@ class AutoTrader extends EventEmitter {
         if (!this.enabledPortfolios.has(portfolio.id)) {
           this.enabledPortfolios.set(portfolio.id, {
             portfolioId: portfolio.id,
-            sellOnlyMode: false,
             sellingPositions: new Set(),
             tradingStats: {
               totalTrades: 0,
@@ -464,40 +457,8 @@ class AutoTrader extends EventEmitter {
     // Check if we have an existing position in this token
     const existingPosition = await storage.getPositionByPortfolioAndToken(portfolioId, token.id);
     
-    // In sell-only mode, prioritize sell signals for positions we hold
-    if (portfolioState.sellOnlyMode && existingPosition && parseFloat(existingPosition.amount) > 0) {
-      // Generate sell signal for bearish patterns on held positions
-      if (bearishPatterns.includes(pattern.patternType)) {
-        return {
-          tokenId: token.id,
-          type: 'sell',
-          confidence,
-          source: `ML Pattern: ${pattern.patternType}`,
-          price: currentPrice,
-          reason: `🔴 [Portfolio ${portfolioId}] ${pattern.patternType} detected - Sell-only mode active (${confidence.toFixed(1)}% confidence)`
-        };
-      }
-      
-      // Also consider selling on weaker bullish patterns to lock in gains
-      if (bullishPatterns.includes(pattern.patternType) && confidence > 80) {
-        const avgBuyPrice = parseFloat(existingPosition.avgBuyPrice);
-        const profitPercent = ((currentPrice - avgBuyPrice) / avgBuyPrice) * 100;
-        
-        if (profitPercent > this.strategy.sellOnlyTakeProfit) {
-          return {
-            tokenId: token.id,
-            type: 'sell',
-            confidence: confidence * 0.8, // Reduce confidence for profit-taking
-            source: `ML Pattern: ${pattern.patternType} (Profit Taking)`,
-            price: currentPrice,
-            reason: `📈 [Portfolio ${portfolioId}] Taking profit on ${pattern.patternType} - ${profitPercent.toFixed(1)}% gain (Sell-only mode)`
-          };
-        }
-      }
-    }
-    
-    // Regular buy signals when not in sell-only mode
-    if (!portfolioState.sellOnlyMode && bullishPatterns.includes(pattern.patternType)) {
+    // Regular buy signals for bullish patterns
+    if (bullishPatterns.includes(pattern.patternType)) {
       // ENHANCED: Add chart analysis reasoning to the signal
       let enhancedReason = `🤖 [Portfolio ${portfolioId}] ${pattern.patternType} detected (${confidence.toFixed(1)}% confidence)`;
       
@@ -532,8 +493,8 @@ class AutoTrader extends EventEmitter {
     const portfolioState = this.enabledPortfolios.get(portfolioId);
     if (!portfolioState) return null;
     
-    // Only generate buy signals when not in sell-only mode
-    if (!portfolioState.sellOnlyMode && (alert.alertType === 'volume_surge' || alert.alertType === 'price_spike')) {
+    // Generate buy signals for volume surges and price spikes
+    if (alert.alertType === 'volume_surge' || alert.alertType === 'price_spike') {
       return {
         tokenId: token.id,
         type: 'buy',
@@ -579,14 +540,6 @@ class AutoTrader extends EventEmitter {
       const totalPnL = parseFloat(portfolio.totalPnL || '0');
       const dailyPnL = parseFloat(portfolio.dailyPnL || '0');
       
-      // DYNAMIC RISK LEVEL: Check daily loss threshold based on portfolio risk level
-      const riskConfig = await this.getRiskConfig(portfolioId);
-      const dailyLossThreshold = startingCapital * (riskConfig.maxDailyLossPercentage / 100);
-      if (dailyPnL < -dailyLossThreshold) {
-        console.log(`🛑 [Portfolio ${portfolioId}] DAILY LOSS LIMIT EXCEEDED (${riskConfig.displayName} mode): ${dailyPnL.toFixed(2)} < -$${dailyLossThreshold.toFixed(2)}`);
-        console.log(`🔴 [Portfolio ${portfolioId}] Trading paused for today to prevent further losses`);
-        return;
-      }
       
       // IMPROVED: Dynamic position sizing from RiskManager
       const positionSizing = await riskManager.calculatePositionSizing(
@@ -609,15 +562,6 @@ class AutoTrader extends EventEmitter {
       
       console.log(`💡 [Portfolio ${portfolioId}] Dynamic position sizing: $${tradeValue.toFixed(2)} (${positionSizing.riskLevel} risk, ${positionSizing.reasoning})`);
       
-      // DYNAMIC RISK LEVEL: Enforce minimum cash floor based on portfolio risk level
-      const minCashRequired = totalValue * (riskConfig.minCashPercentage / 100);
-      const cashAfterTrade = availableCash - tradeValue;
-      
-      if (cashAfterTrade < minCashRequired) {
-        console.log(`🚫 [Portfolio ${portfolioId}] CASH FLOOR PROTECTION (${riskConfig.displayName} mode): Trade would leave $${cashAfterTrade.toFixed(2)} (< $${minCashRequired.toFixed(2)} required)`);
-        console.log(`💰 [Portfolio ${portfolioId}] Maintaining ${riskConfig.minCashPercentage}% cash buffer for risk management`);
-        return;
-      }
       
       // If insufficient funds, try to rebalance by selling stagnant positions at break-even or above
       if (availableCash < tradeValue) {
@@ -722,8 +666,6 @@ class AutoTrader extends EventEmitter {
         cashBalance: newCashBalance,
       });
       
-      // Update sell-only mode immediately after cash change
-      await this.updateSellOnlyModeState(portfolioId);
       
       // Update stats
       portfolioState.tradingStats.totalTrades++;
@@ -780,36 +722,6 @@ class AutoTrader extends EventEmitter {
     }
   }
 
-  private async updateSellOnlyModeState(portfolioId: string) {
-    const portfolioState = this.enabledPortfolios.get(portfolioId);
-    if (!portfolioState) return;
-    
-    try {
-      const portfolio = await storage.getPortfolio(portfolioId);
-      if (!portfolio) return;
-      
-      const availableCash = parseFloat(portfolio.cashBalance || '0');
-      const tradeValue = 500;
-      const previousMode = portfolioState.sellOnlyMode;
-      
-      // Update sell-only mode based on cash balance
-      if (availableCash < tradeValue) {
-        portfolioState.sellOnlyMode = true;
-        if (!previousMode) {
-          console.log(`🔴 [Portfolio ${portfolioId}] SELL-ONLY MODE ACTIVATED: Portfolio switching to exit-focused strategy`);
-          console.log(`💰 [Portfolio ${portfolioId}] Available cash: $${availableCash.toFixed(2)}, Required: $${tradeValue}`);
-        }
-      } else if (availableCash >= tradeValue * 2) {
-        portfolioState.sellOnlyMode = false;
-        if (previousMode) {
-          console.log(`🟢 [Portfolio ${portfolioId}] BUY MODE REACTIVATED: Sufficient cash restored for new positions`);
-          console.log(`💰 [Portfolio ${portfolioId}] Available cash: $${availableCash.toFixed(2)}, Required: $${tradeValue}`);
-        }
-      }
-    } catch (error) {
-      console.error(`[Portfolio ${portfolioId}] Error updating sell-only mode state:`, error);
-    }
-  }
 
   private async monitorAllPortfolios() {
     if (!this.isActive) {
@@ -831,8 +743,6 @@ class AutoTrader extends EventEmitter {
     if (!portfolioState) return;
     
     try {
-      // Update sell-only mode state based on current cash balance
-      await this.updateSellOnlyModeState(portfolioId);
       
       const positions = await storage.getPositionsByPortfolio(portfolioId);
       console.log(`📊 [Portfolio ${portfolioId}] Checking ${positions.length} positions (${positions.filter(p => parseFloat(p.amount) > 0).length} active)`);
@@ -921,12 +831,6 @@ class AutoTrader extends EventEmitter {
             sellTrigger = 'take_profit_stage_1';
             partialSellPercent = 0.3;
             this.positionStages.set(position.id, 1);
-          }
-          // In sell-only mode, also monitor for any meaningful profit to exit positions
-          else if (portfolioState.sellOnlyMode && profitLoss > 2) {
-            sellReason = `Sell-only mode: Exiting profitable position (${profitLoss.toFixed(1)}% gain)`;
-            sellTrigger = 'cash_generation';
-            this.positionStages.delete(position.id);
           }
           
           // Execute sell only once per position per cycle
@@ -1070,8 +974,6 @@ class AutoTrader extends EventEmitter {
         
         console.log(`   💰 [Portfolio ${portfolioId}] Cash credited: +$${totalSellValue.toFixed(2)}, New balance: $${(currentCash + totalSellValue).toFixed(2)}`);
         
-        // Update sell-only mode immediately after cash change
-        await this.updateSellOnlyModeState(portfolioId);
       }
       
       // Update success stats
@@ -1346,10 +1248,6 @@ class AutoTrader extends EventEmitter {
     }
   }
 
-  clearRiskConfigCache(portfolioId: string) {
-    this.riskConfigs.delete(portfolioId);
-    console.log(`🔄 Cleared risk config cache for portfolio ${portfolioId}`);
-  }
 
   getStatsForPortfolio(portfolioId: string) {
     const portfolioState = this.enabledPortfolios.get(portfolioId);
