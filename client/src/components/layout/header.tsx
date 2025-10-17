@@ -3,8 +3,7 @@ import { useLanguage } from "@/hooks/use-language";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Switch } from "@/components/ui/switch";
-import { MoreHorizontal, LogOut, Power, Zap } from "lucide-react";
+import { MoreHorizontal, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWebSocket } from "@/hooks/use-websocket";
@@ -37,44 +36,12 @@ export function Header() {
   // Fetch real portfolio data
   const { data: portfolio, error: portfolioError } = useQuery<{
     totalValue: string;
-    autoTradingEnabled?: boolean;
   }>({
     queryKey: ['/api/portfolio', 'default'],
     refetchInterval: 30000, // Refetch every 30 seconds
     staleTime: 15000, // Data stays fresh for 15 seconds
     retry: false, // Don't retry on 401 errors
   });
-
-  // Trading toggle mutation
-  const toggleTradingMutation = useMutation({
-    mutationFn: async (enabled: boolean) => {
-      const csrfToken = await getCsrfToken();
-      await apiRequest("PATCH", "/api/portfolio/auto-trading", {
-        _csrf: csrfToken,
-        enabled
-      });
-    },
-    onSuccess: (_, enabled) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default'] });
-      toast({
-        title: enabled ? "Trading Activated" : "Trading Deactivated",
-        description: enabled ? 
-          "Auto-trading is now active. The system will execute trades automatically." :
-          "Auto-trading is paused. No new trades will be executed.",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Toggle Failed",
-        description: error.message || "Failed to toggle trading status.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleTradingToggle = (enabled: boolean) => {
-    toggleTradingMutation.mutate(enabled);
-  };
 
   // Check if user is authenticated (401 errors indicate unauthenticated)
   const hasAuthError = (error: any) => {
@@ -184,55 +151,6 @@ export function Header() {
         
         {/* Right section - Controls */}
         <div className="flex items-center space-x-2 md:space-x-4">
-          {/* Trading Toggle - Always visible when authenticated */}
-          {isAuthenticated && (
-            <motion.div
-              className={cn(
-                "flex items-center space-x-2 px-3 py-2 rounded-lg border transition-all",
-                portfolio?.autoTradingEnabled
-                  ? "bg-green-500/10 border-green-500/30"
-                  : "bg-gray-500/10 border-gray-500/30"
-              )}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              data-testid="container-trading-toggle"
-            >
-              <div className="hidden sm:flex items-center space-x-2">
-                <motion.div
-                  animate={{
-                    scale: portfolio?.autoTradingEnabled ? [1, 1.2, 1] : 1,
-                  }}
-                  transition={{
-                    duration: 2,
-                    repeat: portfolio?.autoTradingEnabled ? Infinity : 0,
-                  }}
-                >
-                  {portfolio?.autoTradingEnabled ? (
-                    <Zap className="w-4 h-4 text-green-400" />
-                  ) : (
-                    <Power className="w-4 h-4 text-gray-400" />
-                  )}
-                </motion.div>
-                <span className={cn(
-                  "text-sm font-medium",
-                  portfolio?.autoTradingEnabled ? "text-green-400" : "text-gray-400"
-                )}>
-                  {portfolio?.autoTradingEnabled ? "Trading ON" : "Trading OFF"}
-                </span>
-              </div>
-              <Switch
-                checked={portfolio?.autoTradingEnabled || false}
-                onCheckedChange={handleTradingToggle}
-                disabled={toggleTradingMutation.isPending}
-                className={cn(
-                  "data-[state=checked]:bg-green-500",
-                  toggleTradingMutation.isPending && "opacity-50 cursor-not-allowed"
-                )}
-                data-testid="switch-trading-toggle"
-              />
-            </motion.div>
-          )}
-
           {/* Portfolio Value - Desktop */}
           <div className="hidden md:block text-right">
             <p className="text-sm text-muted-foreground">{t("portfolio.totalValue")}</p>

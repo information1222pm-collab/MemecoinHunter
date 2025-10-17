@@ -972,11 +972,8 @@ export default function Settings() {
             {/* Risk Level Configuration */}
             <RiskLevelCard />
 
-            {/* AI Trading Configuration */}
-            <AITradingCard />
-
-            {/* Launch Trading Configuration */}
-            <LaunchTradingCard />
+            {/* Trading Configuration - Removed manual toggles */}
+            {/* AI and Launch Trading are now controlled by the system only */}
 
             {/* Portfolio Reset */}
             <Card data-testid="card-portfolio-reset" className="col-span-1 lg:col-span-2 border-destructive/50">
