@@ -123,18 +123,34 @@ export async function setupAuth(app: Express) {
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
+  // Helper function to get the correct domain for passport strategy
+  const getDomainForStrategy = (hostname: string): string => {
+    const domains = process.env.REPLIT_DOMAINS!.split(",");
+    
+    // If hostname matches one of the registered domains, use it
+    if (domains.includes(hostname)) {
+      return hostname;
+    }
+    
+    // Otherwise, use the first domain as fallback (handles localhost, etc.)
+    console.log(`[OAUTH] Hostname ${hostname} not in REPLIT_DOMAINS, using first domain: ${domains[0]}`);
+    return domains[0];
+  };
+
   app.get("/api/login", (req, res, next) => {
-    passport.authenticate(`replitauth:${req.hostname}`, {
+    const domain = getDomainForStrategy(req.hostname);
+    passport.authenticate(`replitauth:${domain}`, {
       prompt: "login consent",
       scope: ["openid", "email", "profile", "offline_access"],
     })(req, res, next);
   });
 
   app.get("/api/callback", (req, res, next) => {
-    console.log(`[OAUTH] Callback received from ${req.hostname}`);
+    const domain = getDomainForStrategy(req.hostname);
+    console.log(`[OAUTH] Callback received from ${req.hostname}, using strategy domain: ${domain}`);
     console.log(`[OAUTH] Query params:`, req.query);
     
-    passport.authenticate(`replitauth:${req.hostname}`, 
+    passport.authenticate(`replitauth:${domain}`, 
       (err: any, user: any, info: any) => {
         if (err) {
           console.error(`[OAUTH] Authentication error:`, err);
