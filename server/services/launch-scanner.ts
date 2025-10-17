@@ -66,9 +66,9 @@ export class LaunchScanner extends EventEmitter {
       
       // Fetch potential new launches from multiple sources
       const [newlyLaunched, recentlyAdded, lowCapGems] = await Promise.all([
-        priceFeed.fetchNewlyLaunchedCoins(),
-        priceFeed.fetchRecentlyAddedCoins(),
-        priceFeed.fetchLowCapGems(),
+        priceFeed.getNewlyLaunchedCoins(),
+        priceFeed.getTrendingCoins(), // Use trending as recently added
+        priceFeed.getTopGainers(50), // Use top gainers as low cap gems
       ]);
 
       // Combine and deduplicate
