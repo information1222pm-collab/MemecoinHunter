@@ -18,8 +18,8 @@ export interface RiskLevelConfig {
   minPatternWinRate: number;
   
   // Risk Management
-  stopLossPercentage: number;
-  maxDailyLossPercentage: number;
+  // stopLossPercentage: number;  // Removed - no stop trading
+  // maxDailyLossPercentage: number;  // Removed - no daily limits
   maxOpenPositions: number;
   
   // Take Profit Strategy
@@ -55,8 +55,8 @@ export const RISK_LEVEL_CONFIGS: Record<RiskLevel, RiskLevelConfig> = {
     minPatternWinRate: 0.65,
     
     // Risk Management - Tight stops
-    stopLossPercentage: 3,
-    maxDailyLossPercentage: 2,
+    // stopLossPercentage: 3,  // Removed
+    // maxDailyLossPercentage: 2,  // Removed
     maxOpenPositions: 8,
     
     // Take Profit - Quick wins
@@ -91,8 +91,8 @@ export const RISK_LEVEL_CONFIGS: Record<RiskLevel, RiskLevelConfig> = {
     minPatternWinRate: 0.58,
     
     // Risk Management - Standard stops
-    stopLossPercentage: 4,
-    maxDailyLossPercentage: 3,
+    // stopLossPercentage: 4,  // Removed
+    // maxDailyLossPercentage: 3,  // Removed
     maxOpenPositions: 10,
     
     // Take Profit - Balanced targets
@@ -127,8 +127,8 @@ export const RISK_LEVEL_CONFIGS: Record<RiskLevel, RiskLevelConfig> = {
     minPatternWinRate: 0.52,
     
     // Risk Management - Moderate stops
-    stopLossPercentage: 5,
-    maxDailyLossPercentage: 4,
+    // stopLossPercentage: 5,  // Removed
+    // maxDailyLossPercentage: 4,  // Removed
     maxOpenPositions: 12,
     
     // Take Profit - Standard targets
@@ -163,8 +163,8 @@ export const RISK_LEVEL_CONFIGS: Record<RiskLevel, RiskLevelConfig> = {
     minPatternWinRate: 0.48,
     
     // Risk Management - Wider stops
-    stopLossPercentage: 6,
-    maxDailyLossPercentage: 6,
+    // stopLossPercentage: 6,  // Removed
+    // maxDailyLossPercentage: 6,  // Removed
     maxOpenPositions: 15,
     
     // Take Profit - Ambitious targets
@@ -199,8 +199,8 @@ export const RISK_LEVEL_CONFIGS: Record<RiskLevel, RiskLevelConfig> = {
     minPatternWinRate: 0.42,
     
     // Risk Management - Wide stops
-    stopLossPercentage: 8,
-    maxDailyLossPercentage: 8,
+    // stopLossPercentage: 8,  // Removed
+    // maxDailyLossPercentage: 8,  // Removed
     maxOpenPositions: 20,
     
     // Take Profit - Extreme targets

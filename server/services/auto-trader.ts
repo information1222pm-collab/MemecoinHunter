@@ -796,16 +796,11 @@ class AutoTrader extends EventEmitter {
             }
           }
           
-          // DYNAMIC RISK LEVEL: Apply stop-loss based on portfolio risk level
+          // Get risk config for take-profit levels
           const riskConfig = await this.getRiskConfig(portfolioId);
-          if (profitLoss <= -riskConfig.stopLossPercentage) {
-            sellReason = `Stop-loss triggered at ${profitLoss.toFixed(1)}% loss`;
-            sellTrigger = 'stop_loss';
-            // Full sell on stop-loss, clear stage tracking
-            this.positionStages.delete(position.id);
-          }
+          
           // ENHANCED: Chart-based exit signal
-          else if (chartBasedExit && profitLoss > 2) {
+          if (chartBasedExit && profitLoss > 2) {
             sellReason = `Chart pattern exit signal at ${profitLoss.toFixed(1)}% gain`;
             sellTrigger = 'chart_pattern_exit';
             this.positionStages.delete(position.id);
