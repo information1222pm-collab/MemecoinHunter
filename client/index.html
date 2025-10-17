@@ -6,11 +6,23 @@
     <title>MemeCoin Hunter - Real-time Memecoin Trading Platform</title>
     <meta name="description" content="Professional memecoin trading platform with real-time market scanning, ML-based pattern analysis, and automated trading. Track your portfolio and discover profitable opportunities." />
     
+    <!-- DNS Prefetch and Preconnect for faster API connections -->
+    <link rel="dns-prefetch" href="https://api.coingecko.com">
+    <link rel="dns-prefetch" href="https://ws.coincap.io">
+    <link rel="preconnect" href="https://api.coingecko.com" crossorigin>
+    <link rel="preconnect" href="https://ws.coincap.io" crossorigin>
+    
     <!-- Preload critical resources -->
-    <link rel="preload" href="/src/main.tsx" as="script" crossorigin />
+    <link rel="modulepreload" href="/src/main.tsx" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Load fonts with display swap for faster text rendering -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    
+    <!-- Preload first visible page's critical data -->
+    <link rel="prefetch" href="/api/portfolio" as="fetch" crossorigin>
+    <link rel="prefetch" href="/api/auth/me" as="fetch" crossorigin>
     
     <!-- Instant loading screen styles -->
     <style>

@@ -10,6 +10,7 @@ import { Filter, Play, ChevronUp, ChevronDown, TrendingUp, TrendingDown } from "
 import { cn } from "@/lib/utils";
 import { useState, useMemo } from "react";
 import { QuickTradeModal } from "./quick-trade-modal";
+import { VirtualList } from "@/components/ui/virtual-list";
 
 interface Token {
   id: string;
@@ -267,80 +268,86 @@ export function TokenScanner() {
               </div>
             </div>
             
-            <div className="divide-y divide-border">
-            {filteredAndSortedTokens?.map((token) => {
-              const signal = getSignal(token.priceChange24h);
-              const priceChangeClass = getPriceChangeClass(token.priceChange24h);
-              const changeNum = parseFloat(token.priceChange24h);
-              
-              return (
-                <div
-                  key={token.id}
-                  className="p-4 hover:bg-secondary/20 transition-colors"
-                  data-testid={`row-token-${token.symbol}`}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex-shrink-0" />
-                      <div>
-                        <div className="font-semibold text-base" data-testid={`text-symbol-${token.symbol}`}>{token.symbol}</div>
-                        <div className="text-sm text-muted-foreground" data-testid={`text-name-${token.symbol}`}>{token.name}</div>
-                      </div>
-                    </div>
-                    <Badge
-                      variant={signal.variant as any}
-                      className={cn(
-                        "text-xs",
-                        signal.variant === "success" && "bg-green-400/10 text-green-400",
-                        signal.variant === "destructive" && "bg-destructive/10 text-destructive",
-                        signal.variant === "secondary" && "bg-accent/10 text-accent"
-                      )}
-                      data-testid={`badge-signal-${token.symbol}`}
-                    >
-                      {signal.label}
-                    </Badge>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div>
-                      <div className="text-xs text-muted-foreground mb-1">{t("scanner.price")}</div>
-                      <div className="font-mono text-base" data-testid={`text-price-${token.symbol}`}>
-                        ${parseFloat(token.currentPrice).toFixed(6)}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground mb-1">{t("scanner.change24h")}</div>
-                      <div className={cn("font-semibold text-base flex items-center", priceChangeClass)} data-testid={`text-change-${token.symbol}`}>
-                        {changeNum >= 0 ? <TrendingUp className="w-4 h-4 mr-1" /> : <TrendingDown className="w-4 h-4 mr-1" />}
-                        {changeNum >= 0 ? '+' : ''}{changeNum.toFixed(1)}%
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground mb-1">{t("scanner.volume")}</div>
-                      <div className="font-mono text-sm" data-testid={`text-volume-${token.symbol}`}>
-                        ${(parseFloat(token.volume24h) / 1000000).toFixed(1)}M
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground mb-1">{t("scanner.marketCap")}</div>
-                      <div className="font-mono text-sm" data-testid={`text-marketcap-${token.symbol}`}>
-                        ${(parseFloat(token.marketCap) / 1000000).toFixed(1)}M
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <Button 
-                    size="sm"
-                    className="w-full"
-                    data-testid={`button-trade-${token.symbol}`}
-                    onClick={() => openTradeModal(token)}
+            <VirtualList
+              items={filteredAndSortedTokens || []}
+              itemHeight={180} // Approximate height of each mobile token card
+              containerHeight={window.innerHeight - 200} // Full screen minus header
+              overscan={2}
+              className="divide-y divide-border"
+              emptyMessage={isLoading ? "Loading tokens..." : "No tokens match your filters"}
+              renderItem={(token) => {
+                const signal = getSignal(token.priceChange24h);
+                const priceChangeClass = getPriceChangeClass(token.priceChange24h);
+                const changeNum = parseFloat(token.priceChange24h);
+                
+                return (
+                  <div
+                    key={token.id}
+                    className="p-4 hover:bg-secondary/20 transition-colors border-b border-border"
+                    data-testid={`row-token-${token.symbol}`}
                   >
-                    {t("scanner.trade")}
-                  </Button>
-                </div>
-              );
-            })}
-            </div>
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex-shrink-0" />
+                        <div>
+                          <div className="font-semibold text-base" data-testid={`text-symbol-${token.symbol}`}>{token.symbol}</div>
+                          <div className="text-sm text-muted-foreground" data-testid={`text-name-${token.symbol}`}>{token.name}</div>
+                        </div>
+                      </div>
+                      <Badge
+                        variant={signal.variant as any}
+                        className={cn(
+                          "text-xs",
+                          signal.variant === "success" && "bg-green-400/10 text-green-400",
+                          signal.variant === "destructive" && "bg-destructive/10 text-destructive",
+                          signal.variant === "secondary" && "bg-accent/10 text-accent"
+                        )}
+                        data-testid={`badge-signal-${token.symbol}`}
+                      >
+                        {signal.label}
+                      </Badge>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-1">{t("scanner.price")}</div>
+                        <div className="font-mono text-base" data-testid={`text-price-${token.symbol}`}>
+                          ${parseFloat(token.currentPrice).toFixed(6)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-1">{t("scanner.change24h")}</div>
+                        <div className={cn("font-semibold text-base flex items-center", priceChangeClass)} data-testid={`text-change-${token.symbol}`}>
+                          {changeNum >= 0 ? <TrendingUp className="w-4 h-4 mr-1" /> : <TrendingDown className="w-4 h-4 mr-1" />}
+                          {changeNum >= 0 ? '+' : ''}{changeNum.toFixed(1)}%
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-1">{t("scanner.volume")}</div>
+                        <div className="font-mono text-sm" data-testid={`text-volume-${token.symbol}`}>
+                          ${(parseFloat(token.volume24h) / 1000000).toFixed(1)}M
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-1">{t("scanner.marketCap")}</div>
+                        <div className="font-mono text-sm" data-testid={`text-marketcap-${token.symbol}`}>
+                          ${(parseFloat(token.marketCap) / 1000000).toFixed(1)}M
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <Button 
+                      size="sm"
+                      className="w-full"
+                      data-testid={`button-trade-${token.symbol}`}
+                      onClick={() => openTradeModal(token)}
+                    >
+                      {t("scanner.trade")}
+                    </Button>
+                  </div>
+                );
+              }}
+            />
           </div>
         ) : (
           <div className="overflow-x-auto">
