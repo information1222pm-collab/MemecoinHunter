@@ -21,13 +21,13 @@ export function QuickTrade() {
   const [orderType, setOrderType] = useState("market");
 
   // Fetch portfolio data
-  const { data: portfolio } = useQuery({
+  const { data: portfolio } = useQuery<any>({
     queryKey: ['/api/portfolio', 'default'],
     staleTime: 0,
   });
 
   // Fetch available tokens
-  const { data: tokens } = useQuery({
+  const { data: tokens } = useQuery<any[]>({
     queryKey: ['/api/tokens'],
     staleTime: 0,
   });

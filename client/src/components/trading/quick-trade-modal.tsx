@@ -34,7 +34,7 @@ export function QuickTradeModal({ selectedToken, onClose }: QuickTradeModalProps
   const [orderType, setOrderType] = useState("market");
 
   // Fetch portfolio data
-  const { data: portfolio } = useQuery({
+  const { data: portfolio } = useQuery<any>({
     queryKey: ['/api/portfolio', 'default'],
     staleTime: 0,
   });
