@@ -41,6 +41,12 @@ export class MarketHealthAnalyzer {
 
       console.log('📊 MARKET-HEALTH: Starting market health analysis...');
 
+      // Check if storage is properly initialized
+      if (!this.storage || typeof this.storage.getAllTokens !== 'function') {
+        console.warn('⚠️ MARKET-HEALTH: Storage not properly initialized, returning default health');
+        return this.getDefaultHealth('storage_error');
+      }
+
       // Get all tokens with recent price data
       const tokens = await this.storage.getAllTokens();
       const tokenMetrics: TokenMetrics[] = [];
