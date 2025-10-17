@@ -159,7 +159,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
 
   // RBAC Middleware for Role-Based Access Control (CRITICAL SECURITY FIX)
+  // Supports both email/password auth (req.session.userId) and Replit Auth (req.user from passport)
   const requireAuth = async (req: any, res: any, next: any) => {
+    // Check for Replit Auth (OAuth) first
+    if (req.user && req.user.id) {
+      try {
+        const user = await storage.getUser(req.user.id);
+        if (user) {
+          req.user = user;
+          return next();
+        }
+      } catch (error) {
+        console.error('[SECURITY] Replit Auth user lookup error:', error);
+      }
+    }
+    
+    // Fall back to email/password auth
     if (!req.session?.userId) {
       return res.status(401).json({ error: 'Authentication required' });
     }
