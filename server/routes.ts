@@ -425,9 +425,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { launchScanner } = await import('./services/launch-scanner');
     const { launchPerformanceTracker } = await import('./services/launch-performance-tracker');
     const { launchPatternAnalyzer } = await import('./services/launch-pattern-analyzer');
+    const { launchStrategyExperimenter } = await import('./services/launch-strategy-experimenter');
     launchScanner.start();
     launchPerformanceTracker.start();
     launchPatternAnalyzer.start();
+    launchStrategyExperimenter.start();
   });
 
   // Set up real-time broadcasts with user scoping (CRITICAL SECURITY FIX)

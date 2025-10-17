@@ -136,6 +136,8 @@ export interface IStorage {
   getLaunchAnalysisByLaunchId(launchCoinId: string): Promise<any | undefined>;
   createLaunchAnalysis(data: any): Promise<any>;
   getActiveStrategy(): Promise<any | undefined>;
+  getAllStrategies(): Promise<any[]>;
+  getStrategyPerformance(strategyId: string): Promise<any | undefined>;
   updateLaunchPerformance(strategyId: string, updates: any): Promise<any>;
 }
 
@@ -772,6 +774,17 @@ export class DatabaseStorage implements IStorage {
       .where(eq(launchStrategies.isActive, true))
       .limit(1);
     return strategy || undefined;
+  }
+
+  async getAllStrategies(): Promise<any[]> {
+    const strategies = await db.select().from(launchStrategies);
+    return strategies;
+  }
+
+  async getStrategyPerformance(strategyId: string): Promise<any | undefined> {
+    const [performance] = await db.select().from(launchPerformance)
+      .where(eq(launchPerformance.strategyId, strategyId));
+    return performance || undefined;
   }
 
   async updateLaunchPerformance(strategyId: string, updates: any): Promise<any> {
