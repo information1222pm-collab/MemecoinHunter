@@ -19,15 +19,17 @@ import { InsertLaunchCoin, Token } from '../../shared/schema';
 export class LaunchScanner extends EventEmitter {
   private isRunning = false;
   private scanInterval?: NodeJS.Timeout;
-  private detectedCoins = new Map<string, Date>(); // tokenId -> first detection time
+  private knownCoinIds = new Set<string>(); // Track all known coin IDs from CoinGecko
+  private firstDetectionTime = new Map<string, Date>(); // tokenId -> first detection time
   private scanIntervalMs = 2 * 60 * 1000; // 2 minutes
+  private isInitialized = false;
   
   private launchCriteria = {
-    maxMinutesOnMarket: 5, // Consider coins ≤5 minutes as "newly launched"
-    minMarketCap: 10000, // $10K minimum
-    maxMarketCap: 50000000, // $50M maximum (likely not a brand new launch if higher)
-    minPriceChange24h: 10, // At least 10% price movement indicates activity
-    minVolume: 500, // Minimum liquidity
+    maxMinutesOnMarket: 60, // Consider coins ≤60 minutes as "newly launched" (more realistic)
+    minMarketCap: 5000, // $5K minimum (lowered for better detection)
+    maxMarketCap: 100000000, // $100M maximum (increased for better detection)
+    minPriceChange24h: 5, // At least 5% price movement (lowered for better detection)
+    minVolume: 100, // Minimum liquidity (lowered for better detection)
   };
 
   start() {
@@ -58,38 +60,66 @@ export class LaunchScanner extends EventEmitter {
   }
 
   /**
-   * Scan for newly launched coins
+   * Scan for newly launched coins using polling method
    */
   private async scanForEarlyLaunches() {
     try {
       console.log('🔍 LAUNCH-SCANNER: Scanning for newly launched coins...');
       
-      // Fetch potential new launches from multiple sources
-      const [newlyLaunched, recentlyAdded, lowCapGems] = await Promise.all([
-        priceFeed.getNewlyLaunchedCoins(),
-        priceFeed.getTrendingCoins(), // Use trending as recently added
-        priceFeed.getTopGainers(50), // Use top gainers as low cap gems
-      ]);
-
-      // Combine and deduplicate
-      const allCoins = [...newlyLaunched, ...recentlyAdded, ...lowCapGems];
-      const uniqueCoins = Array.from(
-        new Map(allCoins.map(coin => [coin.id, coin])).values()
-      );
-
+      // Get all coins from CoinGecko to detect new additions
+      const allCoinsList = await priceFeed.getAllCoins();
+      const currentCoinIds = new Set(allCoinsList.map((c: any) => c.id));
+      
+      // Initialize on first run
+      if (!this.isInitialized) {
+        console.log(`🔍 LAUNCH-SCANNER: Initializing with ${currentCoinIds.size} known coins`);
+        this.knownCoinIds = currentCoinIds;
+        this.isInitialized = true;
+        return;
+      }
+      
+      // Find newly added coins
+      const newCoinIds = Array.from(currentCoinIds).filter(id => !this.knownCoinIds.has(id));
+      
+      if (newCoinIds.length === 0) {
+        console.log(`🔍 LAUNCH-SCANNER: No new coins detected from ${currentCoinIds.size} total`);
+        // Update known coins
+        this.knownCoinIds = currentCoinIds;
+        return;
+      }
+      
+      console.log(`🚨 LAUNCH-SCANNER: Detected ${newCoinIds.length} NEW coins!`);
+      
+      // Fetch detailed data for new coins
       let newLaunchesDetected = 0;
-
-      for (const coin of uniqueCoins) {
-        // Check if this coin meets early launch criteria
-        const isEarlyLaunch = await this.checkEarlyLaunchCriteria(coin);
-        
-        if (isEarlyLaunch) {
-          await this.recordLaunchCoin(coin);
-          newLaunchesDetected++;
+      
+      for (const coinId of newCoinIds) {
+        try {
+          const coinInfo = await priceFeed.getCoinMarketData(coinId);
+          
+          if (!coinInfo) {
+            console.log(`⚠️ No market data for ${coinId}, skipping`);
+            continue;
+          }
+          
+          // Check if meets launch criteria
+          const isEarlyLaunch = this.meetsLaunchCriteria(coinInfo);
+          
+          if (isEarlyLaunch) {
+            await this.recordLaunchCoin(coinInfo);
+            newLaunchesDetected++;
+          } else {
+            console.log(`⚠️ Coin ${coinInfo.symbol} detected but doesn't meet criteria`);
+          }
+        } catch (error) {
+          console.error(`❌ Error processing new coin ${coinId}:`, error);
         }
       }
-
-      console.log(`🚀 LAUNCH-SCANNER: Detected ${newLaunchesDetected} potential early launches from ${uniqueCoins.length} candidates`);
+      
+      // Update known coins
+      this.knownCoinIds = currentCoinIds;
+      
+      console.log(`🚀 LAUNCH-SCANNER: Recorded ${newLaunchesDetected} qualifying launches from ${newCoinIds.length} new coins`);
       
       // Cleanup old detections (>6 hours)
       this.cleanupOldDetections();
@@ -100,68 +130,25 @@ export class LaunchScanner extends EventEmitter {
   }
 
   /**
-   * Check if a coin meets early launch criteria
+   * Check if a coin meets early launch criteria (simplified)
    */
-  private async checkEarlyLaunchCriteria(coin: any): Promise<boolean> {
+  private meetsLaunchCriteria(coin: any): boolean {
     const marketCap = coin.market_cap || 0;
     const volume = coin.total_volume || 0;
     const priceChange = Math.abs(coin.price_change_percentage_24h || 0);
 
     // Check basic criteria
-    if (
-      marketCap < this.launchCriteria.minMarketCap ||
-      marketCap > this.launchCriteria.maxMarketCap ||
-      volume < this.launchCriteria.minVolume ||
-      priceChange < this.launchCriteria.minPriceChange24h
-    ) {
-      return false;
-    }
-
-    // Check if we've seen this coin before
-    const now = new Date();
-    const firstDetection = this.detectedCoins.get(coin.id);
+    const meetsBasic = 
+      marketCap >= this.launchCriteria.minMarketCap &&
+      marketCap <= this.launchCriteria.maxMarketCap &&
+      volume >= this.launchCriteria.minVolume &&
+      priceChange >= this.launchCriteria.minPriceChange24h;
     
-    if (!firstDetection) {
-      // First time seeing this coin - record it
-      this.detectedCoins.set(coin.id, now);
-      
-      // Check if it's already in our database by symbol (most reliable identifier)
-      const existingToken = await storage.getTokenBySymbol(coin.symbol.toUpperCase());
-      if (existingToken) {
-        // Coin already exists, estimate how long it's been tracked
-        const tokenAge = now.getTime() - (existingToken.lastUpdated ? new Date(existingToken.lastUpdated).getTime() : now.getTime());
-        const ageMinutes = tokenAge / (60 * 1000);
-        
-        if (ageMinutes > this.launchCriteria.maxMinutesOnMarket) {
-          return false; // Too old
-        }
-        
-        // Check if already in launch_coins table using the actual token UUID
-        const existingLaunch = await storage.getLaunchCoinByToken(existingToken.id);
-        if (existingLaunch) {
-          return false; // Already tracking this launch
-        }
-      }
-      
-      return true; // New coin, within criteria
-    } else {
-      // Calculate time since first detection
-      const timeSinceDetection = now.getTime() - firstDetection.getTime();
-      const minutesSinceDetection = timeSinceDetection / (60 * 1000);
-      
-      // Only consider it early launch if ≤5 minutes since first detection
-      if (minutesSinceDetection <= this.launchCriteria.maxMinutesOnMarket) {
-        // Get token by symbol to check if already recorded
-        const existingToken = await storage.getTokenBySymbol(coin.symbol.toUpperCase());
-        if (existingToken) {
-          const existingLaunch = await storage.getLaunchCoinByToken(existingToken.id);
-          return !existingLaunch;
-        }
-        return true; // Token doesn't exist yet, so no launch record either
-      }
-      
-      return false;
+    if (!meetsBasic) {
+      console.log(`⚠️ ${coin.symbol}: MC=${marketCap}, Vol=${volume}, Change=${priceChange}% - doesn't meet criteria`);
     }
+    
+    return meetsBasic;
   }
 
   /**
@@ -186,11 +173,9 @@ export class LaunchScanner extends EventEmitter {
         });
       }
 
-      // Calculate estimated age
-      const firstDetection = this.detectedCoins.get(coin.id);
-      const minutesOnMarket = firstDetection 
-        ? Math.floor((new Date().getTime() - firstDetection.getTime()) / (60 * 1000))
-        : 0;
+      // Calculate estimated age (newly detected = 0 minutes)
+      const firstDetection = this.firstDetectionTime.get(coin.id) || new Date();
+      const minutesOnMarket = Math.floor((new Date().getTime() - firstDetection.getTime()) / (60 * 1000));
 
       // Create launch coin record
       const launchCoin: InsertLaunchCoin = {
@@ -236,9 +221,9 @@ export class LaunchScanner extends EventEmitter {
   private cleanupOldDetections() {
     const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
     
-    for (const [coinId, detectionTime] of Array.from(this.detectedCoins.entries())) {
+    for (const [coinId, detectionTime] of Array.from(this.firstDetectionTime.entries())) {
       if (detectionTime < sixHoursAgo) {
-        this.detectedCoins.delete(coinId);
+        this.firstDetectionTime.delete(coinId);
       }
     }
   }
@@ -249,7 +234,8 @@ export class LaunchScanner extends EventEmitter {
   getStatus() {
     return {
       isRunning: this.isRunning,
-      trackedCoins: this.detectedCoins.size,
+      trackedCoins: this.knownCoinIds.size,
+      firstDetections: this.firstDetectionTime.size,
       scanInterval: `${this.scanIntervalMs / 1000}s`,
       criteria: this.launchCriteria,
     };

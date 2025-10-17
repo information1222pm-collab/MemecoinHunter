@@ -610,6 +610,62 @@ class PriceFeedService extends EventEmitter {
       return null;
     }
   }
+
+  /**
+   * Get all coins list from CoinGecko (for launch detection)
+   */
+  async getAllCoins(): Promise<any[]> {
+    try {
+      const cacheKey = 'all_coins_list';
+      const cached = this.getCachedResponse(cacheKey);
+      if (cached) return cached;
+
+      await this.respectRateLimit();
+      
+      const response = await fetch(`${this.API_BASE}/coins/list`);
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      this.setCachedResponse(cacheKey, data);
+      return data;
+    } catch (error) {
+      console.error('Error fetching all coins list:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get coin market data by ID
+   */
+  async getCoinMarketData(coinId: string): Promise<any> {
+    try {
+      const cacheKey = `coin_market_${coinId}`;
+      const cached = this.getCachedResponse(cacheKey);
+      if (cached) return cached;
+
+      await this.respectRateLimit();
+      
+      // Use markets endpoint for single coin
+      const response = await fetch(
+        `${this.API_BASE}/coins/markets?vs_currency=usd&ids=${coinId}&sparkline=false`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const coinData = data[0]; // markets endpoint returns array
+      
+      this.setCachedResponse(cacheKey, coinData);
+      return coinData;
+    } catch (error) {
+      console.error(`Error fetching coin market data for ${coinId}:`, error);
+      return null;
+    }
+  }
 }
 
 export const priceFeed = new PriceFeedService();
