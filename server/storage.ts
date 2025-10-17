@@ -4,6 +4,7 @@ import {
   exchangeConfig, exchangeTrades, exchangeBalances, tradingConfig, apiKeys,
   alertRules, alertEvents, visitors,
   launchCoins, launchAnalysis, launchStrategies, launchPerformance, portfolioLaunchConfig,
+  aiInsights,
   type User, type InsertUser, type UpsertUser, type Token, type InsertToken,
   type Portfolio, type InsertPortfolio, type Trade, type InsertTrade,
   type Position, type InsertPosition, type ScanAlert, type InsertScanAlert,
@@ -12,7 +13,8 @@ import {
   type MLLearningParams, type InsertMLLearningParams,
   type AlertRule, type InsertAlertRule, type AlertEvent, type InsertAlertEvent,
   type Visitor, type InsertVisitor,
-  type LaunchCoin, type InsertLaunchCoin, type LaunchAnalysis, type InsertLaunchAnalysis
+  type LaunchCoin, type InsertLaunchCoin, type LaunchAnalysis, type InsertLaunchAnalysis,
+  type AIInsight, type InsertAIInsight
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -143,6 +145,14 @@ export interface IStorage {
   getPortfolioLaunchConfig(portfolioId: string): Promise<any | undefined>;
   updatePortfolioLaunchConfig(portfolioId: string, config: any): Promise<any>;
   getRecentLaunches(limit: number): Promise<any[]>;
+
+  // AI Insights operations
+  getAutoTradingPortfolios(): Promise<Portfolio[]>;
+  getLatestInsightForPortfolio(portfolioId: string): Promise<AIInsight | undefined>;
+  createAIInsight(insight: InsertAIInsight): Promise<AIInsight>;
+  getPatternsSince(date: Date): Promise<Pattern[]>;
+  getInsightsByPortfolio(portfolioId: string, limit?: number): Promise<AIInsight[]>;
+  updateInsightStatus(id: string, status: string): Promise<AIInsight>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -863,6 +873,55 @@ export class DatabaseStorage implements IStorage {
     .limit(limit);
     
     return launches;
+  }
+
+  // AI Insights operations
+  async getAutoTradingPortfolios(): Promise<Portfolio[]> {
+    const results = await db.select()
+      .from(portfolios)
+      .where(eq(portfolios.autoTradingEnabled, true));
+    return results;
+  }
+
+  async getLatestInsightForPortfolio(portfolioId: string): Promise<AIInsight | undefined> {
+    const [insight] = await db.select()
+      .from(aiInsights)
+      .where(eq(aiInsights.portfolioId, portfolioId))
+      .orderBy(desc(aiInsights.createdAt))
+      .limit(1);
+    return insight;
+  }
+
+  async createAIInsight(insight: InsertAIInsight): Promise<AIInsight> {
+    const [newInsight] = await db.insert(aiInsights)
+      .values(insight)
+      .returning();
+    return newInsight;
+  }
+
+  async getPatternsSince(date: Date): Promise<Pattern[]> {
+    const results = await db.select()
+      .from(patterns)
+      .where(gte(patterns.detectedAt, date))
+      .orderBy(desc(patterns.confidence));
+    return results;
+  }
+
+  async getInsightsByPortfolio(portfolioId: string, limit: number = 10): Promise<AIInsight[]> {
+    const results = await db.select()
+      .from(aiInsights)
+      .where(eq(aiInsights.portfolioId, portfolioId))
+      .orderBy(desc(aiInsights.createdAt))
+      .limit(limit);
+    return results;
+  }
+
+  async updateInsightStatus(id: string, status: string): Promise<AIInsight> {
+    const [updated] = await db.update(aiInsights)
+      .set({ status })
+      .where(eq(aiInsights.id, id))
+      .returning();
+    return updated;
   }
 }
 

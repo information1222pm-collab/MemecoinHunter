@@ -19,6 +19,7 @@ import { alertService } from "./services/alert-service";
 import { marketHealthAnalyzer } from "./services/market-health";
 import { dataCleanupService } from "./services/data-cleanup";
 import { cacheService } from "./services/cache-service";
+import { aiInsightsAnalyzer } from "./services/ai-insights-analyzer";
 import { insertUserSchema, insertTradeSchema, insertTokenSchema, insertAlertRuleSchema, insertPortfolioLaunchConfigSchema } from "@shared/schema";
 import { z } from "zod";
 import * as bcrypt from "bcrypt";
@@ -402,6 +403,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Start ML analyzer after auto-trader is listening
     console.log('🧠 Starting ML Pattern Analyzer...');
     mlAnalyzer.start();
+    
+    // Start AI insights analyzer for intelligent recommendations
+    console.log('🤖 Starting AI Insights Analyzer...');
+    aiInsightsAnalyzer.start();
     
     riskManager.start();
     stakeholderReportUpdater.startAutoUpdater();
@@ -2302,6 +2307,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching entries by strategy:', error);
       res.status(500).json({ message: "Failed to fetch entries by strategy", error });
+    }
+  });
+
+  // AI Insights endpoints
+  app.get("/api/insights", async (req, res) => {
+    try {
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const portfolio = await storage.getPortfolioByUserId(user.id);
+      if (!portfolio) {
+        return res.status(404).json({ message: "Portfolio not found" });
+      }
+
+      const limit = parseInt(req.query.limit as string) || 10;
+      const insights = await storage.getInsightsByPortfolio(portfolio.id, limit);
+      
+      res.json(insights);
+    } catch (error) {
+      console.error('Error fetching AI insights:', error);
+      res.status(500).json({ message: "Failed to fetch AI insights", error });
+    }
+  });
+
+  app.put("/api/insights/:id/status", async (req, res) => {
+    try {
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { id } = req.params;
+      const { status } = req.body;
+
+      // Validate status
+      const validStatuses = ['new', 'viewed', 'acted_on', 'dismissed'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: "Invalid status value" });
+      }
+
+      const updated = await storage.updateInsightStatus(id, status);
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating insight status:', error);
+      res.status(500).json({ message: "Failed to update insight status", error });
     }
   });
 
