@@ -750,18 +750,18 @@ class AutoTrader extends EventEmitter {
     try {
       
       const positions = await storage.getPositionsByPortfolio(portfolioId);
-      console.log(`📊 [Portfolio ${portfolioId}] Checking ${positions.length} positions (${positions.filter(p => parseFloat(p.amount) > 0).length} active)`);
+      console.log(`📊 [Portfolio ${portfolioId}] Checking ${positions.length} positions (${positions.filter(p => safeParseFloat(p.amount, 0) > 0).length} active)`);
       
       let totalPortfolioValue = 0;
       const positionsSold = new Set<string>(); // Track positions sold in this cycle
       
       for (const position of positions) {
         const token = await storage.getToken(position.tokenId);
-        if (!token || parseFloat(position.amount) <= 0) continue;
+        if (!token || safeParseFloat(position.amount, 0) <= 0) continue;
         
-        const currentPrice = parseFloat(token.currentPrice || '0');
-        const avgBuyPrice = parseFloat(position.avgBuyPrice);
-        const amount = parseFloat(position.amount);
+        const currentPrice = safeParseFloat(token.currentPrice, 0);
+        const avgBuyPrice = safeParseFloat(position.avgBuyPrice, 0);
+        const amount = safeParseFloat(position.amount, 0);
         
         if (currentPrice > 0) {
           const positionValue = amount * currentPrice;
@@ -859,8 +859,8 @@ class AutoTrader extends EventEmitter {
         console.log(`💰 [Portfolio ${portfolioId}] Portfolio Update: Positions $${totalPortfolioValue.toFixed(2)}, Cash $${currentCashBalance.toFixed(2)}, Total $${newTotalValue.toFixed(2)}`);
         
         await storage.updatePortfolio(portfolio.id, {
-          totalValue: newTotalValue.toString(),
-          totalPnL: totalPnL.toString(),
+          totalValue: safeDbNumber(newTotalValue),
+          totalPnL: safeDbNumber(totalPnL),
         });
         
         portfolioState.tradingStats.totalValue = newTotalValue;

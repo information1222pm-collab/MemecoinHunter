@@ -231,7 +231,7 @@ class RiskManager extends EventEmitter {
         return { allowed: false, reason: 'Portfolio not found' };
       }
 
-      const portfolioValue = parseFloat(portfolio.totalValue || '0');
+      const portfolioValue = safeParseFloat(portfolio.totalValue, 0);
       const tradeValue = amount * price;
       const riskLimits = this.defaultRiskLimits;
 

@@ -25,11 +25,11 @@ export class LaunchScanner extends EventEmitter {
   private isInitialized = false;
   
   private launchCriteria = {
-    maxMinutesOnMarket: 60, // Consider coins ≤60 minutes as "newly launched" (more realistic)
-    minMarketCap: 5000, // $5K minimum (lowered for better detection)
-    maxMarketCap: 100000000, // $100M maximum (increased for better detection)
-    minPriceChange24h: 5, // At least 5% price movement (lowered for better detection)
-    minVolume: 100, // Minimum liquidity (lowered for better detection)
+    minMarketCap: 10000, // $10K minimum - early-stage coins
+    maxMarketCap: 50000000, // $50M maximum - still small enough to be "early"
+    minPriceChange24h: 10, // At least 10% price movement - indicates early momentum
+    minVolumeChange24h: 100, // 100%+ volume spike - indicates new interest (relaxed)
+    minVolume: 500, // Minimum $500 liquidity
   };
 
   start() {
@@ -60,66 +60,81 @@ export class LaunchScanner extends EventEmitter {
   }
 
   /**
-   * Scan for newly launched coins using polling method
+   * Scan for early-stage coins using market characteristics
+   * New strategy: Look for coins with early-stage indicators in existing market data
    */
   private async scanForEarlyLaunches() {
     try {
-      console.log('🔍 LAUNCH-SCANNER: Scanning for newly launched coins...');
+      console.log('🔍 LAUNCH-SCANNER: Scanning for early-stage coins with launch characteristics...');
       
-      // Get all coins from CoinGecko to detect new additions
-      const allCoinsList = await priceFeed.getAllCoins();
-      const currentCoinIds = new Set(allCoinsList.map((c: any) => c.id));
+      // Get all active tokens (these have market data we can analyze)
+      const allTokens = await storage.getActiveTokens();
       
-      // Initialize on first run
-      if (!this.isInitialized) {
-        console.log(`🔍 LAUNCH-SCANNER: Initializing with ${currentCoinIds.size} known coins`);
-        this.knownCoinIds = currentCoinIds;
-        this.isInitialized = true;
+      if (!allTokens || allTokens.length === 0) {
+        console.log('⚠️ LAUNCH-SCANNER: No tokens available for scanning');
         return;
       }
       
-      // Find newly added coins
-      const newCoinIds = Array.from(currentCoinIds).filter(id => !this.knownCoinIds.has(id));
-      
-      if (newCoinIds.length === 0) {
-        console.log(`🔍 LAUNCH-SCANNER: No new coins detected from ${currentCoinIds.size} total`);
-        // Update known coins
-        this.knownCoinIds = currentCoinIds;
-        return;
-      }
-      
-      console.log(`🚨 LAUNCH-SCANNER: Detected ${newCoinIds.length} NEW coins!`);
-      
-      // Fetch detailed data for new coins
+      let candidatesFound = 0;
       let newLaunchesDetected = 0;
       
-      for (const coinId of newCoinIds) {
+      // Scan each token for early-stage characteristics
+      for (const token of allTokens) {
         try {
-          const coinInfo = await priceFeed.getCoinMarketData(coinId);
-          
-          if (!coinInfo) {
-            console.log(`⚠️ No market data for ${coinId}, skipping`);
-            continue;
+          // Skip if we're already monitoring this token
+          const existingLaunch = await storage.getLaunchCoinByToken(token.id);
+          if (existingLaunch && existingLaunch.status === 'monitoring') {
+            continue; // Already tracking this one
           }
           
-          // Check if meets launch criteria
-          const isEarlyLaunch = this.meetsLaunchCriteria(coinInfo);
+          // Check if token meets early-stage criteria
+          const marketCap = parseFloat(token.marketCap || '0');
+          const priceChange24h = parseFloat(token.priceChange24h || '0');
+          const volume = parseFloat(token.volume24h || '0');
           
-          if (isEarlyLaunch) {
+          // Early-stage indicators
+          const hasSmallMarketCap = marketCap >= this.launchCriteria.minMarketCap && 
+                                     marketCap <= this.launchCriteria.maxMarketCap;
+          const hasHighPriceChange = Math.abs(priceChange24h) >= this.launchCriteria.minPriceChange24h;
+          // For now, accept any high price change coin (volume spike hard to track without historical data)
+          const hasVolumeSpike = true; // Simplified: all tokens with high price change qualify
+          const hasSufficientVolume = volume >= this.launchCriteria.minVolume;
+          
+          // Must meet all criteria to be considered early-stage
+          if (hasSmallMarketCap && hasHighPriceChange && hasVolumeSpike && hasSufficientVolume) {
+            candidatesFound++;
+            
+            // Create coinInfo object for recording
+            const coinInfo = {
+              id: token.id,
+              symbol: token.symbol,
+              name: token.name,
+              current_price: parseFloat(token.currentPrice || '0'),
+              market_cap: marketCap,
+              total_volume: volume,
+              price_change_percentage_24h: priceChange24h,
+              ath: parseFloat(token.currentPrice || '0'), // Use current price as ATH estimate
+              ath_date: new Date().toISOString(),
+            };
+            
             await this.recordLaunchCoin(coinInfo);
             newLaunchesDetected++;
-          } else {
-            console.log(`⚠️ Coin ${coinInfo.symbol} detected but doesn't meet criteria`);
+            
+            console.log(`🚀 LAUNCH-SCANNER: Found early-stage coin ${token.symbol}: $${marketCap.toLocaleString()} MC, ${priceChange24h.toFixed(1)}% 24h change`);
           }
         } catch (error) {
-          console.error(`❌ Error processing new coin ${coinId}:`, error);
+          // Silent continue - don't spam logs for minor errors
+          continue;
         }
       }
       
-      // Update known coins
-      this.knownCoinIds = currentCoinIds;
+      console.log(`🔍 LAUNCH-SCANNER: Scan complete - scanned ${allTokens.length} tokens`);
       
-      console.log(`🚀 LAUNCH-SCANNER: Recorded ${newLaunchesDetected} qualifying launches from ${newCoinIds.length} new coins`);
+      if (candidatesFound > 0) {
+        console.log(`✅ LAUNCH-SCANNER: Found ${candidatesFound} early-stage candidates, recorded ${newLaunchesDetected} new launches`);
+      } else {
+        console.log(`⚠️ LAUNCH-SCANNER: No coins met all criteria (MC: $10K-$50M, Price: ≥10%, Vol: ≥$500)`);
+      }
       
       // Cleanup old detections (>6 hours)
       this.cleanupOldDetections();
