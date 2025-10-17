@@ -755,7 +755,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Token routes - Optimized with stale-while-revalidate for <1s load time
   app.get("/api/tokens", async (req, res) => {
     try {
-      const cacheKey = 'active_tokens';
+      // Support field selection for smaller payloads
+      const fields = req.query.fields ? String(req.query.fields).split(',') : null;
+      const limit = req.query.limit ? parseInt(String(req.query.limit)) : undefined;
+      
+      const cacheKey = fields ? `active_tokens_${fields.join('_')}_${limit || 'all'}` : 'active_tokens';
       
       // Try to get from cache first (even if stale)
       let tokens = cacheService.get(cacheKey);
@@ -768,13 +772,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (cacheService.isStale(cacheKey)) {
           storage.getActiveTokens()
             .then(freshTokens => {
-              cacheService.set(cacheKey, freshTokens, 3000);
+              // Apply field selection and limit if specified
+              let processedTokens = freshTokens;
+              if (limit) {
+                processedTokens = freshTokens.slice(0, limit);
+              }
+              if (fields && fields.length > 0) {
+                processedTokens = processedTokens.map(token => {
+                  const filtered: any = { id: token.id }; // Always include ID
+                  fields.forEach(field => {
+                    if (token.hasOwnProperty(field)) {
+                      filtered[field] = token[field];
+                    }
+                  });
+                  return filtered;
+                });
+              }
+              cacheService.set(cacheKey, processedTokens, 3000);
             })
             .catch(err => console.error('Background token refresh failed:', err));
         }
       } else {
         // Cache miss (first time) - fetch from database synchronously
         tokens = await storage.getActiveTokens();
+        
+        // Apply field selection and limit if specified
+        if (limit) {
+          tokens = tokens.slice(0, limit);
+        }
+        if (fields && fields.length > 0) {
+          tokens = tokens.map(token => {
+            const filtered: any = { id: token.id }; // Always include ID
+            fields.forEach(field => {
+              if (token.hasOwnProperty(field)) {
+                filtered[field] = token[field];
+              }
+            });
+            return filtered;
+          });
+        }
+        
         cacheService.set(cacheKey, tokens, 3000); // 3s TTL for fresh price data
         res.json(tokens);
       }
