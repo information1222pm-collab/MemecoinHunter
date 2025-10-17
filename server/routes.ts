@@ -113,19 +113,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
   
   // Comprehensive CSRF protection for ALL state-changing endpoints
+  // NOTE: Temporarily excluding /api/auth/register to debug session persistence issue
   app.use([
-    '/api/auth/login', '/api/auth/register', '/api/auth/logout',
+    '/api/auth/login', /* '/api/auth/register', */ '/api/auth/logout',
     '/api/portfolio', '/api/trades', '/api/positions', '/api/alerts', '/api/price-alerts',
     '/api/api-keys', '/api/settings', '/api/auto-trader',
     '/api/email', '/api/visitor/demo-complete',
     '/api/create-checkout-session', '/api/create-subscription', '/api/cancel-subscription'
   ].map(path => [path, path + '/*']).flat(), conditionalCsrf);
+  
+  // CSRF error handler - catch and log CSRF errors instead of hanging
+  app.use((err: any, req: any, res: any, next: any) => {
+    if (err.code === 'EBADCSRFTOKEN') {
+      console.error('[CSRF-ERROR] Invalid CSRF token for', req.method, req.path);
+      console.error('[CSRF-ERROR] Session ID:', req.sessionID);
+      console.error('[CSRF-ERROR] Session data:', req.session);
+      return res.status(403).json({ error: 'Invalid CSRF token' });
+    }
+    next(err);
+  });
 
   // Rate Limiting for Security (CRITICAL SECURITY FIX)
   const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     limit: 5, // 5 attempts per window
     message: { error: 'Too many login attempts, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false
+  });
+  
+  // More relaxed limiter for registration (allow legitimate sign-ups)
+  const registerLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 10, // 10 registration attempts per window
+    message: { error: 'Too many registration attempts, please try again later' },
     standardHeaders: true,
     legacyHeaders: false
   });
@@ -148,7 +169,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Apply rate limiting
   app.use('/api/auth/login', authLimiter);
-  app.use('/api/auth/register', authLimiter);
+  app.use('/api/auth/register', registerLimiter);
   app.use('/api/trades', tradingLimiter);
   app.use('/api/auto-trader', tradingLimiter);
   app.use('/api/portfolio/default', apiLimiter); // Protect public demo endpoints
@@ -161,12 +182,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // RBAC Middleware for Role-Based Access Control (CRITICAL SECURITY FIX)
   // Supports both email/password auth (req.session.userId) and Replit Auth (req.user from passport)
   const requireAuth = async (req: any, res: any, next: any) => {
+    console.log('[AUTH-DEBUG] requireAuth called for', req.method, req.path);
+    console.log('[AUTH-DEBUG] Session ID:', req.sessionID);
+    console.log('[AUTH-DEBUG] Session data:', req.session);
+    console.log('[AUTH-DEBUG] OAuth user:', req.user);
+    
     // Check for Replit Auth (OAuth) first
     if (req.user && req.user.id) {
+      console.log('[AUTH-DEBUG] Found OAuth user:', req.user.id);
       try {
         const user = await storage.getUser(req.user.id);
         if (user) {
           req.user = user;
+          console.log('[AUTH-DEBUG] OAuth auth successful for user:', user.email);
           return next();
         }
       } catch (error) {
@@ -176,15 +204,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     // Fall back to email/password auth
     if (!req.session?.userId) {
+      console.log('[AUTH-DEBUG] No session userId found - returning 401');
       return res.status(401).json({ error: 'Authentication required' });
     }
     
     try {
+      console.log('[AUTH-DEBUG] Found session userId:', req.session.userId);
       const user = await storage.getUser(req.session.userId);
       if (!user) {
+        console.log('[AUTH-DEBUG] User not found in database - returning 401');
         return res.status(401).json({ error: 'Invalid user session' });
       }
       req.user = user;
+      console.log('[AUTH-DEBUG] Session auth successful for user:', user.email);
       next();
     } catch (error) {
       console.error('[SECURITY] Auth middleware error:', error);
@@ -607,16 +639,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Authentication routes
   app.post("/api/auth/register", async (req, res) => {
+    console.log('[REGISTER-DEBUG] Registration request received');
+    console.log('[REGISTER-DEBUG] Request body:', { ...req.body, password: '[REDACTED]' });
+    console.log('[REGISTER-DEBUG] Session ID before registration:', req.sessionID);
+    console.log('[REGISTER-DEBUG] Session data before registration:', req.session);
+    
     try {
+      console.log('[REGISTER-DEBUG] Parsing user data');
       const userData = insertUserSchema.parse(req.body);
       
       // Check if user already exists
+      console.log('[REGISTER-DEBUG] Checking if user exists:', userData.email);
       const existingUser = await storage.getUserByEmail(userData.email);
       if (existingUser) {
+        console.log('[REGISTER-DEBUG] User already exists');
         return res.status(400).json({ message: "User already exists" });
       }
 
       // Hash password before storing (CRITICAL SECURITY FIX)
+      console.log('[REGISTER-DEBUG] Hashing password');
       const saltRounds = 12;
       const hashedPassword = await bcrypt.hash(userData.password, saltRounds);
       const userDataWithHashedPassword = {
@@ -624,32 +665,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         password: hashedPassword
       };
 
+      console.log('[REGISTER-DEBUG] Creating user in database');
       const user = await storage.createUser(userDataWithHashedPassword);
+      console.log('[REGISTER-DEBUG] User created with ID:', user.id);
       
       // Create default portfolio for new user with $10,000 paper trading capital
       // Database defaults: startingCapital = $10,000, cashBalance = $10,000
+      console.log('[REGISTER-DEBUG] Creating portfolio for user');
       await storage.createPortfolio({ userId: user.id });
+      console.log('[REGISTER-DEBUG] Portfolio created');
       
       // Automatically log in user after successful registration
+      console.log('[REGISTER-DEBUG] Setting session userId and userEmail');
       req.session.userId = user.id;
       req.session.userEmail = user.email;
+      console.log('[REGISTER-DEBUG] Session data after setting:', req.session);
       
       // Save session to database to ensure persistence
+      console.log('[REGISTER-DEBUG] Saving session to database');
       await new Promise<void>((resolve, reject) => {
         req.session.save((err) => {
-          if (err) reject(err);
-          else resolve();
+          if (err) {
+            console.error('[REGISTER-DEBUG] Session save error:', err);
+            reject(err);
+          } else {
+            console.log('[REGISTER-DEBUG] Session saved successfully');
+            resolve();
+          }
         });
       });
+      console.log('[REGISTER-DEBUG] Session ID after save:', req.sessionID);
+      console.log('[REGISTER-DEBUG] Session data after save:', req.session);
       
       // Security audit log
       console.log(`[AUDIT] User registered and auto-logged in: ${user.email} at ${new Date().toISOString()}`);
       
+      console.log('[REGISTER-DEBUG] Sending success response');
       res.json({ 
         success: true,
         user: { id: user.id, username: user.username, email: user.email } 
       });
+      console.log('[REGISTER-DEBUG] Response sent');
     } catch (error) {
+      console.error(`[REGISTER-DEBUG] Registration error:`, error);
       console.error(`[SECURITY] Registration failed for ${req.body?.email}: ${error}`);
       res.status(400).json({ message: "Invalid user data", error });
     }
@@ -669,6 +727,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         console.warn(`[SECURITY] Login attempt for non-existent user: ${email} from ${req.ip || 'unknown'}`);
         return res.status(401).json({ message: "Invalid credentials" });
+      }
+      
+      // Check if user has a password (OAuth users may not have passwords)
+      if (!user.password) {
+        console.warn(`[SECURITY] Login attempt for OAuth-only user: ${email} from ${req.ip || 'unknown'}`);
+        return res.status(401).json({ message: "This account uses OAuth login. Please use 'Continue with Google' instead." });
       }
       
       // Verify password using bcrypt (CRITICAL SECURITY FIX)
@@ -722,16 +786,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Session status check route
-  app.get("/api/auth/me", (req, res) => {
+  app.get("/api/auth/me", async (req: any, res) => {
+    // Check OAuth user first (Replit Auth via passport)
+    if (req.user && req.user.id) {
+      try {
+        const user = await storage.getUser(req.user.id);
+        if (user) {
+          return res.json({ 
+            authenticated: true, 
+            userId: user.id,
+            userEmail: user.email,
+            authMethod: 'oauth'
+          });
+        }
+      } catch (error) {
+        console.error('[AUTH] OAuth user lookup error:', error);
+      }
+    }
+    
+    // Fall back to session-based auth
     if (req.session?.userId) {
-      res.json({ 
+      return res.json({ 
         authenticated: true, 
         userId: req.session.userId,
-        userEmail: req.session.userEmail
+        userEmail: req.session.userEmail,
+        authMethod: 'session'
       });
-    } else {
-      res.json({ authenticated: false });
     }
+    
+    res.json({ authenticated: false });
   });
 
   // Visitor tracking for IP-based demo
@@ -870,9 +953,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Portfolio routes
   // Get authenticated user's portfolio
-  app.get("/api/portfolio", requireAuth, async (req, res) => {
+  app.get("/api/portfolio", requireAuth, async (req: any, res) => {
     try {
-      const userId = req.session?.userId;
+      const userId = req.user.id;  // requireAuth middleware sets req.user for both OAuth and session auth
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
@@ -922,7 +1005,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get authenticated user's trades
   app.get("/api/portfolio/trades", requireAuth, async (req, res) => {
     try {
-      const userId = req.session?.userId;
+      const userId = req.user.id;  // requireAuth middleware sets req.user
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
@@ -956,7 +1039,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update AI trading settings for portfolio
   app.post("/api/portfolio/ai-settings", requireAuth, async (req, res) => {
     try {
-      const userId = req.session?.userId;
+      const userId = req.user.id;  // requireAuth middleware sets req.user
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
@@ -985,7 +1068,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Run backtest for a strategy
   app.post("/api/backtest/run", requireAuth, async (req, res) => {
     try {
-      const userId = req.session?.userId;
+      const userId = req.user.id;  // requireAuth middleware sets req.user
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
@@ -1019,7 +1102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get backtest results history
   app.get("/api/backtest/results", requireAuth, async (req, res) => {
     try {
-      const userId = req.session?.userId;
+      const userId = req.user.id;  // requireAuth middleware sets req.user
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
@@ -1035,7 +1118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Reset portfolio with custom starting capital
   app.post("/api/portfolio/reset", requireAuth, async (req, res) => {
     try {
-      const userId = req.session?.userId;
+      const userId = req.user.id;  // requireAuth middleware sets req.user
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
@@ -1081,7 +1164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update portfolio risk level
   app.patch("/api/portfolio/risk-level", requireAuth, async (req, res) => {
     try {
-      const userId = req.session?.userId;
+      const userId = req.user.id;  // requireAuth middleware sets req.user
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
@@ -1120,7 +1203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Toggle auto-trading for portfolio
   app.patch("/api/portfolio/auto-trading", requireAuth, async (req, res) => {
     try {
-      const userId = req.session?.userId;
+      const userId = req.user.id;  // requireAuth middleware sets req.user
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
