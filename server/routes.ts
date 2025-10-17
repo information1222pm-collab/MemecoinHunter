@@ -419,6 +419,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Start data cleanup service to prevent memory issues
     console.log('🧹 Starting Data Cleanup Service...');
     dataCleanupService.start();
+    
+    // Start early-launch detection system
+    console.log('🚀 Starting Early-Launch Detection System...');
+    const { launchScanner } = await import('./services/launch-scanner');
+    const { launchPerformanceTracker } = await import('./services/launch-performance-tracker');
+    launchScanner.start();
+    launchPerformanceTracker.start();
   });
 
   // Set up real-time broadcasts with user scoping (CRITICAL SECURITY FIX)

@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import { storage } from '../storage';
 import { priceFeed } from './price-feed';
+import { launchPerformanceTracker } from './launch-performance-tracker';
 import { InsertLaunchCoin, Token } from '../../shared/schema';
 
 /**
@@ -214,6 +215,14 @@ export class LaunchScanner extends EventEmitter {
         token,
         launchData: created,
       });
+
+      // Start tracking performance for this launch
+      await launchPerformanceTracker.trackLaunch(
+        created,
+        token.symbol,
+        parseFloat(coin.current_price),
+        coin.market_cap || 0
+      );
 
     } catch (error) {
       console.error(`❌ LAUNCH-SCANNER: Error recording launch coin ${coin.symbol}:`, error);
