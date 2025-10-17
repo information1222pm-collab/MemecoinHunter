@@ -83,17 +83,21 @@ class AIInsightsAnalyzer extends EventEmitter {
       console.log(`🧠 AI-INSIGHTS: Analyzing ${portfolios.length} portfolios...`);
       
       // Process portfolios in batches to avoid overwhelming the system
-      const BATCH_SIZE = 5;
-      for (let i = 0; i < portfolios.length; i += BATCH_SIZE) {
-        const batch = portfolios.slice(i, i + BATCH_SIZE);
+      // Reduced batch size and process only first 20 portfolios to prevent OOM
+      const maxPortfolios = Math.min(portfolios.length, 20); // Limit to 20 portfolios
+      const BATCH_SIZE = 2; // Reduced from 5 to 2
+      
+      for (let i = 0; i < maxPortfolios; i += BATCH_SIZE) {
+        const batch = portfolios.slice(i, Math.min(i + BATCH_SIZE, maxPortfolios));
         
-        await Promise.all(
-          batch.map(portfolio => this.analyzePortfolio(portfolio))
-        );
+        // Process sequentially instead of parallel to reduce memory pressure
+        for (const portfolio of batch) {
+          await this.analyzePortfolio(portfolio);
+        }
         
-        // Small delay between batches
-        if (i + BATCH_SIZE < portfolios.length) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
+        // Longer delay between batches to allow garbage collection
+        if (i + BATCH_SIZE < maxPortfolios) {
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Increased from 1000ms
         }
       }
       

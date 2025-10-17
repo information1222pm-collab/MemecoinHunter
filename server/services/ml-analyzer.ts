@@ -85,13 +85,13 @@ class MLAnalyzer extends EventEmitter {
     try {
       const tokens = await storage.getActiveTokens();
       
-      // FIX: Analyze only top 10 tokens by market cap to prevent memory issues
-      // Process in batches of 2 to avoid overwhelming the system
+      // FIX: Analyze only top 5 tokens by market cap to prevent memory issues
+      // Process in batches of 1 to avoid overwhelming the system
       const topTokens = tokens
         .sort((a, b) => parseFloat(b.marketCap || '0') - parseFloat(a.marketCap || '0'))
-        .slice(0, 10); // Further reduced to top 10 tokens to prevent memory issues
+        .slice(0, 5); // Further reduced to top 5 tokens to prevent OOM
       
-      const BATCH_SIZE = 2; // Further reduced to 2 tokens at a time
+      const BATCH_SIZE = 1; // Further reduced to 1 token at a time
       for (let i = 0; i < topTokens.length; i += BATCH_SIZE) {
         const batch = topTokens.slice(i, i + BATCH_SIZE);
         
@@ -130,8 +130,8 @@ class MLAnalyzer extends EventEmitter {
       console.log(`🔍 ML-ANALYZER: Found ${history.length} price history points for ${token.symbol}`);
       
       // FIX: Limit data to prevent stack overflow on large datasets
-      // Use only the most recent 500 data points to avoid memory/stack issues
-      const MAX_DATA_POINTS = 500;
+      // Use only the most recent 200 data points to avoid memory/stack issues
+      const MAX_DATA_POINTS = 200;
       if (history.length > MAX_DATA_POINTS) {
         console.log(`🔍 ML-ANALYZER: Limiting ${token.symbol} data from ${history.length} to ${MAX_DATA_POINTS} most recent points`);
         history = history.slice(-MAX_DATA_POINTS);
