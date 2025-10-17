@@ -249,7 +249,11 @@ export default function SignIn() {
                     type="button"
                     variant="outline"
                     className="w-full bg-slate-700/30 border-slate-600/50 text-slate-100 hover:bg-slate-600/50"
-                    onClick={() => window.location.href = '/api/login'}
+                    onClick={() => {
+                      console.log('[OAUTH-DEBUG] Button clicked!');
+                      console.log('[OAUTH-DEBUG] Navigating to /api/login...');
+                      window.location.href = '/api/login';
+                    }}
                     data-testid="button-google-login"
                   >
                     <SiGoogle className="mr-2 h-4 w-4" />

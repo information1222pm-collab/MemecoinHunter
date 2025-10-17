@@ -144,10 +144,18 @@ export async function setupAuth(app: Express) {
     return domains[0];
   };
 
+  // Test endpoint to verify button click
+  app.get("/api/oauth-test", (req, res) => {
+    console.log(`[OAUTH-TEST] Button click detected!`);
+    res.json({ success: true, message: "Button click successful" });
+  });
+
   app.get("/api/login", (req, res, next) => {
     console.log(`[OAUTH] ========== LOGIN ROUTE HIT ==========`);
     console.log(`[OAUTH] Method: ${req.method}, Path: ${req.path}`);
     console.log(`[OAUTH] Headers:`, JSON.stringify(req.headers, null, 2));
+    console.log(`[OAUTH] Query params:`, req.query);
+    console.log(`[OAUTH] Full URL: ${req.protocol}://${req.get('host')}${req.originalUrl}`);
     
     const domain = getDomainForStrategy(req);
     
