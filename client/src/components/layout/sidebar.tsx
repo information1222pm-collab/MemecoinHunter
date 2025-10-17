@@ -25,6 +25,7 @@ import {
   Trophy,
   Rocket,
   Lightbulb,
+  FlaskConical,
 } from "lucide-react";
 
 const navigationItems = [
@@ -33,6 +34,7 @@ const navigationItems = [
   { href: "/scanner", icon: Zap, labelKey: "navigation.scanner", hasIndicator: true },
   { href: "/portfolio", icon: Briefcase, labelKey: "navigation.portfolio" },
   { href: "/analytics", icon: TrendingUp, labelKey: "navigation.analytics" },
+  { href: "/backtest", icon: FlaskConical, labelKey: "navigation.backtest" },
   { href: "/activity", icon: Activity, labelKey: "navigation.activity", hasIndicator: true },
   { href: "/journal", icon: BookOpen, labelKey: "navigation.journal" },
   { href: "/insights", icon: Lightbulb, labelKey: "navigation.insights" },

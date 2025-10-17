@@ -30,6 +30,7 @@ const Subscription = lazy(() => import("@/pages/subscription"));
 const Settings = lazy(() => import("@/pages/settings"));
 const LaunchAnalytics = lazy(() => import("@/pages/launch-analytics"));
 const Insights = lazy(() => import("@/pages/insights"));
+const Backtest = lazy(() => import("@/pages/backtest"));
 const SignIn = lazy(() => import("@/pages/signin"));
 const DemoAlerts = lazy(() => import("@/pages/demo-alerts"));
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -162,6 +163,9 @@ function Router() {
           </Route>
           <Route path="/insights">
             {() => <ProtectedRoute component={Insights} />}
+          </Route>
+          <Route path="/backtest">
+            {() => <ProtectedRoute component={Backtest} />}
           </Route>
           
           {/* 404 */}
