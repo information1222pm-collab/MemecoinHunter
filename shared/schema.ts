@@ -623,6 +623,30 @@ export const portfolioLaunchConfig = pgTable("portfolio_launch_config", {
   launchTradingEnabledIdx: index("portfolio_launch_config_enabled_idx").on(table.launchTradingEnabled),
 }));
 
+// AI-Powered Insights - ML-driven trading recommendations
+export const aiInsights = pgTable("ai_insights", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  portfolioId: varchar("portfolio_id").notNull().references(() => portfolios.id),
+  insightType: text("insight_type").notNull(), // 'pattern_analysis', 'risk_assessment', 'opportunity_alert', 'performance_summary', 'market_trend'
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  recommendation: text("recommendation").notNull(), // AI-generated action recommendation
+  confidence: decimal("confidence", { precision: 5, scale: 2 }).notNull(), // 0-100 confidence score
+  priority: text("priority").default("medium"), // 'low', 'medium', 'high', 'critical'
+  supportingData: jsonb("supporting_data"), // Metrics, charts data, etc.
+  status: text("status").default("new"), // 'new', 'viewed', 'acted_on', 'dismissed'
+  expiresAt: timestamp("expires_at"), // When insight becomes stale
+  createdAt: timestamp("created_at").defaultNow(),
+  viewedAt: timestamp("viewed_at"),
+  actedOnAt: timestamp("acted_on_at"),
+}, (table) => ({
+  portfolioIdIdx: index("ai_insights_portfolio_id_idx").on(table.portfolioId),
+  insightTypeIdx: index("ai_insights_type_idx").on(table.insightType),
+  statusIdx: index("ai_insights_status_idx").on(table.status),
+  priorityIdx: index("ai_insights_priority_idx").on(table.priority),
+  createdAtIdx: index("ai_insights_created_at_idx").on(table.createdAt),
+}));
+
 // Insert schemas for launch system
 export const insertLaunchCoinSchema = createInsertSchema(launchCoins).omit({
   id: true,
@@ -722,3 +746,14 @@ export type InsertLaunchPerformance = z.infer<typeof insertLaunchPerformanceSche
 
 export type PortfolioLaunchConfig = typeof portfolioLaunchConfig.$inferSelect;
 export type InsertPortfolioLaunchConfig = z.infer<typeof insertPortfolioLaunchConfigSchema>;
+
+// AI Insights insert schema
+export const insertAIInsightSchema = createInsertSchema(aiInsights).omit({
+  id: true,
+  createdAt: true,
+  viewedAt: true,
+  actedOnAt: true,
+});
+
+export type AIInsight = typeof aiInsights.$inferSelect;
+export type InsertAIInsight = z.infer<typeof insertAIInsightSchema>;
