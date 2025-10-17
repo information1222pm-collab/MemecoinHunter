@@ -306,16 +306,30 @@ Always respond with valid JSON only, no markdown formatting.`
         .replace(/\s*```$/i, '')
         .trim();
 
-      const aiResponse = JSON.parse(cleanContent);
+      let aiResponse: any;
+      try {
+        aiResponse = JSON.parse(cleanContent);
+      } catch (parseError) {
+        console.error('Failed to parse AI response:', cleanContent);
+        // Provide default values if JSON parsing fails
+        aiResponse = {
+          title: 'Performance Analysis',
+          description: 'Unable to generate detailed analysis at this time.',
+          recommendation: 'Please review your portfolio performance manually.',
+          confidence: 50,
+          priority: 'medium'
+        };
+      }
       
+      // Ensure all required fields have values
       return {
         portfolioId: metrics.portfolioId,
         insightType: 'performance_summary',
-        title: aiResponse.title,
-        description: aiResponse.description,
-        recommendation: aiResponse.recommendation,
+        title: aiResponse.title || 'Performance Summary',
+        description: aiResponse.description || 'Analysis of recent trading performance.',
+        recommendation: aiResponse.recommendation || 'Continue monitoring portfolio performance.',
         confidence: (aiResponse.confidence || 50).toString(),
-        priority: aiResponse.priority,
+        priority: aiResponse.priority || 'medium',
         supportingData: {
           winRate: metrics.winRate,
           avgProfit: metrics.avgProfitPerTrade,
@@ -385,16 +399,30 @@ Always respond with valid JSON only, no markdown formatting.`
         .replace(/\s*```$/i, '')
         .trim();
 
-      const aiResponse = JSON.parse(cleanContent);
+      let aiResponse: any;
+      try {
+        aiResponse = JSON.parse(cleanContent);
+      } catch (parseError) {
+        console.error('Failed to parse AI response for risk:', cleanContent);
+        // Provide default values if JSON parsing fails
+        aiResponse = {
+          title: 'Risk Assessment',
+          description: 'Unable to generate detailed risk analysis at this time.',
+          recommendation: 'Maintain current risk management practices.',
+          confidence: 50,
+          priority: 'medium'
+        };
+      }
       
+      // Ensure all required fields have values
       return {
         portfolioId: metrics.portfolioId,
         insightType: 'risk_assessment',
-        title: aiResponse.title,
-        description: aiResponse.description,
-        recommendation: aiResponse.recommendation,
+        title: aiResponse.title || 'Risk Assessment',
+        description: aiResponse.description || 'Analysis of current portfolio risk levels.',
+        recommendation: aiResponse.recommendation || 'Monitor risk exposure carefully.',
         confidence: (aiResponse.confidence || 50).toString(),
-        priority: aiResponse.priority,
+        priority: aiResponse.priority || 'medium',
         supportingData: {
           riskExposure: metrics.currentRiskExposure,
           activePositions: metrics.activePositions,
@@ -472,16 +500,30 @@ Always respond with valid JSON only, no markdown formatting.`
         .replace(/\s*```$/i, '')
         .trim();
 
-      const aiResponse = JSON.parse(cleanContent);
+      let aiResponse: any;
+      try {
+        aiResponse = JSON.parse(cleanContent);
+      } catch (parseError) {
+        console.error('Failed to parse AI response for opportunity:', cleanContent);
+        // Provide default values if JSON parsing fails
+        aiResponse = {
+          title: 'Trading Opportunity',
+          description: 'Potential trading opportunity detected.',
+          recommendation: 'Review pattern signals before trading.',
+          confidence: 50,
+          priority: 'medium'
+        };
+      }
       
+      // Ensure all required fields have values
       return {
         portfolioId: metrics.portfolioId,
         insightType: 'opportunity_alert',
-        title: aiResponse.title,
-        description: aiResponse.description,
-        recommendation: aiResponse.recommendation,
+        title: aiResponse.title || 'Trading Opportunity',
+        description: aiResponse.description || 'New trading opportunity detected based on pattern analysis.',
+        recommendation: aiResponse.recommendation || 'Review pattern signals and market conditions.',
         confidence: (aiResponse.confidence || 50).toString(),
-        priority: aiResponse.priority,
+        priority: aiResponse.priority || 'medium',
         supportingData: {
           patterns: topPatterns.map(p => ({
             type: p.patternType,
@@ -547,16 +589,30 @@ Always respond with valid JSON only, no markdown formatting.`
         .replace(/\s*```$/i, '')
         .trim();
 
-      const aiResponse = JSON.parse(cleanContent);
+      let aiResponse: any;
+      try {
+        aiResponse = JSON.parse(cleanContent);
+      } catch (parseError) {
+        console.error('Failed to parse AI response for market trend:', cleanContent);
+        // Provide default values if JSON parsing fails
+        aiResponse = {
+          title: 'Market Trend Analysis',
+          description: 'Market conditions analysis unavailable.',
+          recommendation: 'Continue monitoring market conditions.',
+          confidence: 50,
+          priority: 'medium'
+        };
+      }
       
+      // Ensure all required fields have values
       return {
         portfolioId: metrics.portfolioId,
         insightType: 'market_trend',
-        title: aiResponse.title,
-        description: aiResponse.description,
-        recommendation: aiResponse.recommendation,
+        title: aiResponse.title || 'Market Trend Analysis',
+        description: aiResponse.description || 'Analysis of current market trends and conditions.',
+        recommendation: aiResponse.recommendation || 'Monitor market trends and adapt strategy accordingly.',
         confidence: (aiResponse.confidence || 50).toString(),
-        priority: aiResponse.priority,
+        priority: aiResponse.priority || 'medium',
         supportingData: {
           totalPnL: metrics.totalPnL,
           profitTrend: metrics.profitTrend,
