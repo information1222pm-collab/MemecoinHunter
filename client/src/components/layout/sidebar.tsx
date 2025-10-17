@@ -23,6 +23,7 @@ import {
   Shield,
   Bell,
   Trophy,
+  Rocket,
 } from "lucide-react";
 
 const navigationItems = [
@@ -37,6 +38,7 @@ const navigationItems = [
   { href: "/risk", icon: Shield, labelKey: "navigation.risk" },
   { href: "/alerts", icon: Bell, labelKey: "navigation.alerts" },
   { href: "/terminal", icon: Terminal, labelKey: "navigation.terminal" },
+  { href: "/launch-analytics", icon: Rocket, labelKey: "navigation.launchAnalytics" },
 ];
 
 const subscriptionItems = [

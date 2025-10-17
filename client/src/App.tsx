@@ -28,6 +28,7 @@ const Alerts = lazy(() => import("@/pages/alerts"));
 const Terminal = lazy(() => import("@/pages/terminal"));
 const Subscription = lazy(() => import("@/pages/subscription"));
 const Settings = lazy(() => import("@/pages/settings"));
+const LaunchAnalytics = lazy(() => import("@/pages/launch-analytics"));
 const SignIn = lazy(() => import("@/pages/signin"));
 const DemoAlerts = lazy(() => import("@/pages/demo-alerts"));
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -154,6 +155,9 @@ function Router() {
           </Route>
           <Route path="/settings">
             {() => <ProtectedRoute component={Settings} />}
+          </Route>
+          <Route path="/launch-analytics">
+            {() => <ProtectedRoute component={LaunchAnalytics} />}
           </Route>
           
           {/* 404 */}
