@@ -139,13 +139,22 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/login", (req, res, next) => {
     const domain = getDomainForStrategy(req.hostname);
-    passport.authenticate(`replitauth:${domain}`, {
-      prompt: "login consent",
-      scope: ["openid", "email", "profile", "offline_access"],
-    })(req, res, next);
+    
+    // CRITICAL: Save session before OAuth redirect to preserve state token
+    req.session.save((err) => {
+      if (err) {
+        console.error('[OAUTH] Session save error before redirect:', err);
+      }
+      
+      passport.authenticate(`replitauth:${domain}`, {
+        prompt: "login consent",
+        scope: ["openid", "email", "profile", "offline_access"],
+      })(req, res, next);
+    });
   });
 
   app.get("/api/callback", (req, res, next) => {
+    console.log(`[OAUTH-CALLBACK] Route hit! Hostname: ${req.hostname}, Full URL: ${req.protocol}://${req.get('host')}${req.originalUrl}`);
     const domain = getDomainForStrategy(req.hostname);
     console.log(`[OAUTH] Callback received from ${req.hostname}, using strategy domain: ${domain}`);
     console.log(`[OAUTH] Query params:`, req.query);
