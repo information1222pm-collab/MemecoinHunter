@@ -809,9 +809,6 @@ class PriceFeedService extends EventEmitter {
 
   // NEW: Fetch newly launched coins with recent ATH dates
   async fetchNewlyLaunchedCoins(): Promise<NewlyLaunchedCoin[]> {
-    // Temporarily disabled to reduce API load
-    return [];
-    
     // Check cache first
     const cacheKey = 'newly_launched_coins';
     const cachedData = this.getCachedResponse(cacheKey);
@@ -866,9 +863,6 @@ class PriceFeedService extends EventEmitter {
 
   // NEW: Fetch recently added coins to CoinGecko platform
   async fetchRecentlyAddedCoins(): Promise<NewlyLaunchedCoin[]> {
-    // Temporarily disabled to reduce API load
-    return [];
-    
     await this.respectRateLimit();
     
     // Get coins with very low market cap rank (indicating recent additions)
@@ -914,9 +908,6 @@ class PriceFeedService extends EventEmitter {
 
   // NEW: Fetch low cap gems with high growth potential
   async fetchLowCapGems(): Promise<NewlyLaunchedCoin[]> {
-    // Temporarily disabled to reduce API load
-    return [];
-    
     await this.respectRateLimit();
     
     // Search for low cap coins with high percentage gains
