@@ -1,0 +1,104 @@
+2025-10-17 01:15:26.46
+54689331
+User
+<--- Last few GCs --->
+2025-10-17 01:15:26.46
+54689331
+User
+2025-10-17 01:15:26.46
+54689331
+User
+[40:0x2e9a4be0] 644549 ms: Mark-Compact 1904.1 (2091.6) -> 1892.8 (2094.6) MB, 2501.40 / 0.00 ms (average mu = 0.088, current mu = 0.017) allocation failure; scavenge might not succeed
+2025-10-17 01:15:26.46
+54689331
+User
+[40:0x2e9a4be0] 647054 ms: Mark-Compact 1908.9 (2095.0) -> 1897.2 (2097.6) MB, 2462.54 / 0.00 ms (average mu = 0.054, current mu = 0.017) allocation failure; scavenge might not succeed
+2025-10-17 01:15:26.46
+54689331
+User
+2025-10-17 01:15:26.46
+54689331
+User
+2025-10-17 01:15:26.46
+54689331
+User
+<--- JS stacktrace --->
+2025-10-17 01:15:26.46
+54689331
+User
+2025-10-17 01:15:26.46
+54689331
+User
+FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory
+2025-10-17 01:15:26.46
+54689331
+User
+----- Native stack trace -----
+2025-10-17 01:15:26.47
+54689331
+User
+1: 0xaa132b node::OOMErrorHandler(char const*, v8::OOMDetails const&) [/nix/store/lz7iav1hd92jbv44zf2rdd7b2mj23536-nodejs-20.19.3/bin/node]
+2025-10-17 01:15:26.47
+54689331
+User
+2: 0xe74030 v8::Utils::ReportOOMFailure(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [/nix/store/lz7iav1hd92jbv44zf2rdd7b2mj23536-nodejs-20.19.3/bin/node]
+2025-10-17 01:15:26.47
+54689331
+User
+3: 0xe7443b v8::internal::V8::FatalProcessOutOfMemory(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [/nix/store/lz7iav1hd92jbv44zf2rdd7b2mj23536-nodejs-20.19.3/bin/node]
+2025-10-17 01:15:26.47
+54689331
+User
+4: 0x10aaaa7 [/nix/store/lz7iav1hd92jbv44zf2rdd7b2mj23536-nodejs-20.19.3/bin/node]
+2025-10-17 01:15:26.47
+54689331
+User
+5: 0x10c36d9 v8::internal::Heap::CollectGarbage(v8::internal::AllocationSpace, v8::internal::GarbageCollectionReason, v8::GCCallbackFlags) [/nix/store/lz7iav1hd92jbv44zf2rdd7b2mj23536-nodejs-20.19.3/bin/node]
+2025-10-17 01:15:26.47
+54689331
+User
+6: 0x109b36c v8::internal::HeapAllocator::AllocateRawWithLightRetrySlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment) [/nix/store/lz7iav1hd92jbv44zf2rdd7b2mj23536-nodejs-20.19.3/bin/node]
+2025-10-17 01:15:26.47
+54689331
+User
+7: 0x109c984 v8::internal::HeapAllocator::AllocateRawWithRetryOrFailSlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment) [/nix/store/lz7iav1hd92jbv44zf2rdd7b2mj23536-nodejs-20.19.3/bin/node]
+2025-10-17 01:15:26.47
+54689331
+User
+8: 0x107b617 v8::internal::Factory::NewFillerObject(int, v8::internal::AllocationAlignment, v8::internal::AllocationType, v8::internal::AllocationOrigin) [/nix/store/lz7iav1hd92jbv44zf2rdd7b2mj23536-nodejs-20.19.3/bin/node]
+2025-10-17 01:15:26.47
+54689331
+User
+9: 0x14f8630 v8::internal::Runtime_AllocateInYoungGeneration(int, unsigned long*, v8::internal::Isolate*) [/nix/store/lz7iav1hd92jbv44zf2rdd7b2mj23536-nodejs-20.19.3/bin/node]
+2025-10-17 01:15:26.47
+54689331
+User
+10: 0x1921ef6 [/nix/store/lz7iav1hd92jbv44zf2rdd7b2mj23536-nodejs-20.19.3/bin/node]
+2025-10-17 01:15:26.72
+54689331
+User
+Aborted
+2025-10-17 01:15:26.72
+54689331
+User
+npm notice
+2025-10-17 01:15:26.72
+54689331
+User
+npm notice New patch version of npm available! 11.6.0 -> 11.6.2
+2025-10-17 01:15:26.72
+54689331
+User
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.6.2
+2025-10-17 01:15:26.72
+54689331
+User
+npm notice To update run: npm install -g npm@11.6.2
+2025-10-17 01:15:26.72
+54689331
+User
+npm notice
+2025-10-17 01:15:26.73
+54689331
+System
+command finished with error [npm run start]: exit status 134

@@ -82,23 +82,36 @@ export class ChartAnalyzer {
    * Identify strong support and resistance levels
    */
   identifySupportResistance(history: PriceHistory[]): SupportResistanceLevel[] {
-    const prices = history.map(h => parseFloat(h.price));
+    // Validate input to prevent stack overflow
+    if (!history || history.length < 5) {
+      return [];
+    }
+    
+    const prices = history.map(h => parseFloat(h.price)).filter(p => !isNaN(p) && p > 0);
     const volumes = history.map(h => parseFloat(h.volume || '0'));
     
+    // Limit data to prevent stack overflow
+    const limitedPrices = prices.length > 1000 ? prices.slice(-1000) : prices;
+    const limitedVolumes = volumes.length > 1000 ? volumes.slice(-1000) : volumes;
+    
+    if (limitedPrices.length < 5) {
+      return [];
+    }
+    
     const levels: SupportResistanceLevel[] = [];
-    const currentPrice = prices[prices.length - 1];
+    const currentPrice = limitedPrices[limitedPrices.length - 1];
     
     // Find local peaks (resistance) and valleys (support)
-    for (let i = 2; i < prices.length - 2; i++) {
-      const price = prices[i];
-      const volume = volumes[i];
+    for (let i = 2; i < limitedPrices.length - 2; i++) {
+      const price = limitedPrices[i];
+      const volume = limitedVolumes[i];
       
       // Check if it's a local peak (resistance)
-      if (price > prices[i-1] && price > prices[i-2] && 
-          price > prices[i+1] && price > prices[i+2]) {
+      if (price > limitedPrices[i-1] && price > limitedPrices[i-2] && 
+          price > limitedPrices[i+1] && price > limitedPrices[i+2]) {
         
-        const touches = this.countTouches(prices, price, 0.015); // Within 1.5%
-        const strength = this.calculateLevelStrength(price, touches, volume, volumes);
+        const touches = this.countTouches(limitedPrices, price, 0.015); // Within 1.5%
+        const strength = this.calculateLevelStrength(price, touches, volume, limitedVolumes);
         
         levels.push({
           price,
@@ -110,11 +123,11 @@ export class ChartAnalyzer {
       }
       
       // Check if it's a local valley (support)
-      if (price < prices[i-1] && price < prices[i-2] && 
-          price < prices[i+1] && price < prices[i+2]) {
+      if (price < limitedPrices[i-1] && price < limitedPrices[i-2] && 
+          price < limitedPrices[i+1] && price < limitedPrices[i+2]) {
         
-        const touches = this.countTouches(prices, price, 0.015);
-        const strength = this.calculateLevelStrength(price, touches, volume, volumes);
+        const touches = this.countTouches(limitedPrices, price, 0.015);
+        const strength = this.calculateLevelStrength(price, touches, volume, limitedVolumes);
         
         levels.push({
           price,
@@ -176,9 +189,35 @@ export class ChartAnalyzer {
    * Calculate Fibonacci retracement and extension levels with entry/exit signals
    */
   calculateFibonacciLevels(history: PriceHistory[]): FibonacciLevels {
-    const prices = history.map(h => parseFloat(h.price));
-    const high = Math.max(...prices);
-    const low = Math.min(...prices);
+    // Validate input to prevent stack overflow
+    if (!history || history.length === 0) {
+      return {
+        levels: {},
+        direction: 'retracement',
+        entryLevels: [],
+        exitLevels: [],
+        stopLoss: 0
+      };
+    }
+    
+    const prices = history.map(h => parseFloat(h.price)).filter(p => !isNaN(p) && p > 0);
+    
+    // Prevent stack overflow with too many prices (limit to last 1000)
+    const limitedPrices = prices.length > 1000 ? prices.slice(-1000) : prices;
+    
+    if (limitedPrices.length === 0) {
+      return {
+        levels: {},
+        direction: 'retracement',
+        entryLevels: [],
+        exitLevels: [],
+        stopLoss: 0
+      };
+    }
+    
+    // Use reduce to find min/max to avoid spread operator stack overflow
+    const high = limitedPrices.reduce((max, p) => Math.max(max, p), limitedPrices[0]);
+    const low = limitedPrices.reduce((min, p) => Math.min(min, p), limitedPrices[0]);
     const range = high - low;
     const currentPrice = prices[prices.length - 1];
     
@@ -245,11 +284,39 @@ export class ChartAnalyzer {
    * Calculate pivot points for day trading
    */
   calculatePivotPoints(history: PriceHistory[]): PivotPoints {
+    // Validate input to prevent stack overflow
+    if (!history || history.length === 0) {
+      return {
+        pivot: 0,
+        resistance1: 0,
+        resistance2: 0,
+        resistance3: 0,
+        support1: 0,
+        support2: 0,
+        support3: 0
+      };
+    }
+    
     // Use last trading period data
     const recentHistory = history.slice(-24); // Last 24 data points
-    const high = Math.max(...recentHistory.map(h => parseFloat(h.price)));
-    const low = Math.min(...recentHistory.map(h => parseFloat(h.price)));
-    const close = parseFloat(recentHistory[recentHistory.length - 1].price);
+    const prices = recentHistory.map(h => parseFloat(h.price)).filter(p => !isNaN(p) && p > 0);
+    
+    if (prices.length === 0) {
+      return {
+        pivot: 0,
+        resistance1: 0,
+        resistance2: 0,
+        resistance3: 0,
+        support1: 0,
+        support2: 0,
+        support3: 0
+      };
+    }
+    
+    // Use reduce to find min/max to avoid spread operator stack overflow
+    const high = prices.reduce((max, p) => Math.max(max, p), prices[0]);
+    const low = prices.reduce((min, p) => Math.min(min, p), prices[0]);
+    const close = prices[prices.length - 1];
     
     // Classic Pivot Points
     const pivot = (high + low + close) / 3;
@@ -301,39 +368,52 @@ export class ChartAnalyzer {
    * Detect chart patterns (triangles, wedges, channels, head & shoulders)
    */
   detectChartPatterns(history: PriceHistory[]): ChartPattern[] {
-    const prices = history.map(h => parseFloat(h.price));
+    // Validate input to prevent stack overflow
+    if (!history || history.length < 30) {
+      return [];
+    }
+    
+    const prices = history.map(h => parseFloat(h.price)).filter(p => !isNaN(p) && p > 0);
+    
+    // Limit data to prevent stack overflow
+    const limitedPrices = prices.length > 1000 ? prices.slice(-1000) : prices;
+    
+    if (limitedPrices.length < 30) {
+      return [];
+    }
+    
     const patterns: ChartPattern[] = [];
     
     // Detect ascending triangle
-    const ascendingTriangle = this.detectAscendingTriangle(prices);
+    const ascendingTriangle = this.detectAscendingTriangle(limitedPrices);
     if (ascendingTriangle) patterns.push(ascendingTriangle);
     
     // Detect descending triangle
-    const descendingTriangle = this.detectDescendingTriangle(prices);
+    const descendingTriangle = this.detectDescendingTriangle(limitedPrices);
     if (descendingTriangle) patterns.push(descendingTriangle);
     
     // Detect symmetrical triangle
-    const symmetricalTriangle = this.detectSymmetricalTriangle(prices);
+    const symmetricalTriangle = this.detectSymmetricalTriangle(limitedPrices);
     if (symmetricalTriangle) patterns.push(symmetricalTriangle);
     
     // Detect rising wedge
-    const risingWedge = this.detectRisingWedge(prices);
+    const risingWedge = this.detectRisingWedge(limitedPrices);
     if (risingWedge) patterns.push(risingWedge);
     
     // Detect falling wedge
-    const fallingWedge = this.detectFallingWedge(prices);
+    const fallingWedge = this.detectFallingWedge(limitedPrices);
     if (fallingWedge) patterns.push(fallingWedge);
     
     // Detect channels
-    const channelPattern = this.detectChannel(prices);
+    const channelPattern = this.detectChannel(limitedPrices);
     if (channelPattern) patterns.push(channelPattern);
     
     // Detect head and shoulders
-    const headShoulders = this.detectHeadAndShoulders(prices);
+    const headShoulders = this.detectHeadAndShoulders(limitedPrices);
     if (headShoulders) patterns.push(headShoulders);
     
     // Detect double top/bottom
-    const doublePattern = this.detectDoubleTopBottom(prices);
+    const doublePattern = this.detectDoubleTopBottom(limitedPrices);
     if (doublePattern) patterns.push(doublePattern);
     
     return patterns.sort((a, b) => b.confidence - a.confidence);
@@ -359,11 +439,11 @@ export class ChartAnalyzer {
     const risingSupport = valleyTrend > 0.02; // 2% upward trend
     
     if (horizontalResistance && risingSupport) {
-      const resistance = Math.max(...peakPrices);
+      const resistance = peakPrices.reduce((max, p) => Math.max(max, p), peakPrices[0] || 0);
       const currentPrice = recent[recent.length - 1];
       const entry = currentPrice;
       const breakoutTarget = resistance * 1.05; // 5% above resistance
-      const stopLoss = Math.min(...valleyPrices) * 0.98; // Below recent support
+      const stopLoss = valleyPrices.reduce((min, p) => Math.min(min, p), valleyPrices[0] || 0) * 0.98; // Below recent support
       const riskRewardRatio = (breakoutTarget - entry) / (entry - stopLoss);
       
       return {
