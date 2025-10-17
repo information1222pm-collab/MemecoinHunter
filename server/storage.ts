@@ -3,6 +3,7 @@ import {
   priceHistory, patterns, subscriptions, patternPerformance, mlLearningParams, auditLog,
   exchangeConfig, exchangeTrades, exchangeBalances, tradingConfig, apiKeys,
   alertRules, alertEvents, visitors,
+  launchCoins, launchAnalysis, launchStrategies, launchPerformance, portfolioLaunchConfig,
   type User, type InsertUser, type UpsertUser, type Token, type InsertToken,
   type Portfolio, type InsertPortfolio, type Trade, type InsertTrade,
   type Position, type InsertPosition, type ScanAlert, type InsertScanAlert,
@@ -10,7 +11,8 @@ import {
   type Subscription, type InsertSubscription, type PatternPerformance, type InsertPatternPerformance,
   type MLLearningParams, type InsertMLLearningParams,
   type AlertRule, type InsertAlertRule, type AlertEvent, type InsertAlertEvent,
-  type Visitor, type InsertVisitor
+  type Visitor, type InsertVisitor,
+  type LaunchCoin, type InsertLaunchCoin, type LaunchAnalysis, type InsertLaunchAnalysis
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -125,6 +127,16 @@ export interface IStorage {
   createVisitor(data: InsertVisitor): Promise<Visitor>;
   updateVisitorDemo(ipAddress: string, hasSeenDemo: boolean): Promise<void>;
   updateVisitorLastVisit(ipAddress: string): Promise<void>;
+
+  // Launch coin detection operations
+  getLaunchCoinByToken(tokenId: string): Promise<any | undefined>;
+  createLaunchCoin(data: any): Promise<any>;
+  updateLaunchCoin(id: string, updates: any): Promise<any>;
+  getMonitoringLaunchCoins(): Promise<any[]>;
+  getLaunchAnalysisByLaunchId(launchCoinId: string): Promise<any | undefined>;
+  createLaunchAnalysis(data: any): Promise<any>;
+  getActiveStrategy(): Promise<any | undefined>;
+  updateLaunchPerformance(strategyId: string, updates: any): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -720,6 +732,54 @@ export class DatabaseStorage implements IStorage {
         visitCount: sql`${visitors.visitCount} + 1`
       })
       .where(eq(visitors.ipAddress, ipAddress));
+  }
+
+  // Launch coin detection operations
+  async getLaunchCoinByToken(tokenId: string): Promise<LaunchCoin | undefined> {
+    const [coin] = await db.select().from(launchCoins).where(eq(launchCoins.tokenId, tokenId));
+    return coin || undefined;
+  }
+
+  async createLaunchCoin(data: InsertLaunchCoin): Promise<LaunchCoin> {
+    const [coin] = await db.insert(launchCoins).values(data).returning();
+    return coin;
+  }
+
+  async updateLaunchCoin(id: string, updates: Partial<InsertLaunchCoin>): Promise<LaunchCoin> {
+    const [coin] = await db.update(launchCoins).set(updates).where(eq(launchCoins.id, id)).returning();
+    return coin;
+  }
+
+  async getMonitoringLaunchCoins(): Promise<LaunchCoin[]> {
+    return await db.select().from(launchCoins)
+      .where(eq(launchCoins.status, 'monitoring'))
+      .orderBy(desc(launchCoins.detectedAt));
+  }
+
+  async getLaunchAnalysisByLaunchId(launchCoinId: string): Promise<LaunchAnalysis | undefined> {
+    const [analysis] = await db.select().from(launchAnalysis)
+      .where(eq(launchAnalysis.launchCoinId, launchCoinId));
+    return analysis || undefined;
+  }
+
+  async createLaunchAnalysis(data: InsertLaunchAnalysis): Promise<LaunchAnalysis> {
+    const [analysis] = await db.insert(launchAnalysis).values(data).returning();
+    return analysis;
+  }
+
+  async getActiveStrategy(): Promise<any | undefined> {
+    const [strategy] = await db.select().from(launchStrategies)
+      .where(eq(launchStrategies.isActive, true))
+      .limit(1);
+    return strategy || undefined;
+  }
+
+  async updateLaunchPerformance(strategyId: string, updates: any): Promise<any> {
+    const [perf] = await db.update(launchPerformance)
+      .set(updates)
+      .where(eq(launchPerformance.strategyId, strategyId))
+      .returning();
+    return perf;
   }
 }
 
