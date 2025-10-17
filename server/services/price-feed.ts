@@ -80,10 +80,12 @@ class PriceFeedService extends EventEmitter {
   private isRunning = false;
   private updateInterval?: NodeJS.Timeout;
   private readonly API_BASE = 'https://api.coingecko.com/api/v3';
-  private readonly RATE_LIMIT_DELAY = 4500; // INCREASED: 4.5 seconds between requests to avoid rate limits (was 2.5s)
-  private readonly CACHE_TTL = 300000; // 5 minutes cache TTL
+  private readonly RATE_LIMIT_DELAY = 6000; // INCREASED: 6 seconds between requests to avoid rate limits
+  private readonly CACHE_TTL = 600000; // 10 minutes cache TTL (increased from 5)
   private lastRequestTime = 0;
   private responseCache = new Map<string, CachedResponse>(); // Response caching layer
+  private requestQueue: Array<() => Promise<void>> = [];
+  private isProcessingQueue = false;
   
   // EXPANDED: Comprehensive list of memecoins and trending tokens to track (200+ coins)
   private readonly TRACKED_COINS = [
@@ -350,21 +352,21 @@ class PriceFeedService extends EventEmitter {
     // Delay first price update to avoid overwhelming API on startup
     setTimeout(() => {
       this.updatePrices();
-    }, 5000); // Wait 5 seconds before first update (faster startup)
+    }, 10000); // Wait 10 seconds before first update
     
-    // OPTIMIZED: Update prices every 20 seconds for faster real-time data
+    // Update prices every 60 seconds (reduced from 20s to prevent rate limiting)
     this.updateInterval = setInterval(() => {
       this.updatePrices();
-    }, 20000);
+    }, 60000); // Every 60 seconds
     
     
-    // Run coin discovery every 5 minutes
+    // Run coin discovery every 15 minutes (increased from 5 minutes)
     setTimeout(() => {
       this.discoverNewMemecoins();
       setInterval(() => {
         this.discoverNewMemecoins();
-      }, 5 * 60 * 1000); // Every 5 minutes
-    }, 10000); // Start after 10 seconds
+      }, 15 * 60 * 1000); // Every 15 minutes
+    }, 30000); // Start after 30 seconds
   }
 
   stop() {
@@ -573,6 +575,50 @@ class PriceFeedService extends EventEmitter {
     this.lastRequestTime = Date.now();
   }
 
+  /**
+   * Process the request queue to ensure rate limiting
+   */
+  private async processRequestQueue(): Promise<void> {
+    if (this.isProcessingQueue || this.requestQueue.length === 0) {
+      return;
+    }
+    
+    this.isProcessingQueue = true;
+    
+    while (this.requestQueue.length > 0) {
+      const request = this.requestQueue.shift();
+      if (request) {
+        await this.respectRateLimit();
+        try {
+          await request();
+        } catch (error) {
+          console.error('Error processing queued request:', error);
+        }
+      }
+    }
+    
+    this.isProcessingQueue = false;
+  }
+
+  /**
+   * Add a request to the queue and process it
+   */
+  private async queueRequest<T>(requestFn: () => Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) => {
+      this.requestQueue.push(async () => {
+        try {
+          const result = await requestFn();
+          resolve(result);
+        } catch (error) {
+          reject(error);
+        }
+      });
+      
+      // Start processing the queue if not already running
+      this.processRequestQueue();
+    });
+  }
+
   private async createFallbackTokens(): Promise<void> {
     console.log('⚠️ Creating fallback tokens due to API failure');
     const fallbackTokens = [
@@ -623,6 +669,13 @@ class PriceFeedService extends EventEmitter {
 
   // Enhanced coin discovery methods
   async fetchTrendingCoins(): Promise<TrendingCoin[]> {
+    // Check cache first
+    const cacheKey = 'trending_coins';
+    const cachedData = this.getCachedResponse(cacheKey);
+    if (cachedData) {
+      return cachedData;
+    }
+    
     await this.respectRateLimit();
     
     const url = `${this.API_BASE}/search/trending`;
@@ -639,7 +692,7 @@ class PriceFeedService extends EventEmitter {
       }
       
       const data = await response.json();
-      return data.coins.map((item: any) => ({
+      const result = data.coins.map((item: any) => ({
         id: item.item.id,
         coin_id: item.item.coin_id,
         name: item.item.name,
@@ -652,16 +705,27 @@ class PriceFeedService extends EventEmitter {
         price_btc: item.item.price_btc,
         score: item.item.score || 0,
       }));
+      
+      // Cache the result
+      this.setCachedResponse(cacheKey, result);
+      return result;
     } catch (error) {
       console.error('Error fetching trending coins:', error);
       return [];
     }
   }
 
-  async fetchTopGainers(limit: number = 100): Promise<TopGainer[]> {
+  async fetchTopGainers(limit: number = 30): Promise<TopGainer[]> {
+    // Check cache first
+    const cacheKey = `top_gainers_${limit}`;
+    const cachedData = this.getCachedResponse(cacheKey);
+    if (cachedData) {
+      return cachedData;
+    }
+    
     await this.respectRateLimit();
     
-    // EXPANDED: Get top 100 gainers from meme-token category
+    // Get top gainers from meme-token category
     const url = `${this.API_BASE}/coins/markets?vs_currency=usd&order=percent_change_24h_desc&per_page=${limit}&page=1&sparkline=false&price_change_percentage=24h&category=meme-token`;
     
     try {
@@ -676,7 +740,7 @@ class PriceFeedService extends EventEmitter {
       }
       
       const data = await response.json();
-      return data.map((coin: any) => ({
+      const result = data.map((coin: any) => ({
         id: coin.id,
         symbol: coin.symbol,
         name: coin.name,
@@ -685,6 +749,10 @@ class PriceFeedService extends EventEmitter {
         market_cap: coin.market_cap || 0,
         total_volume: coin.total_volume || 0,
       }));
+      
+      // Cache the result
+      this.setCachedResponse(cacheKey, result);
+      return result;
     } catch (error) {
       console.error('Error fetching top gainers:', error);
       return [];
@@ -695,41 +763,40 @@ class PriceFeedService extends EventEmitter {
     try {
       console.log('🔍 EXPANDED SEARCH: Discovering trending memecoins and newly launched coins...');
       
-      // Fetch trending coins
-      const trendingCoins = await this.fetchTrendingCoins();
-      const topGainers = await this.fetchTopGainers(100); // EXPANDED: Get top 100 instead of 30
+      // Check if we've recently run discovery (within last 5 minutes)
+      const cacheKey = 'discovery_timestamp';
+      const lastDiscovery = this.getCachedResponse(cacheKey);
+      if (lastDiscovery) {
+        console.log('⏳ Discovery skipped - recently run within cache period');
+        return;
+      }
       
-      // Fetch newly launched coins
-      const newlyLaunched = await this.fetchNewlyLaunchedCoins();
-      const recentlyAdded = await this.fetchRecentlyAddedCoins();
-      const lowCapGems = await this.fetchLowCapGems();
+      // Mark discovery as running to prevent concurrent runs
+      this.setCachedResponse(cacheKey, Date.now());
+      
+      // Fetch data with better spacing - only fetch essential data
+      const trendingCoins = await this.fetchTrendingCoins();
+      
+      // Skip other fetches if we have trending data - reduce API load
+      let topGainers: TopGainer[] = [];
+      let newlyLaunched: NewlyLaunchedCoin[] = [];
+      let recentlyAdded: NewlyLaunchedCoin[] = [];
+      let lowCapGems: NewlyLaunchedCoin[] = [];
+      
+      // Only fetch additional data if trending is insufficient
+      if (trendingCoins.length < 5) {
+        topGainers = await this.fetchTopGainers(30); // Reduced from 100 to 30
+      }
       
       // Process trending coins (all of them)
       for (const trendingCoin of trendingCoins) {
         await this.processDiscoveredCoin(trendingCoin.id, trendingCoin.name, trendingCoin.symbol);
       }
       
-      // EXPANDED: Process top gainers with lower threshold (10% instead of 20%, $100k instead of $1M)
-      for (const gainer of topGainers) {
-        if (gainer.price_change_percentage_24h > 10 && gainer.market_cap > 100000) {
+      // Process top gainers with more conservative approach
+      for (const gainer of topGainers.slice(0, 10)) { // Only top 10 to reduce API calls
+        if (gainer.price_change_percentage_24h > 15 && gainer.market_cap > 500000) {
           await this.processDiscoveredCoin(gainer.id, gainer.name, gainer.symbol);
-        }
-      }
-      
-      // Process newly launched coins (all of them - threshold check in processNewLaunch)
-      for (const newCoin of newlyLaunched) {
-        await this.processNewLaunch(newCoin.id, newCoin.name, newCoin.symbol, newCoin.market_cap);
-      }
-      
-      // Process recently added coins to CoinGecko (all of them)
-      for (const recentCoin of recentlyAdded) {
-        await this.processNewLaunch(recentCoin.id, recentCoin.name, recentCoin.symbol, recentCoin.market_cap);
-      }
-      
-      // EXPANDED: Process low cap gems with lower threshold (20% instead of 50%)
-      for (const gem of lowCapGems) {
-        if (gem.price_change_percentage_24h > 20) { // Lower threshold for more opportunities
-          await this.processNewLaunch(gem.id, gem.name, gem.symbol, gem.market_cap);
         }
       }
       
@@ -742,6 +809,16 @@ class PriceFeedService extends EventEmitter {
 
   // NEW: Fetch newly launched coins with recent ATH dates
   async fetchNewlyLaunchedCoins(): Promise<NewlyLaunchedCoin[]> {
+    // Temporarily disabled to reduce API load
+    return [];
+    
+    // Check cache first
+    const cacheKey = 'newly_launched_coins';
+    const cachedData = this.getCachedResponse(cacheKey);
+    if (cachedData) {
+      return cachedData;
+    }
+    
     await this.respectRateLimit();
     
     // Get coins sorted by market cap with recent ATH dates (indicating new launches)
@@ -789,6 +866,9 @@ class PriceFeedService extends EventEmitter {
 
   // NEW: Fetch recently added coins to CoinGecko platform
   async fetchRecentlyAddedCoins(): Promise<NewlyLaunchedCoin[]> {
+    // Temporarily disabled to reduce API load
+    return [];
+    
     await this.respectRateLimit();
     
     // Get coins with very low market cap rank (indicating recent additions)
@@ -834,6 +914,9 @@ class PriceFeedService extends EventEmitter {
 
   // NEW: Fetch low cap gems with high growth potential
   async fetchLowCapGems(): Promise<NewlyLaunchedCoin[]> {
+    // Temporarily disabled to reduce API load
+    return [];
+    
     await this.respectRateLimit();
     
     // Search for low cap coins with high percentage gains
