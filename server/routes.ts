@@ -79,7 +79,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     store: sessionStore,
     secret: sessionSecret,
     resave: false,
-    saveUninitialized: false, // SECURITY: Only create sessions for authenticated users
+    saveUninitialized: true, // CRITICAL: Required for OAuth flow (stores PKCE verifier and state)
     cookie: {
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
