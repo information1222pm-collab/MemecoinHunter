@@ -397,6 +397,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('❌ Auto-Trader failed to start:', error);
     }
     
+    // Start AI Trade Executor service
+    console.log('🧠 Starting AI Trade Executor service...');
+    try {
+      await aiTradeExecutor.start();
+    } catch (error) {
+      console.error('❌ AI Trade Executor failed to start:', error);
+    }
+    
     // Start trade journal service to track all trades
     console.log('📓 Starting Trade Journal Service...');
     const { tradeJournalService } = await import('./services/trade-journal');
@@ -879,6 +887,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('[API] Error fetching user trades:', error);
       res.status(500).json({ message: "Failed to fetch trades", error });
+    }
+  });
+
+  // Update AI trading settings for portfolio
+  app.post("/api/portfolio/ai-settings", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const { aiTradingEnabled, aiConfidenceThreshold, aiMaxPositionSize, aiCooldownMinutes } = req.body;
+
+      const portfolio = await storage.getPortfolioByUserId(userId);
+      if (!portfolio) {
+        return res.status(404).json({ message: "Portfolio not found" });
+      }
+
+      const updated = await storage.updatePortfolio(portfolio.id, {
+        aiTradingEnabled,
+        aiConfidenceThreshold,
+        aiMaxPositionSize,
+        aiCooldownMinutes
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating AI settings:', error);
+      res.status(500).json({ message: "Failed to update AI settings" });
+    }
+  });
+
+  // Run backtest for a strategy
+  app.post("/api/backtest/run", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      const { strategyName, parameters, startDate, endDate, initialCapital } = req.body;
+
+      const results = await backtestingEngine.runBacktest({
+        strategyName,
+        parameters,
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+        initialCapital: initialCapital || 10000
+      });
+
+      res.json(results);
+    } catch (error) {
+      console.error('Error running backtest:', error);
+      res.status(500).json({ message: "Failed to run backtest" });
+    }
+  });
+
+  // Get backtest results history
+  app.get("/api/backtest/results", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ message: "User not authenticated" });
+      }
+
+      // For now, return empty results - will be stored in database later
+      res.json({ results: [] });
+    } catch (error) {
+      console.error('Error fetching backtest results:', error);
+      res.status(500).json({ message: "Failed to fetch backtest results" });
     }
   });
 
