@@ -428,9 +428,11 @@ class AutoTrader extends EventEmitter {
       console.log(`⚠️ CHART-ANALYZER: Limited price history (${history.length} points) - proceeding with reduced confidence`);
       confidence = Math.max(confidence * 0.7, 50); // Reduce confidence by 30%
     } else {
-      // NO HISTORY: Allow ML pattern trades for new tokens with very reduced confidence
-      console.log(`⚠️ CHART-ANALYZER: No price history available - proceeding with ML pattern only (high risk)`);
-      confidence = Math.max(confidence * 0.5, 40); // Reduce confidence by 50%
+      // NO HISTORY: Allow ML pattern trades for new tokens with slightly reduced confidence
+      // For ML patterns with high initial confidence, reduce less aggressively to allow initial trades
+      console.log(`⚠️ CHART-ANALYZER: No price history available - proceeding with ML pattern only (moderate risk)`);
+      // Reduce confidence by only 20% for high-confidence ML patterns to stay above trading thresholds
+      confidence = Math.max(confidence * 0.8, 65); // Reduce by 20% instead of 50%, minimum 65%
     }
     
     // Strong bullish patterns - BUY signals (only when not in sell-only mode)

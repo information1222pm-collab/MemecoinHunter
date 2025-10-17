@@ -313,22 +313,22 @@ export class MarketHealthAnalyzer {
 
   shouldTrade(confidence: number): boolean {
     if (!this.lastHealthCheck) {
-      return confidence >= 80; // AGGRESSIVE: Lowered from 85
+      return confidence >= 70; // Allow initial trades with 70% confidence when no health data
     }
 
     const { recommendation, healthScore } = this.lastHealthCheck;
 
     switch (recommendation) {
       case 'trade_normally':
-        return confidence >= 75; // AGGRESSIVE: Lowered from 80
+        return confidence >= 70; // Allow trades with 70% confidence in normal conditions
       case 'trade_cautiously':
-        return confidence >= 78; // AGGRESSIVE: Lowered from 85
+        return confidence >= 75; // Slightly higher for cautious conditions
       case 'minimize_trading':
-        return confidence >= 82; // AGGRESSIVE: Lowered from 90
+        return confidence >= 80; // Higher threshold when minimizing
       case 'halt_trading':
         return false; // No trading
       default:
-        return confidence >= 85;
+        return confidence >= 75; // Default threshold
     }
   }
 
