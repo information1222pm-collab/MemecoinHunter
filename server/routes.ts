@@ -2866,12 +2866,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Portfolio not found" });
       }
 
-      const positions = await storage.getActivePositionsByPortfolio(portfolio.id);
+      const positions = await storage.getPositionsByPortfolio(portfolio.id);
       const trades = await storage.getTradesByPortfolio(portfolio.id);
       
       const totalTrades = trades.length;
       const winningTrades = trades.filter(t => {
-        const pnl = parseFloat(t.profitLoss || "0");
+        const pnl = parseFloat(t.realizedPnL || "0");
         return pnl > 0;
       }).length;
       const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
@@ -2944,7 +2944,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const portfolio = await storage.getPortfolioByUserId(user.id);
           if (!portfolio) continue;
 
-          const positions = await storage.getActivePositionsByPortfolio(portfolio.id);
+          const positions = await storage.getPositionsByPortfolio(portfolio.id);
           const trades = await storage.getTradesByPortfolio(portfolio.id);
           
           const totalTrades = trades.length;
