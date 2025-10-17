@@ -162,7 +162,7 @@ export default function Portfolio() {
       case 'portfolio_updated':
         // Update portfolio data in real-time
         if (data) {
-          queryClient.setQueryData(['/api/portfolio', 'default'], (oldData: any) => 
+          queryClient.setQueryData(['/api/portfolio'], (oldData: any) => 
             oldData ? { ...oldData, ...data } : data
           );
         }
@@ -170,18 +170,18 @@ export default function Portfolio() {
       
       case 'positions_updated':
         // Real-time position value updates from position tracker
-        queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/portfolio'] });
         break;
       
       case 'price_update':
         // Invalidate portfolio when prices change (affects position values)
-        queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/portfolio'] });
         break;
       
       case 'trading_stats':
         // Update trading statistics in real-time
         if (data) {
-          queryClient.setQueryData(['/api/portfolio', 'default'], (oldData: any) => 
+          queryClient.setQueryData(['/api/portfolio'], (oldData: any) => 
             oldData ? { ...oldData, winRate: data.winRate?.toString() } : oldData
           );
         }

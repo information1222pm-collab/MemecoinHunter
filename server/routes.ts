@@ -97,12 +97,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ csrfToken: req.csrfToken() });
   });
   
-  // Conditional CSRF middleware - skip for testing endpoints
+  // Conditional CSRF middleware - skip for testing endpoints and GET requests
   const conditionalCsrf = (req: any, res: any, next: any) => {
+    // Skip CSRF for GET and HEAD requests (read operations don't need CSRF protection)
+    if (req.method === 'GET' || req.method === 'HEAD') {
+      return next();
+    }
+    
     // Skip CSRF for testing email endpoints
     if (req.path === '/api/email/test' || req.path === '/api/email/demo-performance') {
       return next();
     }
+    
     return csrfProtection(req, res, next);
   };
   
