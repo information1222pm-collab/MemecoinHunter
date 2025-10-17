@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
+import { Link } from "wouter";
 import { TokenScanner } from "@/components/trading/token-scanner";
 import { PriceChart } from "@/components/trading/price-chart";
 import { PortfolioSummary } from "@/components/trading/portfolio-summary";
@@ -23,7 +24,9 @@ import {
   Award,
   Activity,
   Shield,
-  AlertTriangle
+  AlertTriangle,
+  Lightbulb,
+  ArrowRight
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWebSocket } from "@/hooks/use-websocket";
@@ -114,6 +117,24 @@ function DashboardContent() {
     timestamp: string;
   }>({
     queryKey: ['/api/market-health'],
+    refetchInterval: refreshInterval * 1000,
+    staleTime: (refreshInterval * 1000) - 5000,
+  });
+
+  // Fetch latest AI insight
+  const { data: latestInsight } = useQuery<{
+    id: string;
+    portfolioId: string;
+    insightType: string;
+    title: string;
+    description: string;
+    recommendation: string;
+    confidence: string;
+    priority: string;
+    status: string;
+    createdAt: string;
+  }>({
+    queryKey: ['/api/ai-insights/latest'],
     refetchInterval: refreshInterval * 1000,
     staleTime: (refreshInterval * 1000) - 5000,
   });
@@ -556,6 +577,50 @@ function DashboardContent() {
                     <div className="mt-2 text-xs text-muted-foreground" data-testid="text-market-trend">
                       Trend: {marketHealth.trend} | Volatility: {marketHealth.volatility.toFixed(1)}%
                     </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Card 8 - AI Insights */}
+            <Card data-testid="card-ai-insights" className="backdrop-blur-md bg-card/50 border-white/10">
+              <CardContent className="p-6">
+                {!latestInsight ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-8 w-32" />
+                    <Skeleton className="h-4 w-full" />
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <p className="text-sm text-muted-foreground">Latest AI Insight</p>
+                        <p className="text-lg font-bold truncate" data-testid="text-insight-title">
+                          {latestInsight.title}
+                        </p>
+                      </div>
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                        latestInsight.priority === 'critical' ? 'bg-red-400/10' :
+                        latestInsight.priority === 'high' ? 'bg-orange-400/10' :
+                        latestInsight.priority === 'medium' ? 'bg-yellow-400/10' : 'bg-cyan-400/10'
+                      }`}>
+                        <Lightbulb className={`w-6 h-6 ${
+                          latestInsight.priority === 'critical' ? 'text-red-400' :
+                          latestInsight.priority === 'high' ? 'text-orange-400' :
+                          latestInsight.priority === 'medium' ? 'text-yellow-400' : 'text-cyan-400'
+                        }`} />
+                      </div>
+                    </div>
+                    <div className="mt-3 text-sm text-muted-foreground line-clamp-2" data-testid="text-insight-description">
+                      {latestInsight.description}
+                    </div>
+                    <Link href="/insights">
+                      <div className="mt-4 flex items-center justify-between text-sm text-cyan-400 hover:text-cyan-300 cursor-pointer group" data-testid="link-view-all-insights">
+                        <span>View All Insights</span>
+                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                      </div>
+                    </Link>
                   </>
                 )}
               </CardContent>

@@ -2333,6 +2333,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/ai-insights/latest", async (req, res) => {
+    try {
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const portfolio = await storage.getPortfolioByUserId(user.id);
+      if (!portfolio) {
+        return res.status(404).json({ message: "Portfolio not found" });
+      }
+
+      const insights = await storage.getInsightsByPortfolio(portfolio.id, 1);
+      const latestInsight = insights[0] || null;
+      
+      res.json(latestInsight);
+    } catch (error) {
+      console.error('Error fetching latest AI insight:', error);
+      res.status(500).json({ message: "Failed to fetch latest AI insight", error });
+    }
+  });
+
   app.put("/api/insights/:id/status", async (req, res) => {
     try {
       const user = req.user;
