@@ -36,6 +36,7 @@ import Stripe from "stripe";
 import { db } from "./db";
 import { trades, patterns } from "@shared/schema";
 import { and, desc, gt, isNotNull, sql } from "drizzle-orm";
+import { getDemoUserAndPortfolio } from "./utils/demo-user";
 
 // Stripe configuration - optional, subscription features will be disabled if not configured
 let stripe: Stripe | null = null;
@@ -1314,11 +1315,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auto-trader portfolio status route
   app.get("/api/auto-trader/portfolio", async (req, res) => {
     try {
-      const stats = await autoTrader.getDetailedStats();
-      if (!stats) {
-        return res.status(404).json({ message: "Auto-trader portfolio not found" });
+      const cacheKey = 'autotrader_portfolio';
+      
+      // Try to get from cache first (even if stale)
+      let stats = cacheService.get(cacheKey);
+      
+      if (stats) {
+        // Cache hit - return immediately
+        res.json(stats);
+        
+        // If stale, refresh in background (non-blocking)
+        if (cacheService.isStale(cacheKey)) {
+          (async () => {
+            try {
+              const freshStats = await autoTrader.getDetailedStats();
+              if (freshStats) {
+                cacheService.set(cacheKey, freshStats, 4000);
+              }
+            } catch (err) {
+              console.error('Background autotrader stats refresh failed:', err);
+            }
+          })();
+        }
+      } else {
+        // Cache miss - fetch synchronously
+        stats = await autoTrader.getDetailedStats();
+        if (!stats) {
+          return res.status(404).json({ message: "Auto-trader portfolio not found" });
+        }
+        cacheService.set(cacheKey, stats, 4000);
+        res.json(stats);
       }
-      res.json(stats);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch auto-trader portfolio", error });
     }
@@ -1524,8 +1551,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Scanner routes
   app.get("/api/scanner/status", async (req, res) => {
     try {
-      const status = scanner.getStatus();
-      res.json(status);
+      const cacheKey = 'scanner_status';
+      
+      // Try to get from cache first (even if stale)
+      let status = cacheService.get(cacheKey);
+      
+      if (status) {
+        // Cache hit - return immediately
+        res.json(status);
+        
+        // If stale, refresh in background (non-blocking)
+        if (cacheService.isStale(cacheKey)) {
+          (async () => {
+            try {
+              const freshStatus = scanner.getStatus();
+              cacheService.set(cacheKey, freshStatus, 3000);
+            } catch (err) {
+              console.error('Background scanner status refresh failed:', err);
+            }
+          })();
+        }
+      } else {
+        // Cache miss - fetch synchronously
+        status = scanner.getStatus();
+        cacheService.set(cacheKey, status, 3000);
+        res.json(status);
+      }
     } catch (error) {
       res.status(500).json({ message: "Failed to get scanner status", error });
     }
@@ -1553,8 +1604,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/alerts", async (req, res) => {
     try {
-      const alerts = await storage.getUnreadAlerts();
-      res.json(alerts);
+      const cacheKey = 'alerts';
+      
+      // Try to get from cache first (even if stale)
+      let alerts = cacheService.get(cacheKey);
+      
+      if (alerts) {
+        // Cache hit - return immediately
+        res.json(alerts);
+        
+        // If stale, refresh in background (non-blocking)
+        if (cacheService.isStale(cacheKey)) {
+          (async () => {
+            try {
+              const freshAlerts = await storage.getUnreadAlerts();
+              cacheService.set(cacheKey, freshAlerts, 4000);
+            } catch (err) {
+              console.error('Background alerts refresh failed:', err);
+            }
+          })();
+        }
+      } else {
+        // Cache miss - fetch synchronously
+        alerts = await storage.getUnreadAlerts();
+        cacheService.set(cacheKey, alerts, 4000);
+        res.json(alerts);
+      }
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch alerts", error });
     }
@@ -2052,8 +2127,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Market Health Endpoint
   app.get("/api/market-health", async (req, res) => {
     try {
-      const health = await marketHealthAnalyzer.analyzeMarketHealth();
-      res.json(health);
+      const cacheKey = 'market_health';
+      
+      // Try to get from cache first (even if stale)
+      let health = cacheService.get(cacheKey);
+      
+      if (health) {
+        // Cache hit - return immediately
+        res.json(health);
+        
+        // If stale, refresh in background (non-blocking)
+        if (cacheService.isStale(cacheKey)) {
+          (async () => {
+            try {
+              const freshHealth = await marketHealthAnalyzer.analyzeMarketHealth();
+              cacheService.set(cacheKey, freshHealth, 5000);
+            } catch (err) {
+              console.error('Background market health refresh failed:', err);
+            }
+          })();
+        }
+      } else {
+        // Cache miss - fetch synchronously
+        health = await marketHealthAnalyzer.analyzeMarketHealth();
+        cacheService.set(cacheKey, health, 5000);
+        res.json(health);
+      }
     } catch (error) {
       console.error('[API] Error fetching market health:', error);
       res.status(500).json({ 
@@ -2225,30 +2324,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (cacheService.isStale(cacheKey)) {
           (async () => {
             try {
-              let demoUser = await storage.getUserByEmail("demo@memehunter.app");
-              if (!demoUser) {
-                const saltRounds = 12;
-                const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
-                demoUser = await storage.createUser({
-                  username: "demo_user",
-                  email: "demo@memehunter.app",
-                  password: hashedDemoPassword,
-                  subscriptionTier: "pro",
-                  language: "en"
-                });
-              }
-              
-              let portfolio = await storage.getPortfolioByUserId(demoUser.id);
-              if (!portfolio) {
-                portfolio = await storage.createPortfolio({
-                  userId: demoUser.id,
-                  totalValue: "10000.00",
-                  dailyPnL: "0.00",
-                  totalPnL: "0.00",
-                  winRate: "0.00"
-                });
-              }
-
+              const { portfolio } = await getDemoUserAndPortfolio();
               const allMetrics = await tradingAnalyticsService.getAllMetrics(portfolio.id);
               
               const freshData = {
@@ -2278,30 +2354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } else {
         // Cache miss (first time) - compute analytics synchronously
-        let demoUser = await storage.getUserByEmail("demo@memehunter.app");
-        if (!demoUser) {
-          const saltRounds = 12;
-          const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
-          demoUser = await storage.createUser({
-            username: "demo_user",
-            email: "demo@memehunter.app",
-            password: hashedDemoPassword,
-            subscriptionTier: "pro",
-            language: "en"
-          });
-        }
-        
-        let portfolio = await storage.getPortfolioByUserId(demoUser.id);
-        if (!portfolio) {
-          portfolio = await storage.createPortfolio({
-            userId: demoUser.id,
-            totalValue: "10000.00",
-            dailyPnL: "0.00",
-            totalPnL: "0.00",
-            winRate: "0.00"
-          });
-        }
-
+        const { portfolio } = await getDemoUserAndPortfolio();
         const allMetrics = await tradingAnalyticsService.getAllMetrics(portfolio.id);
         
         transformed = {
@@ -2674,32 +2727,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/risk/exposure", async (req, res) => {
     try {
-      let demoUser = await storage.getUserByEmail("demo@memehunter.app");
-      if (!demoUser) {
-        const saltRounds = 12;
-        const hashedDemoPassword = await bcrypt.hash("demo123", saltRounds);
-        demoUser = await storage.createUser({
-          username: "demo_user",
-          email: "demo@memehunter.app",
-          password: hashedDemoPassword,
-          subscriptionTier: "pro",
-          language: "en"
-        });
-      }
+      const cacheKey = 'risk_exposure';
       
-      let portfolio = await storage.getPortfolioByUserId(demoUser.id);
-      if (!portfolio) {
-        portfolio = await storage.createPortfolio({
-          userId: demoUser.id,
-          totalValue: "10000.00",
-          dailyPnL: "0.00",
-          totalPnL: "0.00",
-          winRate: "0.00"
-        });
+      // Try to get from cache first (even if stale)
+      let exposure = cacheService.get(cacheKey);
+      
+      if (exposure) {
+        // Cache hit - return immediately
+        res.json(exposure);
+        
+        // If stale, refresh in background (non-blocking)
+        if (cacheService.isStale(cacheKey)) {
+          (async () => {
+            try {
+              const { portfolio } = await getDemoUserAndPortfolio();
+              const freshExposure = await riskReportsService.getCurrentExposure(portfolio.id);
+              cacheService.set(cacheKey, freshExposure, 5000);
+            } catch (err) {
+              console.error('Background exposure refresh failed:', err);
+            }
+          })();
+        }
+      } else {
+        // Cache miss - fetch synchronously
+        const { portfolio } = await getDemoUserAndPortfolio();
+        exposure = await riskReportsService.getCurrentExposure(portfolio.id);
+        cacheService.set(cacheKey, exposure, 5000);
+        res.json(exposure);
       }
-
-      const exposure = await riskReportsService.getCurrentExposure(portfolio.id);
-      res.json(exposure);
     } catch (error) {
       console.error('Error fetching current exposure:', error);
       res.status(500).json({ message: "Failed to fetch current exposure", error });
