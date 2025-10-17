@@ -966,13 +966,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { strategyName, parameters, startDate, endDate, initialCapital } = req.body;
 
-      const results = await backtestingEngine.runBacktest({
-        strategyName,
-        parameters,
+      // Convert single strategy name to array of strategies expected by backend
+      const strategies = strategyName ? [strategyName] : ['momentum'];
+      
+      // Map parameters to backtesting engine format
+      const backtestParams = {
+        strategies,
         startDate: new Date(startDate),
         endDate: new Date(endDate),
-        initialCapital: initialCapital || 10000
-      });
+        initialCapital: initialCapital || 10000,
+        stopLoss: parameters?.stopLoss || 0.05,
+        takeProfit: parameters?.takeProfit || 0.20,
+        positionSize: parameters?.positionSize || 0.1,
+        maxPositions: parameters?.maxPositions || 5
+      };
+
+      const results = await backtestingEngine.runBacktest(backtestParams);
 
       res.json(results);
     } catch (error) {

@@ -71,9 +71,11 @@ export default function Backtest() {
     },
     onSuccess: (data) => {
       setResults(data);
+      // Calculate profit percentage from total P&L and initial capital
+      const profitPercentage = ((data.totalPnL / parseFloat(initialCapital)) * 100).toFixed(2);
       toast({
         title: "Backtest Complete",
-        description: `Successfully analyzed ${data.totalTrades} trades with ${data.profitPercentage}% return`,
+        description: `Successfully analyzed ${data.totalTrades} trades with ${profitPercentage}% return`,
       });
     },
     onError: (error: any) => {
@@ -102,7 +104,7 @@ export default function Backtest() {
   // Format chart data if results exist
   const chartData = results?.equityCurve?.map((point: any) => ({
     date: new Date(point.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    portfolio: point.value,
+    portfolio: point.equity || point.value || 0, // Support both field names
   })) || [];
 
   return (
