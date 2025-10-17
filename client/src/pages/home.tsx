@@ -152,7 +152,7 @@ export default function Home() {
   });
 
   const { data: portfolio } = useQuery({
-    queryKey: ['/api/portfolio', 'default'],
+    queryKey: ['/api/portfolio'],
     refetchInterval: refreshInterval * 1000,
     staleTime: (refreshInterval * 1000) - 5000,
     retry: false, // Don't retry on 401 errors

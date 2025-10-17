@@ -72,7 +72,7 @@ export default function Analytics() {
       unrealizedPnL: string;
     }>;
   }>({
-    queryKey: ['/api/portfolio', 'default'],
+    queryKey: ['/api/portfolio'],
     refetchInterval: 30000, // Refetch every 30 seconds
     staleTime: 15000, // Data stays fresh for 15 seconds
     retry: false, // Don't retry on 401 errors
@@ -273,7 +273,7 @@ export default function Analytics() {
       case 'trade_executed':
         // Invalidate auto-trader and trades data when a new trade is executed
         queryClient.invalidateQueries({ queryKey: ['/api/auto-trader/portfolio'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default', 'trades'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'trades'] });
         queryClient.invalidateQueries({ queryKey: ['/api/analytics/all'] });
         break;
       
@@ -284,7 +284,7 @@ export default function Analytics() {
       
       case 'portfolio_update':
         // Update portfolio data that affects analytics
-        queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/portfolio'] });
         queryClient.invalidateQueries({ queryKey: ['/api/risk/portfolio'] });
         break;
       
@@ -521,8 +521,8 @@ export default function Analytics() {
                 data-testid="button-refresh-analytics"
                 onClick={() => {
                   queryClient.invalidateQueries({ queryKey: ['/api/auto-trader/portfolio'] });
-                  queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default'] });
-                  queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default', 'trades'] });
+                  queryClient.invalidateQueries({ queryKey: ['/api/portfolio'] });
+                  queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'trades'] });
                   queryClient.invalidateQueries({ queryKey: ['/api/analytics/all'] });
                   if (autoTraderStats?.portfolioId) {
                     queryClient.invalidateQueries({ queryKey: ['/api/risk/portfolio', autoTraderStats.portfolioId] });

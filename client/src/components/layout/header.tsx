@@ -37,7 +37,7 @@ export function Header() {
   const { data: portfolio, error: portfolioError } = useQuery<{
     totalValue: string;
   }>({
-    queryKey: ['/api/portfolio', 'default'],
+    queryKey: ['/api/portfolio'],
     refetchInterval: 30000, // Refetch every 30 seconds
     staleTime: 15000, // Data stays fresh for 15 seconds
     retry: false, // Don't retry on 401 errors
@@ -113,7 +113,7 @@ export function Header() {
       case 'portfolio_update':
         // Update portfolio value in real-time
         if (data?.totalValue) {
-          queryClient.setQueryData(['/api/portfolio', 'default'], (oldData: any) => 
+          queryClient.setQueryData(['/api/portfolio'], (oldData: any) => 
             oldData ? { ...oldData, totalValue: data.totalValue } : { totalValue: data.totalValue }
           );
         }
@@ -121,12 +121,12 @@ export function Header() {
       
       case 'trade_executed':
         // Invalidate portfolio data when trades are executed
-        queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/portfolio'] });
         break;
       
       case 'price_update':
         // Invalidate portfolio when prices change (affects total value)
-        queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/portfolio'] });
         break;
     }
   }, [lastMessage, isConnected, queryClient]);

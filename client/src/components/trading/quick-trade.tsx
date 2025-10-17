@@ -22,7 +22,7 @@ export function QuickTrade() {
 
   // Fetch portfolio data
   const { data: portfolio } = useQuery<any>({
-    queryKey: ['/api/portfolio', 'default'],
+    queryKey: ['/api/portfolio'],
     staleTime: 0,
   });
 
@@ -45,7 +45,6 @@ export function QuickTrade() {
         title: t("trade.success"),
         description: t("trade.executed"),
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'default'] });
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio'] });
       setAmount("");
     },
