@@ -269,14 +269,23 @@ Provide a concise analysis in JSON format with:
 4. confidence: Score from 0-100
 5. priority: low, medium, high, or critical
 
-Focus on actionable insights that help improve trading performance.`;
+Focus on:
+- If win rate is below 50%, suggest specific improvements
+- If profitable, recommend scaling strategies
+- Identify best performing patterns to focus on
+- Suggest optimal position sizes based on current performance`;
 
       const response = await this.openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
           {
             role: 'system',
-            content: 'You are an expert trading analyst providing concise, actionable insights. Always respond with valid JSON only.'
+            content: `You are an elite crypto trading AI assistant specialized in memecoin markets. Provide sharp, actionable insights that directly improve trading performance. Focus on:
+- Specific entry/exit points
+- Risk-reward ratios
+- Position sizing recommendations
+- Pattern-based predictions
+Always respond with valid JSON only, no markdown formatting.`
           },
           {
             role: 'user',
@@ -290,7 +299,14 @@ Focus on actionable insights that help improve trading performance.`;
       const content = response.choices[0]?.message?.content;
       if (!content) return null;
 
-      const aiResponse = JSON.parse(content);
+      // Clean the response - remove markdown code blocks if present
+      const cleanContent = content
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim();
+
+      const aiResponse = JSON.parse(cleanContent);
       
       return {
         portfolioId: metrics.portfolioId,
@@ -332,14 +348,23 @@ Provide a concise risk assessment in JSON format with:
 4. confidence: Score from 0-100
 5. priority: low, medium, high, or critical
 
-Focus on protecting capital and managing risk effectively.`;
+Focus on:
+- Recommend specific stop-loss levels for current positions
+- Suggest position size adjustments based on risk/reward
+- Identify overexposed positions that need reduction
+- Calculate optimal portfolio allocation percentages`;
 
       const response = await this.openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
           {
             role: 'system',
-            content: 'You are a risk management expert for crypto trading. Always respond with valid JSON only.'
+            content: `You are a risk management AI specialized in crypto trading. Your goal is to protect capital while maximizing returns. Focus on:
+- Position sizing based on Kelly Criterion
+- Stop-loss and take-profit levels
+- Portfolio diversification
+- Risk/reward optimization
+Always respond with valid JSON only, no markdown formatting.`
           },
           {
             role: 'user',
@@ -353,7 +378,14 @@ Focus on protecting capital and managing risk effectively.`;
       const content = response.choices[0]?.message?.content;
       if (!content) return null;
 
-      const aiResponse = JSON.parse(content);
+      // Clean the response - remove markdown code blocks if present
+      const cleanContent = content
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim();
+
+      const aiResponse = JSON.parse(cleanContent);
       
       return {
         portfolioId: metrics.portfolioId,
@@ -403,14 +435,23 @@ Provide an opportunity analysis in JSON format with:
 4. confidence: Score from 0-100
 5. priority: low, medium, high, or critical
 
-Focus on high-probability opportunities aligned with risk tolerance.`;
+Focus on:
+- Name specific tokens showing strong patterns
+- Provide exact entry price ranges (e.g., "Buy PEPE between $0.0012-$0.0013")
+- Set clear profit targets and stop-losses
+- Recommend position size as percentage of portfolio`;
 
       const response = await this.openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
           {
             role: 'system',
-            content: 'You are a pattern recognition expert for crypto trading. Always respond with valid JSON only.'
+            content: `You are an AI pattern recognition expert for memecoin trading. Identify high-probability setups with:
+- Specific token symbols to trade
+- Exact entry price ranges
+- Target prices and stop-losses
+- Timeframe for the trade
+Always respond with valid JSON only, no markdown formatting.`
           },
           {
             role: 'user',
@@ -424,7 +465,14 @@ Focus on high-probability opportunities aligned with risk tolerance.`;
       const content = response.choices[0]?.message?.content;
       if (!content) return null;
 
-      const aiResponse = JSON.parse(content);
+      // Clean the response - remove markdown code blocks if present
+      const cleanContent = content
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim();
+
+      const aiResponse = JSON.parse(cleanContent);
       
       return {
         portfolioId: metrics.portfolioId,
@@ -473,7 +521,12 @@ Focus on market conditions and strategic positioning.`;
         messages: [
           {
             role: 'system',
-            content: 'You are a crypto market analyst specializing in memecoins. Always respond with valid JSON only.'
+            content: `You are an AI market analyst specializing in memecoin trends. Provide insights on:
+- Market sentiment shifts
+- Volume and liquidity analysis
+- Whale movements and smart money flow
+- Upcoming catalysts and risks
+Always respond with valid JSON only, no markdown formatting.`
           },
           {
             role: 'user',
@@ -487,7 +540,14 @@ Focus on market conditions and strategic positioning.`;
       const content = response.choices[0]?.message?.content;
       if (!content) return null;
 
-      const aiResponse = JSON.parse(content);
+      // Clean the response - remove markdown code blocks if present
+      const cleanContent = content
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim();
+
+      const aiResponse = JSON.parse(cleanContent);
       
       return {
         portfolioId: metrics.portfolioId,
