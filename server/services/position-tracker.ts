@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import { storage } from '../storage';
 import type { Position, Token } from '@shared/schema';
 import { streamingPriceGateway } from './streaming-price-gateway';
+import { safeParseFloat } from '../utils/safe-number';
 
 /**
  * Safely convert a number to a fixed decimal string, preventing NaN from being saved to database
@@ -183,8 +184,8 @@ class PositionTracker extends EventEmitter {
         
         if (analytics) {
           positionAnalytics.push(analytics);
-          totalPortfolioValue += parseFloat(analytics.currentValue);
-          totalUnrealizedPnL += parseFloat(analytics.unrealizedPnL);
+          totalPortfolioValue += safeParseFloat(analytics.currentValue, 0);
+          totalUnrealizedPnL += safeParseFloat(analytics.unrealizedPnL, 0);
 
           // Update position in database
           await storage.updatePosition(position.id, {
@@ -195,9 +196,9 @@ class PositionTracker extends EventEmitter {
       }
 
       // Calculate actual portfolio value (positions + cash)
-      const cashBalance = parseFloat(portfolio.cashBalance || '0');
+      const cashBalance = safeParseFloat(portfolio.cashBalance, 0);
       const actualTotalValue = totalPortfolioValue + cashBalance;
-      const startingCapital = parseFloat(portfolio.startingCapital || '10000');
+      const startingCapital = safeParseFloat(portfolio.startingCapital, 10000);
       const actualTotalPnL = actualTotalValue - startingCapital;
       
       // Calculate portfolio analytics with actual total value
@@ -229,9 +230,9 @@ class PositionTracker extends EventEmitter {
       const token = await storage.getToken(position.tokenId);
       if (!token) return null;
 
-      const currentPrice = parseFloat(token.currentPrice || '0');
-      const avgBuyPrice = parseFloat(position.avgBuyPrice);
-      const amount = parseFloat(position.amount);
+      const currentPrice = safeParseFloat(token.currentPrice, 0);
+      const avgBuyPrice = safeParseFloat(position.avgBuyPrice, 0);
+      const amount = safeParseFloat(position.amount, 0);
 
       if (currentPrice <= 0 || avgBuyPrice <= 0 || amount <= 0) return null;
 
@@ -241,7 +242,7 @@ class PositionTracker extends EventEmitter {
       const unrealizedPnLPercent = (unrealizedPnL / costBasis) * 100;
 
       // Calculate day change (simplified - would need price history for exact calculation)
-      const dayChange = parseFloat(token.priceChange24h || '0');
+      const dayChange = safeParseFloat(token.priceChange24h, 0);
       const dayChangeValue = currentValue * (dayChange / 100);
 
       // Calculate holding period (simplified)
@@ -277,7 +278,7 @@ class PositionTracker extends EventEmitter {
     
     // Calculate allocations
     positions.forEach(position => {
-      position.allocation = totalValue > 0 ? (parseFloat(position.currentValue) / totalValue) * 100 : 0;
+      position.allocation = totalValue > 0 ? (safeParseFloat(position.currentValue, 0) / totalValue) * 100 : 0;
     });
 
     // Find top performers
@@ -294,10 +295,10 @@ class PositionTracker extends EventEmitter {
     const riskMetrics = this.calculateRiskMetrics(positions);
 
     // Calculate portfolio-level day change
-    const totalDayChangeValue = positions.reduce((sum, p) => sum + parseFloat(p.dayChangeValue), 0);
+    const totalDayChangeValue = positions.reduce((sum, p) => sum + safeParseFloat(p.dayChangeValue, 0), 0);
     const dayChange = totalValue > 0 ? (totalDayChangeValue / totalValue) * 100 : 0;
 
-    const startingCapital = parseFloat(portfolio.startingCapital || '10000');
+    const startingCapital = safeParseFloat(portfolio.startingCapital, 10000);
     const totalPnLPercent = startingCapital > 0 ? (totalPnL / startingCapital) * 100 : 0;
 
     return {
@@ -353,14 +354,14 @@ class PositionTracker extends EventEmitter {
         const analytics = await this.calculatePositionAnalytics(position);
         if (analytics) {
           positionAnalytics.push(analytics);
-          totalPositionsValue += parseFloat(analytics.currentValue);
+          totalPositionsValue += safeParseFloat(analytics.currentValue, 0);
         }
       }
 
       // Calculate actual portfolio value including cash
-      const cashBalance = parseFloat(portfolio.cashBalance || '0');
+      const cashBalance = safeParseFloat(portfolio.cashBalance, 0);
       const actualTotalValue = totalPositionsValue + cashBalance;
-      const startingCapital = parseFloat(portfolio.startingCapital || '10000');
+      const startingCapital = safeParseFloat(portfolio.startingCapital, 10000);
       const actualTotalPnL = actualTotalValue - startingCapital;
 
       return await this.calculatePortfolioAnalytics(portfolio, positionAnalytics, actualTotalValue, actualTotalPnL);

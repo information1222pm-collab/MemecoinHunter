@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import { storage } from '../storage';
 import { getRiskLevelConfig, type RiskLevel } from './risk-levels';
 import type { Portfolio, Position, Trade, Token } from '@shared/schema';
+import { safeParseFloat } from '../utils/safe-number';
 
 interface RiskMetrics {
   portfolioValue: number;
@@ -103,9 +104,9 @@ class RiskManager extends EventEmitter {
         throw new Error('Portfolio not found');
       }
 
-      const portfolioValue = parseFloat(portfolio.totalValue || '0');
-      const totalPnL = parseFloat(portfolio.totalPnL || '0');
-      const winRate = parseFloat(portfolio.winRate || '0');
+      const portfolioValue = safeParseFloat(portfolio.totalValue, 0);
+      const totalPnL = safeParseFloat(portfolio.totalPnL, 0);
+      const winRate = safeParseFloat(portfolio.winRate, 0);
 
       // Calculate maximum drawdown
       const maxDrawdown = await this.calculateMaxDrawdown(trades);
@@ -153,7 +154,7 @@ class RiskManager extends EventEmitter {
         throw new Error('Portfolio or token not found');
       }
 
-      const portfolioValue = parseFloat(portfolio.totalValue || '0');
+      const portfolioValue = safeParseFloat(portfolio.totalValue, 0);
       
       // DYNAMIC RISK LEVEL: Get portfolio-specific risk configuration
       const riskLevel = (portfolio.riskLevel || 'balanced') as RiskLevel;

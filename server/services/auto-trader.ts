@@ -11,6 +11,7 @@ import { dynamicExitStrategy } from './dynamic-exit-strategy';
 import { getRiskLevelConfig, type RiskLevel, type RiskLevelConfig } from './risk-levels';
 import type { Token, Pattern, InsertTrade } from '@shared/schema';
 import type { ExchangeTradingSignal } from './exchange-service';
+import { safeParseFloat, safeDivide, safeDbNumber } from '../utils/safe-number';
 
 interface TradingSignal {
   tokenId: string;
@@ -250,7 +251,7 @@ class AutoTrader extends EventEmitter {
               totalTrades: 0,
               successfulTrades: 0,
               todayTrades: 0,
-              totalValue: parseFloat(portfolio.totalValue || '10000'),
+              totalValue: safeParseFloat(portfolio.totalValue, 10000),
             },
           });
           console.log(`🔄 Added portfolio ${portfolio.id} to auto-trading`);
@@ -534,11 +535,11 @@ class AutoTrader extends EventEmitter {
       const portfolio = await storage.getPortfolio(portfolioId);
       if (!portfolio) return;
       
-      const availableCash = parseFloat(portfolio.cashBalance || '0');
-      const totalValue = parseFloat(portfolio.totalValue || '10000');
-      const startingCapital = parseFloat(portfolio.startingCapital || '10000');
-      const totalPnL = parseFloat(portfolio.totalPnL || '0');
-      const dailyPnL = parseFloat(portfolio.dailyPnL || '0');
+      const availableCash = safeParseFloat(portfolio.cashBalance, 0);
+      const totalValue = safeParseFloat(portfolio.totalValue, 10000);
+      const startingCapital = safeParseFloat(portfolio.startingCapital, 10000);
+      const totalPnL = safeParseFloat(portfolio.totalPnL, 0);
+      const dailyPnL = safeParseFloat(portfolio.dailyPnL, 0);
       
       
       // IMPROVED: Dynamic position sizing from RiskManager
@@ -576,7 +577,7 @@ class AutoTrader extends EventEmitter {
           const updatedPortfolio = await storage.getPortfolio(portfolioId);
           if (!updatedPortfolio) return;
           
-          const newAvailableCash = parseFloat(updatedPortfolio.cashBalance || '0');
+          const newAvailableCash = safeParseFloat(updatedPortfolio.cashBalance, 0);
           console.log(`💰 [Portfolio ${portfolioId}] Updated cash balance after rebalancing: $${newAvailableCash.toFixed(2)}`);
           
           if (newAvailableCash < tradeValue) {
@@ -662,10 +663,10 @@ class AutoTrader extends EventEmitter {
       const currentPortfolio = await storage.getPortfolio(portfolioId);
       if (!currentPortfolio) return;
       
-      const currentCashBalance = parseFloat(currentPortfolio.cashBalance || '0');
+      const currentCashBalance = safeParseFloat(currentPortfolio.cashBalance, 0);
       
       // Update portfolio cash balance atomically using current balance
-      const newCashBalance = (currentCashBalance - tradeValue).toString();
+      const newCashBalance = safeDbNumber(currentCashBalance - tradeValue);
       await storage.updatePortfolio(portfolioId, {
         cashBalance: newCashBalance,
       });
@@ -848,8 +849,8 @@ class AutoTrader extends EventEmitter {
       // Update portfolio value based on current positions + cash balance
       const portfolio = await storage.getPortfolio(portfolioId);
       if (portfolio) {
-        const startingCapital = parseFloat(portfolio.startingCapital || '10000');
-        const currentCashBalance = parseFloat(portfolio.cashBalance || '0');
+        const startingCapital = safeParseFloat(portfolio.startingCapital, 10000);
+        const currentCashBalance = safeParseFloat(portfolio.cashBalance, 0);
         
         // Total portfolio value = current positions value + current cash balance
         const newTotalValue = totalPortfolioValue + currentCashBalance;
@@ -961,10 +962,10 @@ class AutoTrader extends EventEmitter {
       // CRITICAL: Credit cash balance with sell proceeds
       const portfolio = await storage.getPortfolio(portfolioId);
       if (portfolio) {
-        const currentCash = parseFloat(portfolio.cashBalance || '0');
-        const newCashBalance = (currentCash + totalSellValue).toString();
-        const currentRealizedPnL = parseFloat(portfolio.realizedPnL || '0');
-        const newRealizedPnL = (currentRealizedPnL + realizedPnL).toString();
+        const currentCash = safeParseFloat(portfolio.cashBalance, 0);
+        const newCashBalance = safeDbNumber(currentCash + totalSellValue);
+        const currentRealizedPnL = safeParseFloat(portfolio.realizedPnL, 0);
+        const newRealizedPnL = safeDbNumber(currentRealizedPnL + realizedPnL);
         
         await storage.updatePortfolio(portfolioId, {
           cashBalance: newCashBalance,
@@ -1129,9 +1130,9 @@ class AutoTrader extends EventEmitter {
       if (!portfolio) return null;
       
       // Use portfolio's actual cash balance instead of recalculating from trades
-      const availableCash = parseFloat(portfolio.cashBalance || '0');
-      const startingCapital = parseFloat(portfolio.startingCapital || '10000');
-      const realizedPnL = parseFloat(portfolio.realizedPnL || '0');
+      const availableCash = safeParseFloat(portfolio.cashBalance, 0);
+      const startingCapital = safeParseFloat(portfolio.startingCapital, 10000);
+      const realizedPnL = safeParseFloat(portfolio.realizedPnL, 0);
       
       // Calculate current position values
       let totalPositionValue = 0;
