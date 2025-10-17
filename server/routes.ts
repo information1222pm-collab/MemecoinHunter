@@ -1382,7 +1382,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate request body with Zod schema
       const configSchema = insertPortfolioLaunchConfigSchema.omit({ portfolioId: true, id: true }).extend({
         enabled: z.boolean().optional().default(false),
-        maxDailyTrades: z.number().int().min(1).max(100).optional().default(5),
+        // maxDailyTrades removed - no daily limits
         maxPositionSize: z.number().min(50).max(10000).optional().default(500)
       });
       

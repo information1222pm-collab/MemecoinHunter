@@ -162,10 +162,10 @@ class RiskManager extends EventEmitter {
       // Use dynamic risk limits based on portfolio's risk level
       const riskLimits = {
         maxPositionSize: riskConfig.maxPositionSizePercent,
-        stopLossPercentage: riskConfig.stopLossPercentage,
+        stopLossPercentage: 5,  // Default fallback value since stop-loss removed
         maxConcentration: riskConfig.maxConcentration,
         maxOpenPositions: riskConfig.maxOpenPositions,
-        maxDailyLoss: riskConfig.maxDailyLossPercentage,
+        maxDailyLoss: 5,  // Default fallback value since daily limits removed
         maxDrawdown: 20,
       };
 
