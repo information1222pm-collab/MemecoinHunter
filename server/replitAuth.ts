@@ -145,6 +145,10 @@ export async function setupAuth(app: Express) {
   };
 
   app.get("/api/login", (req, res, next) => {
+    console.log(`[OAUTH] ========== LOGIN ROUTE HIT ==========`);
+    console.log(`[OAUTH] Method: ${req.method}, Path: ${req.path}`);
+    console.log(`[OAUTH] Headers:`, JSON.stringify(req.headers, null, 2));
+    
     const domain = getDomainForStrategy(req);
     
     // CRITICAL: Save session before OAuth redirect to preserve state token
@@ -152,6 +156,8 @@ export async function setupAuth(app: Express) {
       if (err) {
         console.error('[OAUTH] Session save error before redirect:', err);
       }
+      
+      console.log(`[OAUTH] Redirecting to Google OAuth via strategy: replitauth:${domain}`);
       
       passport.authenticate(`replitauth:${domain}`, {
         prompt: "login consent",
