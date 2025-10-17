@@ -84,6 +84,9 @@ function LaunchTradingCard() {
 
   const updateConfigMutation = useMutation({
     mutationFn: async (configData: any) => {
+      if (!portfolio?.id) {
+        throw new Error("Portfolio not loaded");
+      }
       return await apiRequest("POST", `/api/launch/config/${portfolio.id}`, configData);
     },
     onSuccess: () => {
@@ -103,6 +106,14 @@ function LaunchTradingCard() {
   });
 
   const handleSaveConfig = () => {
+    if (!portfolio?.id) {
+      toast({
+        title: "Error",
+        description: "Portfolio not loaded. Please try refreshing the page.",
+        variant: "destructive",
+      });
+      return;
+    }
     updateConfigMutation.mutate({
       enabled,
       maxDailyTrades: parseInt(maxDailyTrades, 10),
