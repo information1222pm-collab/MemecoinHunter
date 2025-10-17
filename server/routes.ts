@@ -1390,6 +1390,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/launch/statistics", async (req, res) => {
+    try {
+      const stats = await storage.getLaunchStatistics();
+      res.json(stats);
+    } catch (error) {
+      console.error('Error fetching launch statistics:', error);
+      res.status(500).json({ message: "Failed to fetch launch statistics", error });
+    }
+  });
+
+  app.get("/api/launch/strategies", async (req, res) => {
+    try {
+      const strategies = await storage.getAllStrategies();
+      res.json(strategies);
+    } catch (error) {
+      console.error('Error fetching launch strategies:', error);
+      res.status(500).json({ message: "Failed to fetch launch strategies", error });
+    }
+  });
+
+  app.get("/api/launch/strategies/active", async (req, res) => {
+    try {
+      const strategy = await storage.getActiveStrategy();
+      if (strategy) {
+        const performance = await storage.getStrategyPerformance(strategy.id);
+        res.json({ strategy, performance });
+      } else {
+        res.json({ strategy: null, performance: null });
+      }
+    } catch (error) {
+      console.error('Error fetching active strategy:', error);
+      res.status(500).json({ message: "Failed to fetch active strategy", error });
+    }
+  });
+
   app.get("/api/launch/recent-launches", async (req, res) => {
     try {
       const limit = parseInt(req.query.limit as string) || 20;

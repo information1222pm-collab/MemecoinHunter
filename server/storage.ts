@@ -810,23 +810,45 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLaunchStatistics(): Promise<any> {
-    const [stats] = await db.select({
-      totalLaunches: sql<number>`count(*)::int`,
-      successfulLaunches: sql<number>`count(*) filter (where ${launchCoins.outcome} = 'success')::int`,
-      failedLaunches: sql<number>`count(*) filter (where ${launchCoins.outcome} = 'failure')::int`,
-      avgGainOnSuccess: sql<string>`avg(case when ${launchCoins.outcome} = 'success' then ${launchCoins.finalPriceChange} else null end)`,
-      totalStrategies: sql<number>`(select count(*)::int from ${launchStrategies})`,
-      activeStrategy: sql<string>`(select ${launchStrategies.strategyName} from ${launchStrategies} where ${launchStrategies.isActive} = true limit 1)`,
-    }).from(launchCoins);
-    
-    return stats || {
-      totalLaunches: 0,
-      successfulLaunches: 0,
-      failedLaunches: 0,
-      avgGainOnSuccess: '0',
-      totalStrategies: 0,
-      activeStrategy: null
-    };
+    try {
+      // Get launch coin statistics
+      const launches = await db.select().from(launchCoins);
+      const totalLaunches = launches.length;
+      const successfulLaunches = launches.filter(l => l.outcome === 'success').length;
+      const failedLaunches = launches.filter(l => l.outcome === 'failure').length;
+      
+      // Calculate average gain on success
+      const successfulGains = launches
+        .filter(l => l.outcome === 'success' && l.finalPriceChange)
+        .map(l => parseFloat(l.finalPriceChange || '0'));
+      const avgGainOnSuccess = successfulGains.length > 0 
+        ? (successfulGains.reduce((a, b) => a + b, 0) / successfulGains.length).toFixed(2)
+        : '0';
+      
+      // Get strategy statistics
+      const strategies = await db.select().from(launchStrategies);
+      const totalStrategies = strategies.length;
+      const activeStrategy = strategies.find(s => s.isActive)?.strategyName || null;
+      
+      return {
+        totalLaunches,
+        successfulLaunches,
+        failedLaunches,
+        avgGainOnSuccess,
+        totalStrategies,
+        activeStrategy
+      };
+    } catch (error) {
+      console.error('Error fetching launch statistics:', error);
+      return {
+        totalLaunches: 0,
+        successfulLaunches: 0,
+        failedLaunches: 0,
+        avgGainOnSuccess: '0',
+        totalStrategies: 0,
+        activeStrategy: null
+      };
+    }
   }
 
   async getPortfolioLaunchConfig(portfolioId: string): Promise<any | undefined> {
@@ -856,23 +878,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRecentLaunches(limit: number = 20): Promise<any[]> {
-    const launches = await db.select({
-      id: launchCoins.id,
-      tokenId: launchCoins.tokenId,
-      symbol: launchCoins.symbol,
-      detectedAt: launchCoins.detectedAt,
-      launchPrice: launchCoins.launchPrice,
-      initialMarketCap: launchCoins.initialMarketCap,
-      initialVolume: launchCoins.initialVolume,
-      outcome: launchCoins.outcome,
-      finalPriceChange: launchCoins.finalPriceChange,
-      status: launchCoins.status,
-    })
-    .from(launchCoins)
-    .orderBy(desc(launchCoins.detectedAt))
-    .limit(limit);
-    
-    return launches;
+    try {
+      const launches = await db.select()
+        .from(launchCoins)
+        .orderBy(desc(launchCoins.detectedAt))
+        .limit(limit);
+      
+      return launches || [];
+    } catch (error) {
+      console.error('Error fetching recent launches:', error);
+      return [];
+    }
   }
 
   // AI Insights operations
