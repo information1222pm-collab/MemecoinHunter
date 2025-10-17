@@ -439,7 +439,15 @@ class AutoTrader extends EventEmitter {
       'macd_golden_cross', 
       'stochastic_oversold_reversal',
       'volume_breakout',
-      'bull_flag'
+      'bull_flag',
+      // ML patterns that generate buy signals
+      'fibonacci_ml_pattern',
+      'volume_profile_ml',
+      'multi_timeframe_ml',
+      'mean_reversion_ml',
+      'harmonic_pattern_ml',
+      'ensemble_ml_signal',
+      'strong_buy_pressure'
     ];
     
     // Strong bearish patterns - SELL signals (for existing positions)
