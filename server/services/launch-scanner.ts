@@ -65,13 +65,14 @@ export class LaunchScanner extends EventEmitter {
       console.log('🔍 LAUNCH-SCANNER: Scanning for newly launched coins...');
       
       // Fetch potential new launches from multiple sources
-      const [recentlyAdded, lowCapGems] = await Promise.all([
+      const [newlyLaunched, recentlyAdded, lowCapGems] = await Promise.all([
+        priceFeed.fetchNewlyLaunchedCoins(),
         priceFeed.fetchRecentlyAddedCoins(),
         priceFeed.fetchLowCapGems(),
       ]);
 
       // Combine and deduplicate
-      const allCoins = [...recentlyAdded, ...lowCapGems];
+      const allCoins = [...newlyLaunched, ...recentlyAdded, ...lowCapGems];
       const uniqueCoins = Array.from(
         new Map(allCoins.map(coin => [coin.id, coin])).values()
       );
