@@ -314,7 +314,7 @@ Always respond with valid JSON only, no markdown formatting.`
         title: aiResponse.title,
         description: aiResponse.description,
         recommendation: aiResponse.recommendation,
-        confidence: aiResponse.confidence.toString(),
+        confidence: (aiResponse.confidence || 50).toString(),
         priority: aiResponse.priority,
         supportingData: {
           winRate: metrics.winRate,
@@ -393,7 +393,7 @@ Always respond with valid JSON only, no markdown formatting.`
         title: aiResponse.title,
         description: aiResponse.description,
         recommendation: aiResponse.recommendation,
-        confidence: aiResponse.confidence.toString(),
+        confidence: (aiResponse.confidence || 50).toString(),
         priority: aiResponse.priority,
         supportingData: {
           riskExposure: metrics.currentRiskExposure,
@@ -480,7 +480,7 @@ Always respond with valid JSON only, no markdown formatting.`
         title: aiResponse.title,
         description: aiResponse.description,
         recommendation: aiResponse.recommendation,
-        confidence: aiResponse.confidence.toString(),
+        confidence: (aiResponse.confidence || 50).toString(),
         priority: aiResponse.priority,
         supportingData: {
           patterns: topPatterns.map(p => ({
@@ -555,7 +555,7 @@ Always respond with valid JSON only, no markdown formatting.`
         title: aiResponse.title,
         description: aiResponse.description,
         recommendation: aiResponse.recommendation,
-        confidence: aiResponse.confidence.toString(),
+        confidence: (aiResponse.confidence || 50).toString(),
         priority: aiResponse.priority,
         supportingData: {
           totalPnL: metrics.totalPnL,
