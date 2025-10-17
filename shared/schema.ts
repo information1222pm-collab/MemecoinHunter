@@ -581,7 +581,6 @@ export const launchStrategies = pgTable("launch_strategies", {
   stopLossPercent: decimal("stop_loss_percent", { precision: 8, scale: 4 }).default("20.00"),
   timeoutMinutes: integer("timeout_minutes").default(60), // Exit after X minutes if no profit
   // Risk management
-  maxDailyTrades: integer("max_daily_trades").default(5),
   cooldownMinutes: integer("cooldown_minutes").default(30), // Wait between trades
   requireConfidence: decimal("require_confidence", { precision: 5, scale: 2 }).default("70.00"),
   // Strategy parameters as JSON for flexibility
