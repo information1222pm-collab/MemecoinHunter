@@ -139,6 +139,10 @@ export interface IStorage {
   getAllStrategies(): Promise<any[]>;
   getStrategyPerformance(strategyId: string): Promise<any | undefined>;
   updateLaunchPerformance(strategyId: string, updates: any): Promise<any>;
+  getLaunchStatistics(): Promise<any>;
+  getPortfolioLaunchConfig(portfolioId: string): Promise<any | undefined>;
+  updatePortfolioLaunchConfig(portfolioId: string, config: any): Promise<any>;
+  getRecentLaunches(limit: number): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -793,6 +797,72 @@ export class DatabaseStorage implements IStorage {
       .where(eq(launchPerformance.strategyId, strategyId))
       .returning();
     return perf;
+  }
+
+  async getLaunchStatistics(): Promise<any> {
+    const [stats] = await db.select({
+      totalLaunches: sql<number>`count(*)::int`,
+      successfulLaunches: sql<number>`count(*) filter (where ${launchCoins.outcome} = 'success')::int`,
+      failedLaunches: sql<number>`count(*) filter (where ${launchCoins.outcome} = 'failure')::int`,
+      avgGainOnSuccess: sql<string>`avg(case when ${launchCoins.outcome} = 'success' then ${launchCoins.finalPriceChange} else null end)`,
+      totalStrategies: sql<number>`(select count(*)::int from ${launchStrategies})`,
+      activeStrategy: sql<string>`(select ${launchStrategies.strategyName} from ${launchStrategies} where ${launchStrategies.isActive} = true limit 1)`,
+    }).from(launchCoins);
+    
+    return stats || {
+      totalLaunches: 0,
+      successfulLaunches: 0,
+      failedLaunches: 0,
+      avgGainOnSuccess: '0',
+      totalStrategies: 0,
+      activeStrategy: null
+    };
+  }
+
+  async getPortfolioLaunchConfig(portfolioId: string): Promise<any | undefined> {
+    const [config] = await db.select().from(portfolioLaunchConfig)
+      .where(eq(portfolioLaunchConfig.portfolioId, portfolioId));
+    return config || undefined;
+  }
+
+  async updatePortfolioLaunchConfig(portfolioId: string, configData: any): Promise<any> {
+    // Check if config exists
+    const existing = await this.getPortfolioLaunchConfig(portfolioId);
+    
+    if (existing) {
+      // Update existing config
+      const [config] = await db.update(portfolioLaunchConfig)
+        .set(configData)
+        .where(eq(portfolioLaunchConfig.portfolioId, portfolioId))
+        .returning();
+      return config;
+    } else {
+      // Create new config
+      const [config] = await db.insert(portfolioLaunchConfig)
+        .values({ portfolioId, ...configData })
+        .returning();
+      return config;
+    }
+  }
+
+  async getRecentLaunches(limit: number = 20): Promise<any[]> {
+    const launches = await db.select({
+      id: launchCoins.id,
+      tokenId: launchCoins.tokenId,
+      symbol: launchCoins.symbol,
+      detectedAt: launchCoins.detectedAt,
+      launchPrice: launchCoins.launchPrice,
+      initialMarketCap: launchCoins.initialMarketCap,
+      initialVolume: launchCoins.initialVolume,
+      outcome: launchCoins.outcome,
+      finalPriceChange: launchCoins.finalPriceChange,
+      status: launchCoins.status,
+    })
+    .from(launchCoins)
+    .orderBy(desc(launchCoins.detectedAt))
+    .limit(limit);
+    
+    return launches;
   }
 }
 

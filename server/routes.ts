@@ -19,7 +19,7 @@ import { alertService } from "./services/alert-service";
 import { marketHealthAnalyzer } from "./services/market-health";
 import { dataCleanupService } from "./services/data-cleanup";
 import { cacheService } from "./services/cache-service";
-import { insertUserSchema, insertTradeSchema, insertTokenSchema, insertAlertRuleSchema } from "@shared/schema";
+import { insertUserSchema, insertTradeSchema, insertTokenSchema, insertAlertRuleSchema, insertPortfolioLaunchConfigSchema } from "@shared/schema";
 import { z } from "zod";
 import * as bcrypt from "bcrypt";
 import session from "express-session";
@@ -1190,6 +1190,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(stats);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch auto-trader portfolio", error });
+    }
+  });
+
+  // Launch Trading Strategy routes
+  app.get("/api/launch/statistics", async (req, res) => {
+    try {
+      const stats = await storage.getLaunchStatistics();
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch launch statistics", error });
+    }
+  });
+
+  app.get("/api/launch/strategies", async (req, res) => {
+    try {
+      const strategies = await storage.getAllStrategies();
+      res.json(strategies);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch launch strategies", error });
+    }
+  });
+
+  app.get("/api/launch/strategies/active", async (req, res) => {
+    try {
+      const strategy = await storage.getActiveStrategy();
+      if (!strategy) {
+        return res.status(404).json({ message: "No active strategy found" });
+      }
+      const performance = await storage.getStrategyPerformance(strategy.id);
+      res.json({ strategy, performance });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch active strategy", error });
+    }
+  });
+
+  app.get("/api/launch/performance/:strategyId", async (req, res) => {
+    try {
+      const performance = await storage.getStrategyPerformance(req.params.strategyId);
+      if (!performance) {
+        return res.status(404).json({ message: "Performance data not found" });
+      }
+      res.json(performance);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch strategy performance", error });
+    }
+  });
+
+  app.get("/api/launch/config/:portfolioId", async (req, res) => {
+    try {
+      const config = await storage.getPortfolioLaunchConfig(req.params.portfolioId);
+      res.json(config || { enabled: false });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch launch config", error });
+    }
+  });
+
+  app.post("/api/launch/config/:portfolioId", async (req, res) => {
+    try {
+      // Validate request body with Zod schema
+      const configSchema = insertPortfolioLaunchConfigSchema.omit({ portfolioId: true, id: true }).extend({
+        enabled: z.boolean().optional().default(false),
+        maxDailyTrades: z.number().int().min(1).max(100).optional().default(5),
+        maxPositionSize: z.number().min(50).max(10000).optional().default(500)
+      });
+      
+      const validatedConfig = configSchema.parse(req.body);
+      
+      const config = await storage.updatePortfolioLaunchConfig(req.params.portfolioId, validatedConfig);
+      
+      res.json(config);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid configuration data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update launch config", error });
+    }
+  });
+
+  app.get("/api/launch/recent-launches", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 20;
+      const launches = await storage.getRecentLaunches(limit);
+      res.json(launches);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch recent launches", error });
     }
   });
 
