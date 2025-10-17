@@ -1,0 +1,12 @@
+# Supported browsers configuration for MemeCoin Hunter
+
+# Support modern browsers and maintained versions
+defaults
+not IE 11
+maintained node versions
+
+# Specific browser versions for better clarity
+last 2 Chrome versions
+last 2 Firefox versions
+last 2 Safari versions
+last 2 Edge versions
