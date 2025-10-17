@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/hooks/use-language";
 import { motion, AnimatePresence } from "framer-motion";
+import { prefetchQuery } from "@/lib/queryClient";
 import {
   BarChart3,
   Zap,
@@ -457,7 +458,28 @@ export function Sidebar() {
                         ? "glass-card text-white"
                         : "text-muted-foreground hover:text-white hover:glass-card"
                     )}
-                    onHoverStart={() => setHoveredIcon(item.href)}
+                    onHoverStart={() => {
+                      setHoveredIcon(item.href);
+                      // Prefetch data for instant page load
+                      const prefetchMap: Record<string, string[]> = {
+                        '/': ['/api/portfolio', '/api/trades/recent'],
+                        '/dashboard': ['/api/portfolio', '/api/positions', '/api/portfolio/top'],
+                        '/scanner': ['/api/scanner/status', '/api/tokens'],
+                        '/portfolio': ['/api/portfolio', '/api/positions', '/api/trades'],
+                        '/analytics': ['/api/analytics/overview', '/api/portfolio/trends'],
+                        '/activity': ['/api/patterns/recent', '/api/trades/recent'],
+                        '/journal': ['/api/journal/entries', '/api/trades/closed'],
+                        '/insights': ['/api/insights', '/api/portfolio'],
+                        '/trophy-room': ['/api/trophy/top-trades'],
+                        '/risk': ['/api/risk/portfolio-metrics', '/api/portfolio'],
+                        '/alerts': ['/api/alert-rules', '/api/alert-rules/triggers'],
+                        '/terminal': ['/api/trades/recent'],
+                        '/launch-analytics': ['/api/launch/statistics', '/api/launch/strategies/active'],
+                        '/backtest': ['/api/backtest/results'],
+                      };
+                      const queries = prefetchMap[item.href] || [];
+                      queries.forEach(q => prefetchQuery(q));
+                    }}
                     onHoverEnd={() => setHoveredIcon(null)}
                     whileHover={{ 
                       scale: 1.02,
