@@ -2334,9 +2334,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/analytics/all", async (req, res) => {
+  app.get("/api/analytics/all", async (req: any, res) => {
     try {
-      const cacheKey = 'analytics_all';
+      // Check if user is authenticated
+      const isAuthenticated = !!(req.user?.id || req.session?.userId);
+      const userId = req.user?.id || req.session?.userId;
+      
+      // Use user-specific cache key or demo cache key
+      const cacheKey = isAuthenticated ? `analytics_all_${userId}` : 'analytics_all_demo';
       
       // Try to get from cache first (even if stale)
       let transformed = cacheService.get(cacheKey);
@@ -2349,7 +2354,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (cacheService.isStale(cacheKey)) {
           (async () => {
             try {
-              const { portfolio } = await getDemoUserAndPortfolio();
+              let portfolio;
+              if (isAuthenticated) {
+                portfolio = await storage.getPortfolioByUserId(userId);
+              } else {
+                const demoData = await getDemoUserAndPortfolio();
+                portfolio = demoData.portfolio;
+              }
+              
+              if (!portfolio) return;
+              
               const allMetrics = await tradingAnalyticsService.getAllMetrics(portfolio.id);
               
               const freshData = {
@@ -2379,7 +2393,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } else {
         // Cache miss (first time) - compute analytics synchronously
-        const { portfolio } = await getDemoUserAndPortfolio();
+        let portfolio;
+        if (isAuthenticated) {
+          portfolio = await storage.getPortfolioByUserId(userId);
+        } else {
+          const demoData = await getDemoUserAndPortfolio();
+          portfolio = demoData.portfolio;
+        }
+        
+        if (!portfolio) {
+          return res.status(404).json({ message: "Portfolio not found" });
+        }
+        
         const allMetrics = await tradingAnalyticsService.getAllMetrics(portfolio.id);
         
         transformed = {
@@ -2750,9 +2775,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/risk/exposure", async (req, res) => {
+  app.get("/api/risk/exposure", async (req: any, res) => {
     try {
-      const cacheKey = 'risk_exposure';
+      // Check if user is authenticated
+      const isAuthenticated = !!(req.user?.id || req.session?.userId);
+      const userId = req.user?.id || req.session?.userId;
+      
+      // Use user-specific cache key or demo cache key
+      const cacheKey = isAuthenticated ? `risk_exposure_${userId}` : 'risk_exposure_demo';
       
       // Try to get from cache first (even if stale)
       let exposure = cacheService.get(cacheKey);
@@ -2765,7 +2795,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (cacheService.isStale(cacheKey)) {
           (async () => {
             try {
-              const { portfolio } = await getDemoUserAndPortfolio();
+              let portfolio;
+              if (isAuthenticated) {
+                portfolio = await storage.getPortfolioByUserId(userId);
+              } else {
+                const demoData = await getDemoUserAndPortfolio();
+                portfolio = demoData.portfolio;
+              }
+              
+              if (!portfolio) return;
+              
               const freshExposure = await riskReportsService.getCurrentExposure(portfolio.id);
               cacheService.set(cacheKey, freshExposure, 5000);
             } catch (err) {
@@ -2775,7 +2814,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } else {
         // Cache miss - fetch synchronously
-        const { portfolio } = await getDemoUserAndPortfolio();
+        let portfolio;
+        if (isAuthenticated) {
+          portfolio = await storage.getPortfolioByUserId(userId);
+        } else {
+          const demoData = await getDemoUserAndPortfolio();
+          portfolio = demoData.portfolio;
+        }
+        
+        if (!portfolio) {
+          return res.status(404).json({ message: "Portfolio not found" });
+        }
+        
         exposure = await riskReportsService.getCurrentExposure(portfolio.id);
         cacheService.set(cacheKey, exposure, 5000);
         res.json(exposure);
