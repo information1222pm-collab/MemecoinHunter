@@ -20,7 +20,7 @@ interface Trade {
 
 export function RecentTrades() {
   const { data: trades, isLoading } = useQuery<Trade[]>({
-    queryKey: ['/api/portfolio', 'default', 'trades'],
+    queryKey: ['/api/portfolio', 'trades'],
     refetchInterval: 30000,
     staleTime: 15000,
     retry: false,

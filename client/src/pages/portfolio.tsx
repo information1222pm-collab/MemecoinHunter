@@ -99,7 +99,7 @@ export default function Portfolio() {
       name: string;
     };
   }>>({
-    queryKey: ['/api/portfolio/trades'],
+    queryKey: ['/api/portfolio', 'trades'],
     refetchInterval: 60000, // 60s - trade history is historical
     staleTime: 45000,
     retry: false,
@@ -155,7 +155,7 @@ export default function Portfolio() {
       case 'trade_executed':
         // Invalidate portfolio and trades data when a new trade is executed
         queryClient.invalidateQueries({ queryKey: ['/api/portfolio'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/portfolio/trades'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'trades'] });
         break;
       
       case 'portfolio_update':

@@ -702,7 +702,7 @@ export default function Settings() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/portfolio/trades'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/portfolio', 'trades'] });
       toast({
         title: "Portfolio Reset",
         description: `Your portfolio has been reset with $${parseFloat(startingCapital).toLocaleString()} starting capital`,

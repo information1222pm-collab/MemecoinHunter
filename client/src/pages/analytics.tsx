@@ -86,7 +86,7 @@ export default function Analytics() {
     createdAt: string;
     closedAt?: string;
   }>>({ 
-    queryKey: ['/api/portfolio', 'default', 'trades'],
+    queryKey: ['/api/portfolio', 'trades'],
     refetchInterval: 60000,
     retry: false, // Don't retry on 401 errors
   });
