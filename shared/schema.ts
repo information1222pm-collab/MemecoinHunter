@@ -508,6 +508,148 @@ export const tradingConfig = pgTable("trading_config", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Early-Launch Coin Detection System Tables
+// Track newly detected coins (≤5 minutes on market)
+export const launchCoins = pgTable("launch_coins", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tokenId: varchar("token_id").notNull().references(() => tokens.id),
+  detectedAt: timestamp("detected_at").defaultNow(), // When we first detected this coin
+  launchPrice: decimal("launch_price", { precision: 20, scale: 8 }).notNull(),
+  initialMarketCap: decimal("initial_market_cap", { precision: 20, scale: 2 }),
+  initialVolume: decimal("initial_volume", { precision: 20, scale: 2 }),
+  minutesOnMarket: integer("minutes_on_market"), // Estimated age when detected
+  status: text("status").default("monitoring"), // 'monitoring', 'success', 'failure', 'expired'
+  outcomePrice: decimal("outcome_price", { precision: 20, scale: 8 }), // Price after 1 hour
+  priceChange1h: decimal("price_change_1h", { precision: 8, scale: 4 }), // % change after 1 hour
+  evaluatedAt: timestamp("evaluated_at"), // When we evaluated success/failure
+}, (table) => ({
+  tokenIdIdx: index("launch_coins_token_id_idx").on(table.tokenId),
+  statusIdx: index("launch_coins_status_idx").on(table.status),
+  detectedAtIdx: index("launch_coins_detected_at_idx").on(table.detectedAt),
+}));
+
+// Detailed analysis of successful and failed launches
+export const launchAnalysis = pgTable("launch_analysis", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  launchCoinId: varchar("launch_coin_id").notNull().references(() => launchCoins.id),
+  outcomeType: text("outcome_type").notNull(), // 'success', 'failure'
+  // Success indicators
+  maxPriceReached: decimal("max_price_reached", { precision: 20, scale: 8 }),
+  maxGainPercent: decimal("max_gain_percent", { precision: 8, scale: 4 }),
+  timeToMaxGain: integer("time_to_max_gain"), // Minutes to reach max gain
+  volumePattern: text("volume_pattern"), // 'increasing', 'decreasing', 'stable', 'spike'
+  priceVolatility: decimal("price_volatility", { precision: 8, scale: 4 }),
+  // Technical indicators at launch
+  initialMomentum: decimal("initial_momentum", { precision: 8, scale: 4 }),
+  volumeVsMarketCap: decimal("volume_vs_market_cap", { precision: 8, scale: 4 }),
+  // Pattern insights
+  identifiedPatterns: text("identified_patterns").array(), // Patterns detected
+  successFactors: jsonb("success_factors"), // Key factors contributing to success/failure
+  rejectionCriteria: jsonb("rejection_criteria"), // Criteria that should reject similar launches
+  analysisComplete: boolean("analysis_complete").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  launchCoinIdIdx: index("launch_analysis_launch_coin_id_idx").on(table.launchCoinId),
+  outcomeTypeIdx: index("launch_analysis_outcome_type_idx").on(table.outcomeType),
+}));
+
+// Experimental strategies for launch trading
+export const launchStrategies = pgTable("launch_strategies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  strategyName: text("strategy_name").notNull().unique(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  // Entry criteria
+  minMarketCap: decimal("min_market_cap", { precision: 20, scale: 2 }),
+  maxMarketCap: decimal("max_market_cap", { precision: 20, scale: 2 }),
+  minVolume: decimal("min_volume", { precision: 20, scale: 2 }),
+  requiredPatterns: text("required_patterns").array(), // Patterns that must be present
+  rejectionPatterns: text("rejection_patterns").array(), // Patterns that disqualify
+  minMomentum: decimal("min_momentum", { precision: 8, scale: 4 }),
+  // Position sizing
+  entryPercent: decimal("entry_percent", { precision: 5, scale: 2 }).default("2.00"), // % of portfolio
+  maxPositionSize: decimal("max_position_size", { precision: 20, scale: 2 }).default("500.00"),
+  // Exit strategy
+  takeProfitPercent: decimal("take_profit_percent", { precision: 8, scale: 4 }).default("100.00"), // 100% gain target
+  stopLossPercent: decimal("stop_loss_percent", { precision: 8, scale: 4 }).default("20.00"),
+  timeoutMinutes: integer("timeout_minutes").default(60), // Exit after X minutes if no profit
+  // Risk management
+  maxDailyTrades: integer("max_daily_trades").default(5),
+  cooldownMinutes: integer("cooldown_minutes").default(30), // Wait between trades
+  requireConfidence: decimal("require_confidence", { precision: 5, scale: 2 }).default("70.00"),
+  // Strategy parameters as JSON for flexibility
+  customParams: jsonb("custom_params"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  isActiveIdx: index("launch_strategies_is_active_idx").on(table.isActive),
+}));
+
+// Performance tracking for each strategy
+export const launchPerformance = pgTable("launch_performance", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  strategyId: varchar("strategy_id").notNull().references(() => launchStrategies.id),
+  // Overall metrics
+  totalTrades: integer("total_trades").default(0),
+  successfulTrades: integer("successful_trades").default(0),
+  failedTrades: integer("failed_trades").default(0),
+  winRate: decimal("win_rate", { precision: 5, scale: 2 }).default("0"), // %
+  avgProfitPerTrade: decimal("avg_profit_per_trade", { precision: 8, scale: 4 }).default("0"), // %
+  totalProfitLoss: decimal("total_profit_loss", { precision: 20, scale: 2 }).default("0"),
+  maxDrawdown: decimal("max_drawdown", { precision: 20, scale: 2 }).default("0"),
+  // Performance thresholds
+  meetsWinRateThreshold: boolean("meets_win_rate_threshold").default(false), // ≥65%
+  meetsProfitThreshold: boolean("meets_profit_threshold").default(false), // ≥50% per trade
+  isReadyForLive: boolean("is_ready_for_live").default(false), // Both thresholds met
+  // Time tracking
+  firstTradeAt: timestamp("first_trade_at"),
+  lastTradeAt: timestamp("last_trade_at"),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+}, (table) => ({
+  strategyIdIdx: index("launch_performance_strategy_id_idx").on(table.strategyId),
+  isReadyForLiveIdx: index("launch_performance_is_ready_for_live_idx").on(table.isReadyForLive),
+}));
+
+// Link portfolios to launch trading strategies
+export const portfolioLaunchConfig = pgTable("portfolio_launch_config", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  portfolioId: varchar("portfolio_id").notNull().references(() => portfolios.id).unique(),
+  launchTradingEnabled: boolean("launch_trading_enabled").default(false),
+  activeStrategyId: varchar("active_strategy_id").references(() => launchStrategies.id),
+  maxAllocationPercent: decimal("max_allocation_percent", { precision: 5, scale: 2 }).default("10.00"), // Max % of portfolio for launch trades
+  lastUpdated: timestamp("last_updated").defaultNow(),
+}, (table) => ({
+  portfolioIdIdx: index("portfolio_launch_config_portfolio_id_idx").on(table.portfolioId),
+  launchTradingEnabledIdx: index("portfolio_launch_config_enabled_idx").on(table.launchTradingEnabled),
+}));
+
+// Insert schemas for launch system
+export const insertLaunchCoinSchema = createInsertSchema(launchCoins).omit({
+  id: true,
+  detectedAt: true,
+});
+
+export const insertLaunchAnalysisSchema = createInsertSchema(launchAnalysis).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertLaunchStrategySchema = createInsertSchema(launchStrategies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLaunchPerformanceSchema = createInsertSchema(launchPerformance).omit({
+  id: true,
+  lastUpdated: true,
+});
+
+export const insertPortfolioLaunchConfigSchema = createInsertSchema(portfolioLaunchConfig).omit({
+  id: true,
+  lastUpdated: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -564,3 +706,19 @@ export type InsertAlertEvent = z.infer<typeof insertAlertEventSchema>;
 
 export type Visitor = typeof visitors.$inferSelect;
 export type InsertVisitor = z.infer<typeof insertVisitorSchema>;
+
+// Launch system types
+export type LaunchCoin = typeof launchCoins.$inferSelect;
+export type InsertLaunchCoin = z.infer<typeof insertLaunchCoinSchema>;
+
+export type LaunchAnalysis = typeof launchAnalysis.$inferSelect;
+export type InsertLaunchAnalysis = z.infer<typeof insertLaunchAnalysisSchema>;
+
+export type LaunchStrategy = typeof launchStrategies.$inferSelect;
+export type InsertLaunchStrategy = z.infer<typeof insertLaunchStrategySchema>;
+
+export type LaunchPerformance = typeof launchPerformance.$inferSelect;
+export type InsertLaunchPerformance = z.infer<typeof insertLaunchPerformanceSchema>;
+
+export type PortfolioLaunchConfig = typeof portfolioLaunchConfig.$inferSelect;
+export type InsertPortfolioLaunchConfig = z.infer<typeof insertPortfolioLaunchConfigSchema>;
