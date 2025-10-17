@@ -42,6 +42,7 @@ export const translations = {
       currentPrice: "Current Price",
     },
     portfolio: {
+      title: "Portfolio",
       summary: "Portfolio Summary",
       totalValue: "Portfolio Value",
       viewFull: "View Full Portfolio",
@@ -166,6 +167,7 @@ export const translations = {
       currentPrice: "Precio Actual",
     },
     portfolio: {
+      title: "Cartera",
       summary: "Resumen de Cartera",
       totalValue: "Valor de Cartera",
       viewFull: "Ver Cartera Completa",
@@ -287,6 +289,7 @@ export const translations = {
       currentPrice: "Prix Actuel",
     },
     portfolio: {
+      title: "Portefeuille",
       summary: "Résumé du Portefeuille",
       totalValue: "Valeur du Portefeuille",
       viewFull: "Voir Portefeuille Complet",
@@ -408,6 +411,7 @@ export const translations = {
       currentPrice: "Aktueller Preis",
     },
     portfolio: {
+      title: "Portfolio",
       summary: "Portfolio Zusammenfassung",
       totalValue: "Portfolio Wert",
       viewFull: "Vollständiges Portfolio Anzeigen",
@@ -531,6 +535,7 @@ export const translations = {
       currentPrice: "現在価格",
     },
     portfolio: {
+      title: "ポートフォリオ",
       summary: "ポートフォリオサマリー",
       totalValue: "ポートフォリオ価値",
       viewFull: "フルポートフォリオを見る",
