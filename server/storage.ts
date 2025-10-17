@@ -291,7 +291,7 @@ export class DatabaseStorage implements IStorage {
       .set({
         startingCapital,
         cashBalance: startingCapital,
-        totalValue: "0",
+        totalValue: startingCapital,
         realizedPnL: "0",
         dailyPnL: "0",
         totalPnL: "0",

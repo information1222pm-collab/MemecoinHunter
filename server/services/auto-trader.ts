@@ -631,19 +631,23 @@ class AutoTrader extends EventEmitter {
       // Create or update position (prevent duplicates)
       if (existingPosition) {
         // Update existing position (add to it)
-        const currentAmount = parseFloat(existingPosition.amount);
-        const newAmount = currentAmount + parseFloat(tradeAmount);
+        const currentAmount = parseFloat(existingPosition.amount) || 0;
+        const newAmount = currentAmount + (parseFloat(tradeAmount) || 0);
         
-        // Calculate new average buy price
-        const currentValue = currentAmount * parseFloat(existingPosition.avgBuyPrice);
-        const newValue = parseFloat(tradeAmount) * signal.price;
-        const newAvgPrice = (currentValue + newValue) / newAmount;
+        // Calculate new average buy price with validation to prevent NaN
+        const currentValue = currentAmount * (parseFloat(existingPosition.avgBuyPrice) || 0);
+        const newValue = (parseFloat(tradeAmount) || 0) * signal.price;
+        const newAvgPrice = newAmount > 0 ? (currentValue + newValue) / newAmount : signal.price;
+        
+        // Validate values before saving to prevent NaN corruption
+        const validAmount = isNaN(newAmount) || !isFinite(newAmount) ? currentAmount : newAmount;
+        const validAvgPrice = isNaN(newAvgPrice) || !isFinite(newAvgPrice) ? parseFloat(existingPosition.avgBuyPrice) || signal.price : newAvgPrice;
         
         await storage.updatePosition(existingPosition.id, {
-          amount: newAmount.toString(),
-          avgBuyPrice: newAvgPrice.toString(),
+          amount: validAmount.toString(),
+          avgBuyPrice: validAvgPrice.toString(),
         });
-        console.log(`📝 [Portfolio ${portfolioId}] Added to existing position for ${signal.tokenId}: ${newAmount.toFixed(6)} @ avg $${newAvgPrice.toFixed(6)}`);
+        console.log(`📝 [Portfolio ${portfolioId}] Added to existing position for ${signal.tokenId}: ${validAmount.toFixed(6)} @ avg $${validAvgPrice.toFixed(6)}`);
       } else {
         // Create new position (first time buying this token)
         await storage.createPosition({

@@ -3,6 +3,16 @@ import { storage } from '../storage';
 import type { Position, Token } from '@shared/schema';
 import { streamingPriceGateway } from './streaming-price-gateway';
 
+/**
+ * Safely convert a number to a fixed decimal string, preventing NaN from being saved to database
+ */
+function safeToFixed(value: number, decimals: number = 2, fallback: string = '0'): string {
+  if (isNaN(value) || !isFinite(value)) {
+    return fallback;
+  }
+  return value.toFixed(decimals);
+}
+
 interface PositionAnalytics {
   positionId: string;
   tokenSymbol: string;
@@ -200,8 +210,8 @@ class PositionTracker extends EventEmitter {
       
       // Update portfolio totals including daily P&L from analytics
       await storage.updatePortfolio(portfolioId, {
-        totalValue: actualTotalValue.toFixed(2),
-        totalPnL: actualTotalPnL.toFixed(2),
+        totalValue: safeToFixed(actualTotalValue, 2, portfolio.startingCapital || '10000'),
+        totalPnL: safeToFixed(actualTotalPnL, 2, '0'),
         dailyPnL: portfolioAnalytics.dayChangeValue
       });
 
@@ -242,13 +252,13 @@ class PositionTracker extends EventEmitter {
       return {
         positionId: position.id,
         tokenSymbol: token.symbol,
-        currentValue: currentValue.toFixed(2),
-        unrealizedPnL: unrealizedPnL.toFixed(2),
+        currentValue: safeToFixed(currentValue),
+        unrealizedPnL: safeToFixed(unrealizedPnL),
         unrealizedPnLPercent,
-        costBasis: costBasis.toFixed(2),
+        costBasis: safeToFixed(costBasis),
         allocation: 0, // Will be calculated at portfolio level
         dayChange,
-        dayChangeValue: dayChangeValue.toFixed(2),
+        dayChangeValue: safeToFixed(dayChangeValue),
         holdingPeriod
       };
 
@@ -293,11 +303,11 @@ class PositionTracker extends EventEmitter {
     return {
       portfolioId: portfolio.id,
       userId: portfolio.userId,
-      totalValue: totalValue.toFixed(2),
-      totalPnL: totalPnL.toFixed(2),
+      totalValue: safeToFixed(totalValue),
+      totalPnL: safeToFixed(totalPnL),
       totalPnLPercent,
       dayChange,
-      dayChangeValue: totalDayChangeValue.toFixed(2),
+      dayChangeValue: safeToFixed(totalDayChangeValue),
       positionsCount: positions.length,
       topPerformers,
       riskMetrics
