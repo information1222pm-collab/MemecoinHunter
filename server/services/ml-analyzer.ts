@@ -85,29 +85,31 @@ class MLAnalyzer extends EventEmitter {
     try {
       const tokens = await storage.getActiveTokens();
       
-      // FIX: Analyze only top 20 tokens by market cap to prevent memory issues
-      // Process in batches of 5 to avoid overwhelming the system
+      // FIX: Analyze only top 10 tokens by market cap to prevent memory issues
+      // Process in batches of 2 to avoid overwhelming the system
       const topTokens = tokens
         .sort((a, b) => parseFloat(b.marketCap || '0') - parseFloat(a.marketCap || '0'))
-        .slice(0, 20); // Limit to top 20 tokens (reduced from 50)
+        .slice(0, 10); // Further reduced to top 10 tokens to prevent memory issues
       
-      const BATCH_SIZE = 5; // Reduced from 10
+      const BATCH_SIZE = 2; // Further reduced to 2 tokens at a time
       for (let i = 0; i < topTokens.length; i += BATCH_SIZE) {
         const batch = topTokens.slice(i, i + BATCH_SIZE);
         
         // Process batch sequentially to control memory usage
         for (const token of batch) {
           await this.analyzeTokenPatterns(token);
+          // Clear token data from memory after processing
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
         
         // Force garbage collection between batches if available
-        if (global.gc && i + BATCH_SIZE < topTokens.length) {
+        if (global.gc) {
           global.gc();
         }
         
         // Longer delay between batches to allow system to breathe and GC to complete
         if (i + BATCH_SIZE < topTokens.length) {
-          await new Promise(resolve => setTimeout(resolve, 2000)); // Increased from 1000ms
+          await new Promise(resolve => setTimeout(resolve, 3000)); // Increased to 3 seconds
         }
       }
       
@@ -128,8 +130,8 @@ class MLAnalyzer extends EventEmitter {
       console.log(`🔍 ML-ANALYZER: Found ${history.length} price history points for ${token.symbol}`);
       
       // FIX: Limit data to prevent stack overflow on large datasets
-      // Use only the most recent 1000 data points to avoid memory/stack issues
-      const MAX_DATA_POINTS = 1000;
+      // Use only the most recent 500 data points to avoid memory/stack issues
+      const MAX_DATA_POINTS = 500;
       if (history.length > MAX_DATA_POINTS) {
         console.log(`🔍 ML-ANALYZER: Limiting ${token.symbol} data from ${history.length} to ${MAX_DATA_POINTS} most recent points`);
         history = history.slice(-MAX_DATA_POINTS);
