@@ -20,6 +20,8 @@ import { marketHealthAnalyzer } from "./services/market-health";
 import { dataCleanupService } from "./services/data-cleanup";
 import { cacheService } from "./services/cache-service";
 import { aiInsightsAnalyzer } from "./services/ai-insights-analyzer";
+import { aiTradeExecutor } from "./services/ai-trade-executor";
+import { backtestingEngine } from "./services/backtesting-engine";
 import { insertUserSchema, insertTradeSchema, insertTokenSchema, insertAlertRuleSchema, insertPortfolioLaunchConfigSchema } from "@shared/schema";
 import { z } from "zod";
 import * as bcrypt from "bcrypt";

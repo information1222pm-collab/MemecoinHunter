@@ -2,7 +2,7 @@ import { db } from '../db';
 import { aiInsights, portfolios, trades, tokens, positions } from '@shared/schema';
 import { eq, and, gte, desc, sql, gt, lt, or } from 'drizzle-orm';
 import { EventEmitter } from 'events';
-import { v4 as uuidv4 } from 'uuid';
+import crypto from 'crypto';
 
 interface AITradeSignal {
   portfolioId: string;
@@ -106,7 +106,7 @@ export class AITradeExecutor extends EventEmitter {
         .where(
           and(
             eq(trades.portfolioId, insight.portfolioId),
-            gte(trades.timestamp, new Date(Date.now() - this.cooldownPeriod))
+            gte(trades.createdAt, new Date(Date.now() - this.cooldownPeriod))
           )
         )
         .limit(1);
@@ -179,18 +179,23 @@ export class AITradeExecutor extends EventEmitter {
 
   private async executeTrade(signal: AITradeSignal, insight: any): Promise<void> {
     try {
-      // Find token by symbol
-      const token = await db.select()
-        .from(tokens)
-        .where(eq(tokens.symbol, signal.tokenId))
-        .limit(1);
+      // Find token by symbol (if signal contains symbol instead of ID)
+      let tokenId = signal.tokenId;
+      if (!tokenId.includes('-')) {
+        // It's a symbol, not an ID
+        const token = await db.select()
+          .from(tokens)
+          .where(eq(tokens.symbol, signal.tokenId))
+          .limit(1);
 
-      if (!token[0]) {
-        console.log(`❌ AI-EXECUTOR: Token not found for signal`);
-        return;
+        if (!token[0]) {
+          console.log(`❌ AI-EXECUTOR: Token not found for signal`);
+          return;
+        }
+        tokenId = token[0].id;
       }
 
-      signal.tokenId = token[0].id;
+      signal.tokenId = tokenId;
 
       // Get portfolio details
       const portfolio = await db.select()
@@ -211,7 +216,7 @@ export class AITradeExecutor extends EventEmitter {
             and(
               eq(positions.portfolioId, signal.portfolioId),
               eq(positions.tokenId, signal.tokenId),
-              gt(positions.amount, 0)
+              gt(positions.amount, '0')
             )
           )
           .limit(1);
@@ -225,19 +230,17 @@ export class AITradeExecutor extends EventEmitter {
         const quantity = tradeAmount / signal.price;
         
         const trade = await db.insert(trades).values({
-          id: uuidv4(),
           portfolioId: signal.portfolioId,
           tokenId: signal.tokenId,
           type: 'buy',
           quantity: quantity.toString(),
           price: signal.price.toString(),
-          timestamp: new Date(),
           stopLoss: signal.stopLoss?.toString(),
           takeProfit: signal.takeProfit?.toString(),
           patternId: insight.id, // Link to AI insight
         }).returning();
 
-        console.log(`✅ AI-EXECUTOR: Executed BUY trade for ${token[0].symbol} at $${signal.price}`);
+        console.log(`✅ AI-EXECUTOR: Executed BUY trade at $${signal.price}`);
         console.log(`   Reason: ${signal.reason}`);
         console.log(`   Confidence: ${signal.confidence}%`);
         
@@ -255,29 +258,27 @@ export class AITradeExecutor extends EventEmitter {
             and(
               eq(positions.portfolioId, signal.portfolioId),
               eq(positions.tokenId, signal.tokenId),
-              gt(positions.amount, 0)
+              gt(positions.amount, '0')
             )
           )
           .limit(1);
 
         if (!position[0]) {
-          console.log(`❌ AI-EXECUTOR: No position to sell for ${token[0].symbol}`);
+          console.log(`❌ AI-EXECUTOR: No position to sell`);
           return;
         }
 
         // Create sell trade
         const trade = await db.insert(trades).values({
-          id: uuidv4(),
           portfolioId: signal.portfolioId,
           tokenId: signal.tokenId,
           type: 'sell',
           quantity: position[0].amount.toString(),
           price: signal.price.toString(),
-          timestamp: new Date(),
           patternId: insight.id,
         }).returning();
 
-        console.log(`✅ AI-EXECUTOR: Executed SELL trade for ${token[0].symbol} at $${signal.price}`);
+        console.log(`✅ AI-EXECUTOR: Executed SELL trade at $${signal.price}`);
         console.log(`   Reason: ${signal.reason}`);
         
         this.emit('trade-executed', {

@@ -53,6 +53,13 @@ export const portfolios = pgTable("portfolios", {
   winRate: decimal("win_rate", { precision: 5, scale: 2 }).default("0"),
   autoTradingEnabled: boolean("auto_trading_enabled").default(true),
   riskLevel: text("risk_level").default("balanced"),
+  
+  // AI Trading Settings
+  aiTradingEnabled: boolean("ai_trading_enabled").default(false),
+  aiConfidenceThreshold: integer("ai_confidence_threshold").default(75),
+  aiMaxPositionSize: decimal("ai_max_position_size", { precision: 5, scale: 2 }).default("0.05"),
+  aiCooldownMinutes: integer("ai_cooldown_minutes").default(5),
+  
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
