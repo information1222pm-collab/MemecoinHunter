@@ -124,11 +124,18 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   // Helper function to get the correct domain for passport strategy
-  const getDomainForStrategy = (hostname: string): string => {
+  const getDomainForStrategy = (req: any): string => {
     const domains = process.env.REPLIT_DOMAINS!.split(",");
+    
+    // Try to get actual domain from Host header first (more reliable in proxied environments)
+    const hostHeader = req.get('host');
+    const hostname = hostHeader ? hostHeader.split(':')[0] : req.hostname;
+    
+    console.log(`[OAUTH-DEBUG] Detecting domain - Host header: ${hostHeader}, req.hostname: ${req.hostname}, extracted: ${hostname}`);
     
     // If hostname matches one of the registered domains, use it
     if (domains.includes(hostname)) {
+      console.log(`[OAUTH] Using matched domain: ${hostname}`);
       return hostname;
     }
     
@@ -138,7 +145,7 @@ export async function setupAuth(app: Express) {
   };
 
   app.get("/api/login", (req, res, next) => {
-    const domain = getDomainForStrategy(req.hostname);
+    const domain = getDomainForStrategy(req);
     
     // CRITICAL: Save session before OAuth redirect to preserve state token
     req.session.save((err) => {
@@ -154,9 +161,9 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/callback", (req, res, next) => {
-    console.log(`[OAUTH-CALLBACK] Route hit! Hostname: ${req.hostname}, Full URL: ${req.protocol}://${req.get('host')}${req.originalUrl}`);
-    const domain = getDomainForStrategy(req.hostname);
-    console.log(`[OAUTH] Callback received from ${req.hostname}, using strategy domain: ${domain}`);
+    console.log(`[OAUTH-CALLBACK] Route hit! Full URL: ${req.protocol}://${req.get('host')}${req.originalUrl}`);
+    const domain = getDomainForStrategy(req);
+    console.log(`[OAUTH] Callback using strategy domain: ${domain}`);
     console.log(`[OAUTH] Query params:`, req.query);
     
     passport.authenticate(`replitauth:${domain}`, 
