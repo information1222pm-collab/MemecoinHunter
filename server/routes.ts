@@ -448,6 +448,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     launchPatternAnalyzer.start();
     launchStrategyExperimenter.start();
     launchAutoTrader.start();
+    
+    // Warm caches for sub-second initial load times
+    const { warmCaches } = await import('./utils/cache-warmer');
+    await warmCaches();
   });
 
   // Set up real-time broadcasts with user scoping (CRITICAL SECURITY FIX)
