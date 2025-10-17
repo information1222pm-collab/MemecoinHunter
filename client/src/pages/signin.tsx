@@ -235,32 +235,28 @@ export default function SignIn() {
                   >
                     {loginMutation.isPending ? "Signing in..." : "Sign In"}
                   </Button>
-                  
-                  <div className="relative w-full">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t border-slate-600/50" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-slate-800/40 px-2 text-slate-400">Or continue with</span>
-                    </div>
-                  </div>
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full bg-slate-700/30 border-slate-600/50 text-slate-100 hover:bg-slate-600/50"
-                    onClick={() => {
-                      console.log('[OAUTH-DEBUG] Button clicked!');
-                      console.log('[OAUTH-DEBUG] Navigating to /api/login...');
-                      window.location.href = '/api/login';
-                    }}
-                    data-testid="button-google-login"
-                  >
-                    <SiGoogle className="mr-2 h-4 w-4" />
-                    Continue with Google
-                  </Button>
                 </CardFooter>
               </form>
+              
+              <div className="px-6 pb-6">
+                <div className="relative w-full mb-3">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-slate-600/50" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-slate-800/40 px-2 text-slate-400">Or continue with</span>
+                  </div>
+                </div>
+
+                <a 
+                  href="/api/login"
+                  className="flex items-center justify-center w-full px-4 py-2 bg-slate-700/30 border border-slate-600/50 text-slate-100 hover:bg-slate-600/50 rounded-md transition-colors"
+                  data-testid="button-google-login"
+                >
+                  <SiGoogle className="mr-2 h-4 w-4" />
+                  Continue with Google
+                </a>
+              </div>
             </TabsContent>
 
             <TabsContent value="register">
