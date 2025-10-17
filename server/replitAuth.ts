@@ -155,8 +155,19 @@ export async function setupAuth(app: Express) {
           // CRITICAL FIX: Store userId in session for app authentication
           (req.session as any).userId = user.id;
           
-          console.log(`[OAUTH] Successfully authenticated user ${user.id}`);
-          return res.redirect("/");
+          console.log(`[OAUTH] User authenticated, userId set to: ${user.id}`);
+          console.log(`[OAUTH] Session before save:`, req.session);
+          
+          // CRITICAL: Explicitly save session to ensure userId persists
+          req.session.save((saveErr) => {
+            if (saveErr) {
+              console.error(`[OAUTH] Session save error:`, saveErr);
+              return res.redirect("/?error=session_save_failed");
+            }
+            
+            console.log(`[OAUTH] Session saved successfully for user ${user.id}`);
+            return res.redirect("/");
+          });
         });
       }
     )(req, res, next);
