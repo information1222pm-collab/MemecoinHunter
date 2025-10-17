@@ -44,6 +44,222 @@ const colorMap: Record<string, string> = {
   'red': 'text-red-500',
 };
 
+function LaunchTradingCard() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  // Fetch current portfolio to get ID
+  const { data: portfolio } = useQuery<any>({
+    queryKey: ['/api/portfolio'],
+  });
+
+  // Fetch launch config for current portfolio
+  const { data: launchConfig, isLoading: isLoadingConfig } = useQuery<any>({
+    queryKey: ['/api/launch/config', portfolio?.id],
+    enabled: !!portfolio?.id,
+  });
+
+  // Fetch active strategy and performance
+  const { data: activeStrategyData } = useQuery<any>({
+    queryKey: ['/api/launch/strategies/active'],
+  });
+
+  // Fetch launch statistics
+  const { data: launchStats } = useQuery<any>({
+    queryKey: ['/api/launch/statistics'],
+  });
+
+  const [enabled, setEnabled] = useState(false);
+  const [maxDailyTrades, setMaxDailyTrades] = useState("5");
+  const [maxPositionSize, setMaxPositionSize] = useState("500");
+
+  // Update local state when config loads
+  useEffect(() => {
+    if (launchConfig) {
+      setEnabled(launchConfig.enabled || false);
+      setMaxDailyTrades(launchConfig.maxDailyTrades?.toString() || "5");
+      setMaxPositionSize(launchConfig.maxPositionSize?.toString() || "500");
+    }
+  }, [launchConfig]);
+
+  const updateConfigMutation = useMutation({
+    mutationFn: async (configData: any) => {
+      return await apiRequest("POST", `/api/launch/config/${portfolio.id}`, configData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/launch/config', portfolio?.id] });
+      toast({
+        title: "Launch Trading Updated",
+        description: "Your launch trading configuration has been saved",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update configuration. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSaveConfig = () => {
+    updateConfigMutation.mutate({
+      enabled,
+      maxDailyTrades: parseInt(maxDailyTrades, 10),
+      maxPositionSize: parseFloat(maxPositionSize)
+    });
+  };
+
+  const strategy = activeStrategyData?.strategy;
+  const performance = activeStrategyData?.performance;
+
+  if (isLoadingConfig) {
+    return (
+      <Card data-testid="card-launch-trading" className="col-span-1 lg:col-span-2">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <TrendingUp className="w-5 h-5" />
+            <span>Early-Launch Coin Trading</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-sm text-muted-foreground">Loading configuration...</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card data-testid="card-launch-trading" className="col-span-1 lg:col-span-2">
+      <CardHeader>
+        <CardTitle className="flex items-center space-x-2">
+          <TrendingUp className="w-5 h-5 text-cyan-500" />
+          <span>Early-Launch Coin Trading</span>
+          <span className="ml-auto text-xs bg-cyan-500/20 text-cyan-500 px-2 py-1 rounded">EXPERIMENTAL</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Automatically detect and trade newly launched coins (≤5 minutes on market) using machine learning strategies. The system learns from successful patterns and experiments with different approaches.
+          </p>
+
+          {/* Enable/Disable Toggle */}
+          <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+            <div>
+              <Label htmlFor="launch-trading-enabled" className="text-base">Enable Launch Trading</Label>
+              <p className="text-sm text-muted-foreground">Allow this portfolio to trade early-launch coins</p>
+            </div>
+            <Switch 
+              id="launch-trading-enabled" 
+              checked={enabled} 
+              onCheckedChange={setEnabled}
+              data-testid="switch-launch-trading"
+            />
+          </div>
+
+          {/* Configuration Options */}
+          {enabled && (
+            <div className="space-y-4 pt-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="max-daily-trades">Max Daily Trades</Label>
+                  <Input
+                    id="max-daily-trades"
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={maxDailyTrades}
+                    onChange={(e) => setMaxDailyTrades(e.target.value)}
+                    className="mt-1"
+                    data-testid="input-max-daily-trades"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Maximum launch trades per day</p>
+                </div>
+
+                <div>
+                  <Label htmlFor="max-position-size">Max Position Size ($)</Label>
+                  <Input
+                    id="max-position-size"
+                    type="number"
+                    min="50"
+                    max="10000"
+                    value={maxPositionSize}
+                    onChange={(e) => setMaxPositionSize(e.target.value)}
+                    className="mt-1"
+                    data-testid="input-max-position-size"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Maximum amount per launch trade</p>
+                </div>
+              </div>
+
+              {/* Strategy Status */}
+              {strategy && performance && (
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-sm">Active Strategy: {strategy.strategyName}</h4>
+                    {performance.isReadyForLive ? (
+                      <span className="text-xs bg-green-500/20 text-green-500 px-2 py-1 rounded">READY</span>
+                    ) : (
+                      <span className="text-xs bg-yellow-500/20 text-yellow-500 px-2 py-1 rounded">LEARNING</span>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-3 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Win Rate</p>
+                      <p className="font-semibold text-cyan-500">{performance.winRate || 0}%</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Avg Profit</p>
+                      <p className="font-semibold text-cyan-500">{performance.avgProfitPerTrade || 0}%</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Total Trades</p>
+                      <p className="font-semibold">{performance.totalTrades || 0}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Learning Progress */}
+              {launchStats && (
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <h4 className="font-semibold text-sm mb-3">Learning Progress</h4>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Total Launches Detected</p>
+                      <p className="font-semibold">{launchStats.totalLaunches || 0}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Success Rate</p>
+                      <p className="font-semibold text-green-500">
+                        {launchStats.totalLaunches > 0 
+                          ? ((launchStats.successfulLaunches / launchStats.totalLaunches) * 100).toFixed(1)
+                          : 0}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Save button always visible */}
+          <Button 
+            onClick={handleSaveConfig} 
+            className="w-full bg-cyan-600 hover:bg-cyan-700 mt-4"
+            disabled={updateConfigMutation.isPending}
+            data-testid="button-save-launch-config"
+          >
+            {updateConfigMutation.isPending ? "Saving..." : "Save Configuration"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function RiskLevelCard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -553,6 +769,9 @@ export default function Settings() {
 
             {/* Risk Level Configuration */}
             <RiskLevelCard />
+
+            {/* Launch Trading Configuration */}
+            <LaunchTradingCard />
 
             {/* Portfolio Reset */}
             <Card data-testid="card-portfolio-reset" className="col-span-1 lg:col-span-2 border-destructive/50">
