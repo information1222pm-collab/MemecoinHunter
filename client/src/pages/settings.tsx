@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { useLanguage } from "@/hooks/use-language";
 import { useRefreshInterval } from "@/hooks/use-refresh-interval";
 import { useState, useEffect } from "react";
-import { Settings as SettingsIcon, User, Bell, Shield, Globe, Palette, TestTube, RefreshCw, DollarSign, TrendingUp, AlertTriangle } from "lucide-react";
+import { Settings as SettingsIcon, User, Bell, Shield, Globe, Palette, TestTube, RefreshCw, DollarSign, TrendingUp, AlertTriangle, Brain, Bot, Percent, Timer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
@@ -405,6 +405,197 @@ function RiskLevelCard() {
   );
 }
 
+function AITradingCard() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  
+  // Fetch current portfolio to get AI settings
+  const { data: portfolio } = useQuery<any>({
+    queryKey: ['/api/portfolio'],
+  });
+
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [confidenceThreshold, setConfidenceThreshold] = useState("75");
+  const [maxPositionSize, setMaxPositionSize] = useState("5");
+  const [cooldownMinutes, setCooldownMinutes] = useState("5");
+
+  // Update local state when portfolio loads
+  useEffect(() => {
+    if (portfolio) {
+      setAiEnabled(portfolio.aiTradingEnabled || false);
+      setConfidenceThreshold((portfolio.aiConfidenceThreshold || 75).toString());
+      setMaxPositionSize(((portfolio.aiMaxPositionSize || 0.05) * 100).toString());
+      setCooldownMinutes((portfolio.aiCooldownMinutes || 5).toString());
+    }
+  }, [portfolio]);
+
+  const updateAISettingsMutation = useMutation({
+    mutationFn: async (settings: any) => {
+      return await apiRequest("POST", "/api/portfolio/ai-settings", settings);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/portfolio'] });
+      toast({
+        title: "AI Trading Settings Updated",
+        description: "Your AI automation settings have been saved",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update AI settings",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSaveAISettings = () => {
+    updateAISettingsMutation.mutate({
+      aiTradingEnabled: aiEnabled,
+      aiConfidenceThreshold: parseInt(confidenceThreshold, 10),
+      aiMaxPositionSize: parseFloat(maxPositionSize) / 100,
+      aiCooldownMinutes: parseInt(cooldownMinutes, 10),
+    });
+  };
+
+  return (
+    <Card data-testid="card-ai-trading" className="col-span-1 lg:col-span-2">
+      <CardHeader>
+        <CardTitle className="flex items-center space-x-2">
+          <Brain className="w-5 h-5 text-cyan-500" />
+          <span>AI-Powered Trading Automation</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-6">
+          <p className="text-sm text-muted-foreground">
+            Configure AI-driven automated trading execution based on machine learning insights. The AI analyzes patterns and executes trades automatically when confidence thresholds are met.
+          </p>
+
+          {/* Enable/Disable Toggle */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label htmlFor="ai-enabled" className="flex items-center space-x-2">
+                <Bot className="w-4 h-4" />
+                <span>Enable AI Trading</span>
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Allow AI to automatically execute trades based on insights
+              </p>
+            </div>
+            <Switch
+              id="ai-enabled"
+              checked={aiEnabled}
+              onCheckedChange={setAiEnabled}
+              data-testid="switch-ai-trading"
+            />
+          </div>
+
+          {/* Settings (only show when enabled) */}
+          {aiEnabled && (
+            <div className="space-y-4 p-4 bg-muted/20 rounded-lg">
+              {/* Confidence Threshold */}
+              <div>
+                <Label htmlFor="confidence-threshold" className="flex items-center space-x-2">
+                  <Percent className="w-4 h-4" />
+                  <span>Minimum Confidence Threshold</span>
+                </Label>
+                <div className="mt-2 flex items-center space-x-4">
+                  <Input
+                    id="confidence-threshold"
+                    type="number"
+                    min="50"
+                    max="100"
+                    step="5"
+                    value={confidenceThreshold}
+                    onChange={(e) => setConfidenceThreshold(e.target.value)}
+                    className="max-w-[120px]"
+                    data-testid="input-confidence-threshold"
+                  />
+                  <span className="text-sm text-muted-foreground">%</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Only execute trades when AI confidence is above this level (50-100%)
+                </p>
+              </div>
+
+              {/* Max Position Size */}
+              <div>
+                <Label htmlFor="max-position-size" className="flex items-center space-x-2">
+                  <DollarSign className="w-4 h-4" />
+                  <span>Maximum Position Size</span>
+                </Label>
+                <div className="mt-2 flex items-center space-x-4">
+                  <Input
+                    id="max-position-size"
+                    type="number"
+                    min="1"
+                    max="20"
+                    step="1"
+                    value={maxPositionSize}
+                    onChange={(e) => setMaxPositionSize(e.target.value)}
+                    className="max-w-[120px]"
+                    data-testid="input-max-position-size"
+                  />
+                  <span className="text-sm text-muted-foreground">% of portfolio</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Maximum percentage of portfolio for each AI-initiated trade (1-20%)
+                </p>
+              </div>
+
+              {/* Cooldown Period */}
+              <div>
+                <Label htmlFor="cooldown-minutes" className="flex items-center space-x-2">
+                  <Timer className="w-4 h-4" />
+                  <span>Trade Cooldown Period</span>
+                </Label>
+                <div className="mt-2 flex items-center space-x-4">
+                  <Input
+                    id="cooldown-minutes"
+                    type="number"
+                    min="1"
+                    max="60"
+                    step="1"
+                    value={cooldownMinutes}
+                    onChange={(e) => setCooldownMinutes(e.target.value)}
+                    className="max-w-[120px]"
+                    data-testid="input-cooldown-minutes"
+                  />
+                  <span className="text-sm text-muted-foreground">minutes</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Minimum time between AI trades for the same token (1-60 minutes)
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Save Button */}
+          <Button 
+            onClick={handleSaveAISettings}
+            disabled={updateAISettingsMutation.isPending}
+            className="w-full md:w-auto"
+            data-testid="button-save-ai-settings"
+          >
+            {updateAISettingsMutation.isPending ? (
+              <>
+                <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Brain className="w-4 h-4 mr-2" />
+                Save AI Settings
+              </>
+            )}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function Settings() {
   const { t, language, setLanguage } = useLanguage();
   const { refreshInterval, setRefreshInterval } = useRefreshInterval();
@@ -769,6 +960,9 @@ export default function Settings() {
 
             {/* Risk Level Configuration */}
             <RiskLevelCard />
+
+            {/* AI Trading Configuration */}
+            <AITradingCard />
 
             {/* Launch Trading Configuration */}
             <LaunchTradingCard />
