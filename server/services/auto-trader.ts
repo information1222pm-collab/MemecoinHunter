@@ -393,7 +393,10 @@ class AutoTrader extends EventEmitter {
     let chartSignal = null;
     let tradeQuality = null;
     
-    if (history.length >= 50) {
+    // REDUCED: Lower threshold to 10 points to allow more trading opportunities
+    const MIN_HISTORY_POINTS = 10; // Reduced from 50
+    
+    if (history.length >= MIN_HISTORY_POINTS) {
       chartSignal = chartAnalyzer.generateEntryExitSignal(history);
       tradeQuality = dynamicExitStrategy.assessTradeQuality(currentPrice, history, confidence);
       
@@ -408,16 +411,26 @@ class AutoTrader extends EventEmitter {
       
       // DYNAMIC RISK LEVEL: Check risk-reward ratio based on portfolio risk level
       const riskConfig = await this.getRiskConfig(portfolioId);
-      if (!chartSignal.riskRewardRatio || chartSignal.riskRewardRatio < riskConfig.minRiskRewardRatio) {
-        console.log(`⚠️ CHART-ANALYZER: Poor/missing risk-reward ratio (${chartSignal.riskRewardRatio?.toFixed(2) || '0'}:1 < ${riskConfig.minRiskRewardRatio}:1 required for ${riskConfig.displayName}) - trade rejected`);
-        return null; // Reject trade with poor or missing R:R
-      }
       
-      console.log(`✅ CHART-ANALYZER: Trade approved with ${chartSignal.riskRewardRatio.toFixed(2)}:1 risk-reward ratio`);
+      // RELAXED: Allow trades with lower R:R when data is limited
+      const adjustedMinRR = history.length < 50 ? 
+        Math.max(1.0, riskConfig.minRiskRewardRatio * 0.5) : // Halve requirement for limited data
+        riskConfig.minRiskRewardRatio;
+      
+      if (chartSignal.riskRewardRatio && chartSignal.riskRewardRatio < adjustedMinRR) {
+        console.log(`⚠️ CHART-ANALYZER: Low risk-reward ratio (${chartSignal.riskRewardRatio?.toFixed(2)}:1 < ${adjustedMinRR}:1) - proceeding with caution`);
+        confidence = Math.max(confidence - 10, 60); // Reduce confidence instead of blocking
+      } else if (chartSignal.riskRewardRatio) {
+        console.log(`✅ CHART-ANALYZER: Trade approved with ${chartSignal.riskRewardRatio.toFixed(2)}:1 risk-reward ratio`);
+      }
+    } else if (history.length > 0) {
+      // FALLBACK: Allow pattern-based trading with minimal history but reduced confidence
+      console.log(`⚠️ CHART-ANALYZER: Limited price history (${history.length} points) - proceeding with reduced confidence`);
+      confidence = Math.max(confidence * 0.7, 50); // Reduce confidence by 30%
     } else {
-      // CRITICAL FIX: Require chart analysis for pattern trades
-      console.log(`⚠️ CHART-ANALYZER: Insufficient price history (${history.length} < 50 points) - trade rejected for safety`);
-      return null;
+      // NO HISTORY: Allow ML pattern trades for new tokens with very reduced confidence
+      console.log(`⚠️ CHART-ANALYZER: No price history available - proceeding with ML pattern only (high risk)`);
+      confidence = Math.max(confidence * 0.5, 40); // Reduce confidence by 50%
     }
     
     // Strong bullish patterns - BUY signals (only when not in sell-only mode)
@@ -630,9 +643,17 @@ class AutoTrader extends EventEmitter {
         signal.tokenId
       );
       
+      // IMPROVED: Allow adding to existing positions if they're small enough
       if (existingPosition && parseFloat(existingPosition.amount) > 0) {
-        console.log(`📋 [Portfolio ${portfolioId}] Position already exists for ${signal.tokenId}, skipping duplicate buy`);
-        return; // Skip if we already have an active position
+        const positionValue = parseFloat(existingPosition.amount) * signal.price;
+        const maxPositionValue = totalValue * 0.15; // Max 15% of portfolio per token
+        
+        if (positionValue >= maxPositionValue) {
+          console.log(`📋 [Portfolio ${portfolioId}] Position limit reached for ${signal.tokenId} ($${positionValue.toFixed(2)} >= $${maxPositionValue.toFixed(2)})`);
+          return; // Skip if position is already large
+        } else {
+          console.log(`✅ [Portfolio ${portfolioId}] Adding to existing position in ${signal.tokenId} ($${positionValue.toFixed(2)} < $${maxPositionValue.toFixed(2)} limit)`);
+        }
       }
       
       // Calculate trade amount ($500 per trade)
@@ -654,13 +675,21 @@ class AutoTrader extends EventEmitter {
       const trade = await storage.createTrade(tradeData);
       
       // Create or update position (prevent duplicates)
-      if (existingPosition && parseFloat(existingPosition.amount) <= 0) {
-        // Update existing zero-amount position to prevent duplicates
+      if (existingPosition) {
+        // Update existing position (add to it)
+        const currentAmount = parseFloat(existingPosition.amount);
+        const newAmount = currentAmount + parseFloat(tradeAmount);
+        
+        // Calculate new average buy price
+        const currentValue = currentAmount * parseFloat(existingPosition.avgBuyPrice);
+        const newValue = parseFloat(tradeAmount) * signal.price;
+        const newAvgPrice = (currentValue + newValue) / newAmount;
+        
         await storage.updatePosition(existingPosition.id, {
-          amount: tradeAmount,
-          avgBuyPrice: signal.price.toString(),
+          amount: newAmount.toString(),
+          avgBuyPrice: newAvgPrice.toString(),
         });
-        console.log(`📝 [Portfolio ${portfolioId}] Updated existing zero-amount position for ${signal.tokenId}`);
+        console.log(`📝 [Portfolio ${portfolioId}] Added to existing position for ${signal.tokenId}: ${newAmount.toFixed(6)} @ avg $${newAvgPrice.toFixed(6)}`);
       } else {
         // Create new position (first time buying this token)
         await storage.createPosition({
