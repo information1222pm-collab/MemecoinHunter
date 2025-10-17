@@ -20,7 +20,7 @@ interface StrategyTest {
 export class LaunchStrategyExperimenter {
   private evaluationInterval: NodeJS.Timeout | null = null;
   private readonly evaluationIntervalMs = 30 * 60 * 1000; // Evaluate every 30 minutes
-  private readonly minTradesForEvaluation = 20; // Minimum trades needed for strategy evaluation
+  private readonly minTradesForEvaluation = 5; // Reduced from 20 - minimum trades needed for strategy evaluation
   private readonly winRateThreshold = 65; // 65% win rate required
   private readonly profitThreshold = 50; // 50% avg profit per trade required
 
