@@ -686,13 +686,27 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createAlertRule(data: InsertAlertRule): Promise<AlertRule> {
-    const [alert] = await db.insert(alertRules).values(data).returning();
+    // Convert number fields to strings for decimal columns
+    const dbData = {
+      ...data,
+      thresholdValue: data.thresholdValue.toString(),
+      percentWindow: data.percentWindow !== undefined && data.percentWindow !== null ? data.percentWindow.toString() : null,
+    };
+    const [alert] = await db.insert(alertRules).values(dbData).returning();
     return alert;
   }
 
   async updateAlertRule(id: string, data: Partial<InsertAlertRule>): Promise<AlertRule> {
+    // Convert number fields to strings for decimal columns
+    const dbData: any = { ...data, updatedAt: new Date() };
+    if (data.thresholdValue !== undefined) {
+      dbData.thresholdValue = data.thresholdValue.toString();
+    }
+    if (data.percentWindow !== undefined && data.percentWindow !== null) {
+      dbData.percentWindow = data.percentWindow.toString();
+    }
     const [alert] = await db.update(alertRules)
-      .set({ ...data, updatedAt: new Date() })
+      .set(dbData)
       .where(eq(alertRules.id, id))
       .returning();
     return alert;
@@ -824,13 +838,13 @@ export class DatabaseStorage implements IStorage {
       // Get launch coin statistics
       const launches = await db.select().from(launchCoins);
       const totalLaunches = launches.length;
-      const successfulLaunches = launches.filter(l => l.outcome === 'success').length;
-      const failedLaunches = launches.filter(l => l.outcome === 'failure').length;
+      const successfulLaunches = launches.filter(l => l.status === 'success').length;
+      const failedLaunches = launches.filter(l => l.status === 'failure').length;
       
       // Calculate average gain on success
       const successfulGains = launches
-        .filter(l => l.outcome === 'success' && l.finalPriceChange)
-        .map(l => parseFloat(l.finalPriceChange || '0'));
+        .filter(l => l.status === 'success' && l.priceChange1h)
+        .map(l => parseFloat(l.priceChange1h || '0'));
       const avgGainOnSuccess = successfulGains.length > 0 
         ? (successfulGains.reduce((a, b) => a + b, 0) / successfulGains.length).toFixed(2)
         : '0';
