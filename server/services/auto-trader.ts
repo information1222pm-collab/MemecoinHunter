@@ -127,22 +127,22 @@ class AutoTrader extends EventEmitter {
     // Step 4: Set up monitoring and sync intervals
     console.log('⏰ Step 4/4: Setting up monitoring intervals...');
     
-    // Monitor positions every 30s
+    // AGGRESSIVE: Monitor positions every 10s for faster exits (was 30s)
     this.monitoringInterval = setInterval(() => {
       this.monitorAllPortfolios();
-    }, 30000);
+    }, 10000);
     
     // Sync enabled portfolios every 60s to detect changes
     this.syncInterval = setInterval(() => {
       this.syncEnabledPortfolios();
     }, 60000);
     
-    // Check market health every 5 minutes
+    // AGGRESSIVE: Check market health every 2 minutes for faster adaptation (was 5 minutes)
     this.healthCheckInterval = setInterval(() => {
       this.marketHealthAnalyzer.analyzeMarketHealth().catch(err => {
         console.error('Error analyzing market health:', err);
       });
-    }, 5 * 60 * 1000);
+    }, 2 * 60 * 1000);
     
     // Run initial health check
     this.marketHealthAnalyzer.analyzeMarketHealth().catch(err => {
@@ -811,7 +811,7 @@ class AutoTrader extends EventEmitter {
           // Get current stage for this position (0 = none completed)
           const currentStage = this.positionStages.get(position.id) || 0;
           
-          // ENHANCED: Get chart-based exit signal for better decision making
+          // AGGRESSIVE: Get chart-based exit signal for frequent exits
           const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
           const history = await storage.getPriceHistory(token.id, sevenDaysAgo);
           
@@ -819,20 +819,32 @@ class AutoTrader extends EventEmitter {
           if (history.length >= 50) {
             const chartSignal = chartAnalyzer.generateEntryExitSignal(history);
             
-            // Check for strong bearish chart signals
-            if (chartSignal.action === 'sell' && chartSignal.confidence > 75) {
+            // AGGRESSIVE: Lower confidence threshold from 75% to 60% for quicker exits
+            if (chartSignal.action === 'sell' && chartSignal.confidence > 60) {
               chartBasedExit = true;
               console.log(`📉 CHART-ANALYZER: Bearish exit signal for ${token.symbol} - ${chartSignal.reasoning.join(', ')}`);
             }
             
-            // Check resistance levels for exit
+            // AGGRESSIVE: Check resistance levels for exit with lower profit threshold
             if (chartSignal.resistanceLevels.length > 0) {
               const nearResistance = chartSignal.resistanceLevels.some(r => 
-                Math.abs(currentPrice - r) / r < 0.015
+                Math.abs(currentPrice - r) / r < 0.02 // Wider detection range (was 0.015)
               );
-              if (nearResistance && profitLoss > 3) {
+              // AGGRESSIVE: Lower profit requirement from 3% to 2% for quicker exits
+              if (nearResistance && profitLoss > 2) {
                 chartBasedExit = true;
                 console.log(`📉 CHART-ANALYZER: Price at resistance $${chartSignal.resistanceLevels[0].toFixed(6)} - taking profit on ${token.symbol}`);
+              }
+            }
+            
+            // AGGRESSIVE: Exit on support level breaks (new exit condition)
+            if (chartSignal.supportLevels.length > 0 && chartSignal.action === 'sell') {
+              const brokeSupport = chartSignal.supportLevels.some(s => 
+                currentPrice < s * 0.98 // 2% below support = break
+              );
+              if (brokeSupport) {
+                chartBasedExit = true;
+                console.log(`📉 CHART-ANALYZER: Support broken at $${chartSignal.supportLevels[0].toFixed(6)} - exit ${token.symbol}`);
               }
             }
           }
