@@ -37,6 +37,7 @@ interface PortfolioState {
 class AutoTrader extends EventEmitter {
   private isActive = false;
   private enabledPortfolios = new Map<string, PortfolioState>(); // Track multiple portfolios
+  private tradeLocks = new Map<string, boolean>(); // CRITICAL: Prevent concurrent trades on same portfolio
   private positionStages = new Map<string, number>(); // Track take-profit stage per position (0=none, 1=first, 2=second, 3=final)
   private monitoringInterval?: NodeJS.Timeout;
   private syncInterval?: NodeJS.Timeout;
@@ -515,6 +516,15 @@ class AutoTrader extends EventEmitter {
     const portfolioState = this.enabledPortfolios.get(portfolioId);
     if (!portfolioState) return;
     
+    // CRITICAL: Check if portfolio is already processing a trade
+    if (this.tradeLocks.get(portfolioId)) {
+      // Skip this trade to prevent race conditions and negative cash balances
+      return;
+    }
+    
+    // Lock the portfolio for trading
+    this.tradeLocks.set(portfolioId, true);
+    
     try {
       // Check if real money trading is enabled for this portfolio
       const isRealTradingEnabled = await exchangeService.isRealTradingEnabled(portfolioId);
@@ -541,6 +551,12 @@ class AutoTrader extends EventEmitter {
       const totalPnL = safeParseFloat(portfolio.totalPnL, 0);
       const dailyPnL = safeParseFloat(portfolio.dailyPnL, 0);
       
+      // CRITICAL: Check market health BEFORE calculating position sizing
+      const healthMultiplier = this.marketHealthAnalyzer.getPositionSizeMultiplier();
+      if (healthMultiplier === 0) {
+        // Market health recommends halting trading - skip this trade
+        return;
+      }
       
       // IMPROVED: Dynamic position sizing from RiskManager
       const positionSizing = await riskManager.calculatePositionSizing(
@@ -554,8 +570,7 @@ class AutoTrader extends EventEmitter {
       const recommendedDollars = positionSizing.recommendedSize * signal.price;
       let tradeValue = Math.min(recommendedDollars, this.strategy.maxPositionSize);
       
-      // MARKET HEALTH: Apply position size adjustment based on market conditions
-      const healthMultiplier = this.marketHealthAnalyzer.getPositionSizeMultiplier();
+      // MARKET HEALTH: Apply position size adjustment (already checked for 0 above)
       if (healthMultiplier < 1.0) {
         tradeValue = tradeValue * healthMultiplier;
         console.log(`📊 MARKET-HEALTH: Position size reduced by ${((1 - healthMultiplier) * 100).toFixed(0)}% due to market conditions`);
@@ -678,6 +693,13 @@ class AutoTrader extends EventEmitter {
       
       // Update portfolio cash balance atomically using current balance
       const newCashBalance = safeDbNumber(currentCashBalance - tradeValue);
+      
+      // CRITICAL INVARIANT: Ensure cash balance never goes negative
+      if (newCashBalance < -0.01) { // Allow tiny floating point errors
+        console.error(`❌ CRITICAL: Portfolio ${portfolioId} cash would go negative: ${currentCashBalance} - ${tradeValue} = ${newCashBalance}`);
+        throw new Error('Portfolio cash balance would go negative - trade aborted');
+      }
+      
       await storage.updatePortfolio(portfolioId, {
         cashBalance: newCashBalance,
       });
@@ -709,6 +731,9 @@ class AutoTrader extends EventEmitter {
       
     } catch (error) {
       console.error(`[Portfolio ${portfolioId}] Error executing trade signal:`, error);
+    } finally {
+      // CRITICAL: Always unlock the portfolio, even if trade fails
+      this.tradeLocks.delete(portfolioId);
     }
   }
 
