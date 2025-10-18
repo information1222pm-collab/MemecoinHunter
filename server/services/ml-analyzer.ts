@@ -120,18 +120,34 @@ class MLAnalyzer extends EventEmitter {
   }
 
   private async analyzeTokenPatterns(token: Token) {
+    let history: PriceHistory[] | null = null;
+    let indicators: TechnicalIndicators | null = null;
+    let patterns: any[] | null = null;
+    
     try {
       console.log(`🔍 ML-ANALYZER: Analyzing patterns for token ${token.symbol} (${token.id})`);
       
+      // MEMORY: Skip if we have recent patterns (< 15 minutes old) to avoid redundant analysis
+      const recentPatterns = await storage.getPatternsByToken(token.id);
+      if (recentPatterns.length > 0) {
+        const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+        const hasRecentPattern = recentPatterns.some(p => 
+          p.detectedAt && new Date(p.detectedAt) > fifteenMinutesAgo
+        );
+        if (hasRecentPattern) {
+          console.log(`🔍 ML-ANALYZER: Skipping ${token.symbol} - has recent patterns`);
+          return;
+        }
+      }
+      
       // ENHANCED: Get price history for the last 7 days for better trend analysis
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      let history = await storage.getPriceHistory(token.id, sevenDaysAgo);
+      history = await storage.getPriceHistory(token.id, sevenDaysAgo);
       
       console.log(`🔍 ML-ANALYZER: Found ${history.length} price history points for ${token.symbol}`);
       
-      // FIX: Limit data to prevent stack overflow on large datasets
-      // Use only the most recent 200 data points to avoid memory/stack issues
-      const MAX_DATA_POINTS = 200;
+      // FIX: Limit data to prevent memory issues - further reduced from 200 to 100
+      const MAX_DATA_POINTS = 100;
       if (history.length > MAX_DATA_POINTS) {
         console.log(`🔍 ML-ANALYZER: Limiting ${token.symbol} data from ${history.length} to ${MAX_DATA_POINTS} most recent points`);
         history = history.slice(-MAX_DATA_POINTS);
@@ -144,20 +160,32 @@ class MLAnalyzer extends EventEmitter {
       }
       
       console.log(`🔍 ML-ANALYZER: Calculating indicators for ${token.symbol}`);
-      const indicators = this.calculateTechnicalIndicators(history);
+      indicators = this.calculateTechnicalIndicators(history);
       
       console.log(`🔍 ML-ANALYZER: Detecting patterns for ${token.symbol}`);
-      const patterns = this.detectPatterns(history, indicators);
+      patterns = this.detectPatterns(history, indicators);
       
       console.log(`🔍 ML-ANALYZER: Found ${patterns.length} patterns for ${token.symbol}`);
       
-      for (const pattern of patterns) {
+      // MEMORY: Limit to top 3 strongest patterns only to reduce database bloat
+      const topPatterns = patterns
+        .sort((a, b) => b.confidence - a.confidence)
+        .slice(0, 3);
+      
+      console.log(`🔍 ML-ANALYZER: Saving top ${topPatterns.length} patterns for ${token.symbol}`);
+      
+      for (const pattern of topPatterns) {
         console.log(`🔍 ML-ANALYZER: Processing pattern ${pattern.type} for ${token.symbol}`);
         await this.savePattern(token.id, pattern);
       }
       
     } catch (error) {
       console.error(`Error analyzing patterns for ${token.symbol}:`, error);
+    } finally {
+      // MEMORY: Explicitly null out large objects to help garbage collection
+      history = null;
+      indicators = null;
+      patterns = null;
     }
   }
 
