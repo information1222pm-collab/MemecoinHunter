@@ -85,11 +85,11 @@ class MLAnalyzer extends EventEmitter {
     try {
       const tokens = await storage.getActiveTokens();
       
-      // FIX: Analyze only top 5 tokens by market cap to prevent memory issues
-      // Process in batches of 1 to avoid overwhelming the system
+      // PERFORMANCE: Analyze only top 20 tokens by market cap to balance coverage and performance
+      // Process in batches to avoid overwhelming the system
       const topTokens = tokens
         .sort((a, b) => parseFloat(b.marketCap || '0') - parseFloat(a.marketCap || '0'))
-        .slice(0, 5); // Further reduced to top 5 tokens to prevent OOM
+        .slice(0, 20); // Top 20 tokens for comprehensive market coverage
       
       const BATCH_SIZE = 1; // Further reduced to 1 token at a time
       for (let i = 0; i < topTokens.length; i += BATCH_SIZE) {

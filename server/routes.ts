@@ -992,7 +992,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   };
                 }));
                 const freshData = { ...portfolio, positions: enhancedPositions, analytics: portfolioAnalytics };
-                cacheService.set(cacheKey, freshData, 5000); // 5s TTL
+                cacheService.set(cacheKey, freshData, 30000); // 30s TTL for faster responses
               }
             } catch (err) {
               console.error('[CACHE] Error refreshing portfolio:', err);
@@ -1028,7 +1028,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
       
       const responseData = { ...portfolio, positions: enhancedPositions, analytics: portfolioAnalytics };
-      cacheService.set(cacheKey, responseData, 5000); // Cache for 5s
+      cacheService.set(cacheKey, responseData, 30000); // Cache for 30s
       res.json(responseData);
     } catch (error) {
       console.error('[API] Error fetching user portfolio:', error);
