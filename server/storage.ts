@@ -61,6 +61,7 @@ export interface IStorage {
   getPositionByPortfolioAndToken(portfolioId: string, tokenId: string): Promise<Position | undefined>;
   createPosition(position: InsertPosition): Promise<Position>;
   updatePosition(id: string, updates: Partial<InsertPosition>): Promise<Position>;
+  deletePosition(id: string): Promise<void>;
 
   // Alert operations
   getUnreadAlerts(): Promise<ScanAlert[]>;
@@ -355,6 +356,10 @@ export class DatabaseStorage implements IStorage {
   async updatePosition(id: string, updates: Partial<InsertPosition>): Promise<Position> {
     const [position] = await db.update(positions).set(updates).where(eq(positions.id, id)).returning();
     return position;
+  }
+
+  async deletePosition(id: string): Promise<void> {
+    await db.delete(positions).where(eq(positions.id, id));
   }
 
   // Alert operations

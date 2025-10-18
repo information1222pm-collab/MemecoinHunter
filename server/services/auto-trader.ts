@@ -953,14 +953,17 @@ class AutoTrader extends EventEmitter {
       const realizedPnL = totalSellValue - totalBuyValue;
       const totalValue = (sellAmount * currentPrice).toString();
       
-      // IMPROVED: Update position amount (partial sell keeps position open, full sell closes it)
-      await storage.updatePosition(currentPosition.id, { 
-        amount: remainingAmount.toString() 
-      });
-      
-      // Clean up stage tracking if position is fully closed
+      // CRITICAL FIX: Delete position if fully sold, otherwise update amount
       if (remainingAmount <= 0) {
+        // Position fully sold - DELETE from database
+        await storage.deletePosition(currentPosition.id);
         this.positionStages.delete(currentPosition.id);
+        console.log(`🗑️  [Portfolio ${portfolioId}] Deleted zero-amount position for ${token.symbol}`);
+      } else {
+        // Partial sell - UPDATE amount
+        await storage.updatePosition(currentPosition.id, { 
+          amount: remainingAmount.toString() 
+        });
       }
       
       // Find the original buy trade to get pattern linkage
