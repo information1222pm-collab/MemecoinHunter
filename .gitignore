@@ -4,3 +4,28 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Environment variables and secrets
+.env
+.env.local
+.env.production
+*.env
+
+# Database
+*.db
+*.sqlite
+
+# Logs
+*.log
+logs/
+/tmp/
+
+# IDE
+.vscode/
+.idea/
+
+# Replit specific
+.replit
+.config/
+.upm/
+replit.nix
