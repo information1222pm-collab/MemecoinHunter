@@ -270,8 +270,17 @@ Provide a concise analysis in JSON format with:
 1. title: Brief headline (max 60 chars)
 2. description: Detailed analysis (2-3 sentences)
 3. recommendation: Specific action to take (1-2 sentences)
-4. confidence: Score from 0-100
-5. priority: low, medium, high, or critical
+4. confidence: Score from 0-100 (as a number)
+5. priority: "low", "medium", "high", or "critical" (as a quoted string)
+
+Example format:
+{
+  "title": "Strong Performance Trend",
+  "description": "Portfolio shows consistent gains...",
+  "recommendation": "Continue current strategy...",
+  "confidence": 85,
+  "priority": "medium"
+}
 
 Focus on:
 - If win rate is below 50%, suggest specific improvements
@@ -363,8 +372,17 @@ Provide a concise risk assessment in JSON format with:
 1. title: Risk alert headline (max 60 chars)
 2. description: Risk analysis (2-3 sentences)
 3. recommendation: Specific risk mitigation action (1-2 sentences)
-4. confidence: Score from 0-100
-5. priority: low, medium, high, or critical
+4. confidence: Score from 0-100 (as a number)
+5. priority: "low", "medium", "high", or "critical" (as a quoted string)
+
+Example format:
+{
+  "title": "Moderate Risk Exposure",
+  "description": "Current positions are balanced...",
+  "recommendation": "Maintain current risk levels...",
+  "confidence": 75,
+  "priority": "medium"
+}
 
 Focus on:
 - Recommend specific stop-loss levels for current positions

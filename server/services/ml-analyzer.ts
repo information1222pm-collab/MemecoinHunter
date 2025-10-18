@@ -141,17 +141,12 @@ class MLAnalyzer extends EventEmitter {
       }
       
       // ENHANCED: Get price history for the last 7 days for better trend analysis
+      // MEMORY: Limit database query to 100 rows max to prevent memory issues
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      history = await storage.getPriceHistory(token.id, sevenDaysAgo);
+      const MAX_DATA_POINTS = 100;
+      history = await storage.getPriceHistory(token.id, sevenDaysAgo, undefined, MAX_DATA_POINTS);
       
       console.log(`🔍 ML-ANALYZER: Found ${history.length} price history points for ${token.symbol}`);
-      
-      // FIX: Limit data to prevent memory issues - further reduced from 200 to 100
-      const MAX_DATA_POINTS = 100;
-      if (history.length > MAX_DATA_POINTS) {
-        console.log(`🔍 ML-ANALYZER: Limiting ${token.symbol} data from ${history.length} to ${MAX_DATA_POINTS} most recent points`);
-        history = history.slice(-MAX_DATA_POINTS);
-      }
       
       // ENHANCED: Require more data points for better accuracy (increased from 20 to 50)
       if (history.length < 50) {

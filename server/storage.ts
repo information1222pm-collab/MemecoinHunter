@@ -68,7 +68,7 @@ export interface IStorage {
   markAlertAsRead(id: string): Promise<ScanAlert>;
 
   // Price history operations
-  getPriceHistory(tokenId: string, from?: Date, to?: Date): Promise<PriceHistory[]>;
+  getPriceHistory(tokenId: string, from?: Date, to?: Date, limit?: number): Promise<PriceHistory[]>;
   createPriceHistory(history: InsertPriceHistory): Promise<PriceHistory>;
 
   // Pattern operations
@@ -373,7 +373,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Price history operations
-  async getPriceHistory(tokenId: string, from?: Date, to?: Date): Promise<PriceHistory[]> {
+  async getPriceHistory(tokenId: string, from?: Date, to?: Date, limit?: number): Promise<PriceHistory[]> {
+    // MEMORY: Add limit parameter to prevent fetching massive datasets
+    const MAX_ROWS = limit || 1000; // Default to 1000 max rows if not specified
+    
     if (from && to) {
       return await db.select().from(priceHistory)
         .where(and(
@@ -381,12 +384,14 @@ export class DatabaseStorage implements IStorage {
           gte(priceHistory.timestamp, from),
           lte(priceHistory.timestamp, to)
         ))
-        .orderBy(desc(priceHistory.timestamp));
+        .orderBy(desc(priceHistory.timestamp))
+        .limit(MAX_ROWS);
     }
     
     return await db.select().from(priceHistory)
       .where(eq(priceHistory.tokenId, tokenId))
-      .orderBy(desc(priceHistory.timestamp));
+      .orderBy(desc(priceHistory.timestamp))
+      .limit(MAX_ROWS);
   }
 
   async createPriceHistory(insertHistory: InsertPriceHistory): Promise<PriceHistory> {
