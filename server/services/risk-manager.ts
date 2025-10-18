@@ -156,6 +156,12 @@ class RiskManager extends EventEmitter {
 
       const portfolioValue = safeParseFloat(portfolio.totalValue, 0);
       
+      // CRITICAL: Validate portfolio value to prevent NaN calculations
+      if (portfolioValue <= 0 || isNaN(portfolioValue) || !isFinite(portfolioValue)) {
+        console.error(`❌ RISK-MANAGER: Invalid portfolio value for ${portfolioId}: ${portfolioValue}`);
+        throw new Error(`Invalid portfolio value: ${portfolioValue}`);
+      }
+      
       // DYNAMIC RISK LEVEL: Get portfolio-specific risk configuration
       const riskLevel = (portfolio.riskLevel || 'balanced') as RiskLevel;
       const riskConfig = getRiskLevelConfig(riskLevel);
@@ -607,10 +613,16 @@ class RiskManager extends EventEmitter {
   }
 
   private getAvailableCapacity(positions: Position[], portfolioValue: number, riskLimits: RiskLimits): number {
+    // CRITICAL: Validate portfolio value to prevent NaN
+    if (portfolioValue <= 0 || isNaN(portfolioValue) || !isFinite(portfolioValue)) {
+      console.error(`❌ RISK-MANAGER: Invalid portfolio value in getAvailableCapacity: ${portfolioValue}`);
+      return 0; // Return 0 capacity if portfolio value is invalid
+    }
+    
     // Filter out zero-amount positions before calculating
     const activePositions = positions.filter(p => parseFloat(p.amount) > 0);
     const totalPositionValue = activePositions.reduce((sum, p) => sum + parseFloat(p.currentValue || '0'), 0);
-    const usedCapacity = portfolioValue > 0 ? (totalPositionValue / portfolioValue) * 100 : 0;
+    const usedCapacity = (totalPositionValue / portfolioValue) * 100;
     const availableCapacity = Math.max(0, 95 - usedCapacity); // Keep 5% cash
     
     return Math.min(availableCapacity, riskLimits.maxPositionSize);
