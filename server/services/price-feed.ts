@@ -87,10 +87,10 @@ class PriceFeedService extends EventEmitter {
   private requestQueue: Array<() => Promise<void>> = [];
   private isProcessingQueue = false;
   
-  // EXPANDED: Now fetching top 5000 coins dynamically
-  private readonly MAX_COINS_TO_TRACK = 5000; // Track top 5000 coins by market cap
-  private readonly COINS_PER_PAGE = 250; // CoinGecko max per page
-  private readonly BATCH_SIZE = 100; // Process in batches for memory efficiency
+  // PERFORMANCE: Reduced to top 100 coins for faster loading
+  private readonly MAX_COINS_TO_TRACK = 100; // Track top 100 coins by market cap (reduced from 5000)
+  private readonly COINS_PER_PAGE = 100; // Fetch all in one page
+  private readonly BATCH_SIZE = 50; // Process in batches for memory efficiency
   
   start() {
     if (this.isRunning) return;
@@ -101,10 +101,10 @@ class PriceFeedService extends EventEmitter {
     // Initialize tokens on startup
     this.initializeTokensFromAPI();
     
-    // Update prices every 2 minutes (reduced frequency for 5000 coins)
+    // Update prices every 5 minutes (reduced frequency for better performance)
     this.updateInterval = setInterval(() => {
       this.updatePrices();
-    }, 120000); // 2 minutes
+    }, 300000); // 5 minutes
   }
 
   stop() {

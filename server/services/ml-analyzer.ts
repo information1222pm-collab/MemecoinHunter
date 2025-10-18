@@ -60,11 +60,11 @@ class MLAnalyzer extends EventEmitter {
     this.isRunning = true;
     console.log('🤖 ML Pattern Analyzer started');
     
-    // Analyze every 2 minutes
+    // Analyze every 10 minutes (reduced from 2 min for better performance)
     this.analysisInterval = setInterval(() => {
       console.log('🔍 ML-ANALYZER: Starting analysis cycle...');
       this.analyzePatterns();
-    }, 120000);
+    }, 600000);
     
     // Initial analysis
     console.log('🔍 ML-ANALYZER: Running initial analysis...');
