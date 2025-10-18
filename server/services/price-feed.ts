@@ -117,7 +117,7 @@ class PriceFeedService extends EventEmitter {
 
   private async initializeTokensFromAPI() {
     try {
-      console.log('🔄 Fetching top 5000 tokens from CoinGecko API...');
+      console.log(`🔄 Fetching top ${this.MAX_COINS_TO_TRACK} tokens from CoinGecko API...`);
       const allCoins = await this.fetchAllCoinsData();
       
       console.log(`📊 Processing ${allCoins.length} coins...`);
@@ -174,7 +174,7 @@ class PriceFeedService extends EventEmitter {
 
   private async updatePrices() {
     try {
-      console.log('🔄 Updating prices for top 5000 coins...');
+      console.log(`🔄 Updating prices for top ${this.MAX_COINS_TO_TRACK} coins...`);
       const allCoins = await this.fetchAllCoinsData();
       const tokens = await storage.getActiveTokens();
       
@@ -264,16 +264,16 @@ class PriceFeedService extends EventEmitter {
   }
 
   /**
-   * Fetch all 5000 coins with pagination
+   * Fetch top coins with pagination (optimized for performance)
    */
   private async fetchAllCoinsData(): Promise<CoinGeckoToken[]> {
-    const cacheKey = 'all_coins_5000';
+    const cacheKey = `all_coins_${this.MAX_COINS_TO_TRACK}`;
     const cachedData = this.getCachedResponse(cacheKey);
     if (cachedData) {
       return cachedData;
     }
 
-    console.log('🌐 Fetching 5000 coins from CoinGecko (this may take a moment)...');
+    console.log(`🌐 Fetching ${this.MAX_COINS_TO_TRACK} coins from CoinGecko (this may take a moment)...`);
     
     const allCoins: CoinGeckoToken[] = [];
     const totalPages = Math.ceil(this.MAX_COINS_TO_TRACK / this.COINS_PER_PAGE);
