@@ -952,7 +952,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Portfolio routes
-  // Get authenticated user's portfolio
+  // Get authenticated user's portfolio (with aggressive caching for speed)
   app.get("/api/portfolio", requireAuth, async (req: any, res) => {
     try {
       const userId = req.user.id;  // requireAuth middleware sets req.user for both OAuth and session auth
@@ -960,25 +960,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "User not authenticated" });
       }
 
+      // PERFORMANCE: Check cache first for instant response
+      const cacheKey = `portfolio_${userId}`;
+      const cached = cacheService.get(cacheKey);
+      
+      if (cached) {
+        // Return cached data immediately
+        res.json(cached);
+        
+        // Refresh cache in background if stale
+        if (cacheService.isStale(cacheKey)) {
+          setImmediate(async () => {
+            try {
+              const portfolio = await storage.getPortfolioByUserId(userId);
+              if (portfolio) {
+                const positions = await storage.getPositionsByPortfolio(portfolio.id);
+                const activePositions = positions.filter(p => parseFloat(p.amount) > 0);
+                const portfolioAnalytics = await positionTracker.getPortfolioAnalytics(portfolio.id);
+                const positionAnalytics = await positionTracker.getPositionAnalytics(portfolio.id);
+                const enhancedPositions = await Promise.all(activePositions.map(async position => {
+                  const analytics = positionAnalytics.find(a => a.positionId === position.id);
+                  const token = await storage.getToken(position.tokenId);
+                  return {
+                    ...position,
+                    analytics: analytics || null,
+                    token: { 
+                      symbol: token?.symbol || analytics?.tokenSymbol || 'Unknown',
+                      name: token?.name || `${analytics?.tokenSymbol || 'Unknown'} Token`,
+                      currentPrice: token?.currentPrice || '0'
+                    }
+                  };
+                }));
+                const freshData = { ...portfolio, positions: enhancedPositions, analytics: portfolioAnalytics };
+                cacheService.set(cacheKey, freshData, 5000); // 5s TTL
+              }
+            } catch (err) {
+              console.error('[CACHE] Error refreshing portfolio:', err);
+            }
+          });
+        }
+        return;
+      }
+
+      // Cache miss - fetch fresh data
       const portfolio = await storage.getPortfolioByUserId(userId);
       if (!portfolio) {
         return res.status(404).json({ message: "Portfolio not found" });
       }
       
       const positions = await storage.getPositionsByPortfolio(portfolio.id);
-      
-      // Filter out closed positions (amount = 0)
       const activePositions = positions.filter(p => parseFloat(p.amount) > 0);
-      
-      // Get enhanced analytics from position tracker
       const portfolioAnalytics = await positionTracker.getPortfolioAnalytics(portfolio.id);
       const positionAnalytics = await positionTracker.getPositionAnalytics(portfolio.id);
       
-      // Merge position data with analytics (only for active positions)
       const enhancedPositions = await Promise.all(activePositions.map(async position => {
         const analytics = positionAnalytics.find(a => a.positionId === position.id);
         const token = await storage.getToken(position.tokenId);
-        
         return {
           ...position,
           analytics: analytics || null,
@@ -990,12 +1027,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       }));
       
-      // totalValue now already includes cash balance (updated by position tracker)
-      res.json({ 
-        ...portfolio,
-        positions: enhancedPositions,
-        analytics: portfolioAnalytics
-      });
+      const responseData = { ...portfolio, positions: enhancedPositions, analytics: portfolioAnalytics };
+      cacheService.set(cacheKey, responseData, 5000); // Cache for 5s
+      res.json(responseData);
     } catch (error) {
       console.error('[API] Error fetching user portfolio:', error);
       res.status(500).json({ message: "Failed to fetch portfolio", error });
