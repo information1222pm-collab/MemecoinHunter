@@ -72,10 +72,11 @@ export function Header() {
       });
       // Clear all cached data
       queryClient.clear();
-      // Refetch auth status
-      refetch();
+      // Redirect to signin page
+      window.location.href = "/signin";
     },
     onError: (error: any) => {
+      console.error("Logout error:", error);
       toast({
         title: "Logout failed",
         description: error.message || "Please try again.",
