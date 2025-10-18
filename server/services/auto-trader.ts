@@ -563,6 +563,17 @@ class AutoTrader extends EventEmitter {
       
       console.log(`💡 [Portfolio ${portfolioId}] Dynamic position sizing: $${tradeValue.toFixed(2)} (${positionSizing.riskLevel} risk, ${positionSizing.reasoning})`);
       
+      // CRITICAL: Validate trade value before proceeding
+      if (isNaN(tradeValue) || !isFinite(tradeValue) || tradeValue <= 0) {
+        console.log(`❌ [Portfolio ${portfolioId}] Invalid trade value: $${tradeValue} - skipping trade`);
+        return;
+      }
+      
+      // Minimum trade size to prevent dust trades
+      if (tradeValue < 1) {
+        console.log(`❌ [Portfolio ${portfolioId}] Trade value too small: $${tradeValue.toFixed(2)} - minimum is $1`);
+        return;
+      }
       
       // If insufficient funds, try to rebalance by selling stagnant positions at break-even or above
       if (availableCash < tradeValue) {

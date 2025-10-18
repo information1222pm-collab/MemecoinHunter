@@ -170,8 +170,12 @@ class RiskManager extends EventEmitter {
         maxDrawdown: 20,
       };
 
-      // Base position size (Kelly Criterion adapted for stop loss, with risk level multiplier)
-      const kellyPercentage = this.calculateKellyPercentage(confidence, riskLimits.stopLossPercentage) * riskConfig.kellyMultiplier;
+      // Base position size (Kelly Criterion with risk level multiplier)
+      const baseKelly = this.calculateKellyPercentage(confidence, riskLimits.stopLossPercentage);
+      const adjustedKelly = baseKelly * riskConfig.kellyMultiplier;
+      
+      // CRITICAL: Cap Kelly percentage to safe limits (5-15%) even after risk multiplier
+      const kellyPercentage = Math.max(0, Math.min(adjustedKelly, 15));
       
       // Risk-adjusted position size as percentage
       const availableCapacity = this.getAvailableCapacity(positions, portfolioValue, riskLimits);
@@ -185,7 +189,10 @@ class RiskManager extends EventEmitter {
       const tokenVolatility = await this.getTokenVolatility(tokenId);
       const volatilityAdjustment = this.calculateVolatilityAdjustment(tokenVolatility, riskConfig.volatilityTolerance);
       
-      const finalPercentage = riskAdjustedPercentage * volatilityAdjustment;
+      const adjustedPercentage = riskAdjustedPercentage * volatilityAdjustment;
+      
+      // CRITICAL SAFETY: Final cap to guarantee position sizing never exceeds 15% under any circumstances
+      const finalPercentage = Math.max(0, Math.min(adjustedPercentage, 15));
       
       // Convert to dollar amount and then to token amount
       const dollarAmount = (finalPercentage / 100) * portfolioValue;
@@ -578,28 +585,25 @@ class RiskManager extends EventEmitter {
   }
 
   private calculateKellyPercentage(confidence: number, stopLossPercentage: number): number {
-    // Kelly Criterion adapted for stop loss: f = (bp - q) / b
+    // Kelly Criterion: f = (bp - q) / b
     // where b = reward/risk ratio, p = probability of win, q = probability of loss
     const winProbability = confidence;
     const lossProbability = 1 - confidence;
     
-    // Risk per trade based on stop loss
-    const riskPerTrade = stopLossPercentage / 100;
-    
     // Assume 2:1 reward/risk ratio (target gain vs stop loss)
     const rewardRiskRatio = 2.0;
     
-    // Kelly formula: f = (probability_win * reward_ratio - probability_loss) / reward_ratio
+    // Kelly formula: f = (p * b - q) / b
     const kellyFraction = (winProbability * rewardRiskRatio - lossProbability) / rewardRiskRatio;
     
-    // Scale by risk per trade and convert to percentage
-    let kellyPercentage = (kellyFraction / riskPerTrade) * 100;
+    // Convert to percentage
+    let kellyPercentage = kellyFraction * 100;
     
-    // AGGRESSIVE MODE: Use 2x Kelly for higher returns (increased risk)
-    kellyPercentage = kellyPercentage * 2;
+    // AGGRESSIVE MODE: Use 1.5x Kelly for higher returns (balanced risk)
+    kellyPercentage = kellyPercentage * 1.5;
     
-    // Cap at higher limits for aggressive trading (increased from 15% to 30%)
-    return Math.max(0, Math.min(kellyPercentage, 30));
+    // Cap at reasonable limits (5-15% range for safety)
+    return Math.max(0, Math.min(kellyPercentage, 15));
   }
 
   private getAvailableCapacity(positions: Position[], portfolioValue: number, riskLimits: RiskLimits): number {
