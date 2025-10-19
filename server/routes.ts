@@ -451,6 +451,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error('❌ Auto-Trader failed to start:', error);
     }
     
+    // Start hourly PnL tracker for $100/hour performance monitoring
+    console.log('💰 Starting Hourly PnL Tracker...');
+    const { hourlyPnLTracker } = await import('./services/hourly-pnl-tracker');
+    hourlyPnLTracker.start();
+    
     // Start AI Trade Executor service
     console.log('🧠 Starting AI Trade Executor service...');
     try {

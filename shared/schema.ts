@@ -103,6 +103,24 @@ export const positions = pgTable("positions", {
   tokenIdIdx: index("positions_token_id_idx").on(table.tokenId),
 }));
 
+export const hourlyPnL = pgTable("hourly_pnl", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  portfolioId: varchar("portfolio_id").notNull().references(() => portfolios.id),
+  hour: timestamp("hour").notNull(),
+  startingEquity: decimal("starting_equity", { precision: 20, scale: 2 }).notNull(),
+  endingEquity: decimal("ending_equity", { precision: 20, scale: 2 }).notNull(),
+  hourlyPnL: decimal("hourly_pnl", { precision: 20, scale: 2 }).notNull(),
+  trades: integer("trades").default(0),
+  wins: integer("wins").default(0),
+  losses: integer("losses").default(0),
+  averageReturn: decimal("average_return", { precision: 8, scale: 4 }).default("0"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  portfolioIdIdx: index("hourly_pnl_portfolio_id_idx").on(table.portfolioId),
+  hourIdx: index("hourly_pnl_hour_idx").on(table.hour),
+  portfolioHourIdx: index("hourly_pnl_portfolio_hour_idx").on(table.portfolioId, table.hour),
+}));
+
 export const scanAlerts = pgTable("scan_alerts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tokenId: varchar("token_id").notNull().references(() => tokens.id),
@@ -763,3 +781,12 @@ export const insertAIInsightSchema = createInsertSchema(aiInsights).omit({
 
 export type AIInsight = typeof aiInsights.$inferSelect;
 export type InsertAIInsight = z.infer<typeof insertAIInsightSchema>;
+
+// Hourly PnL Tracking
+export const insertHourlyPnLSchema = createInsertSchema(hourlyPnL).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type HourlyPnL = typeof hourlyPnL.$inferSelect;
+export type InsertHourlyPnL = z.infer<typeof insertHourlyPnLSchema>;

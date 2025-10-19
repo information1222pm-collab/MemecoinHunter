@@ -4,7 +4,7 @@ import {
   exchangeConfig, exchangeTrades, exchangeBalances, tradingConfig, apiKeys,
   alertRules, alertEvents, visitors,
   launchCoins, launchAnalysis, launchStrategies, launchPerformance, portfolioLaunchConfig,
-  aiInsights,
+  aiInsights, hourlyPnL,
   type User, type InsertUser, type UpsertUser, type Token, type InsertToken,
   type Portfolio, type InsertPortfolio, type Trade, type InsertTrade,
   type Position, type InsertPosition, type ScanAlert, type InsertScanAlert,
@@ -154,6 +154,12 @@ export interface IStorage {
   getPatternsSince(date: Date): Promise<Pattern[]>;
   getInsightsByPortfolio(portfolioId: string, limit?: number): Promise<AIInsight[]>;
   updateInsightStatus(id: string, status: string): Promise<AIInsight>;
+
+  // Hourly PnL tracking operations
+  getPortfolioTrades(portfolioId: string, startDate: Date, endDate: Date): Promise<Trade[]>;
+  createHourlyPnL(data: any): Promise<any>;
+  getHourlyPnL(portfolioId: string, hours: number): Promise<any[]>;
+  getHourlyPnLSince(portfolioId: string, since: Date): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -962,6 +968,49 @@ export class DatabaseStorage implements IStorage {
       .where(eq(aiInsights.id, id))
       .returning();
     return updated;
+  }
+
+  async getPortfolioTrades(portfolioId: string, startDate: Date, endDate: Date): Promise<Trade[]> {
+    const results = await db.select()
+      .from(trades)
+      .where(
+        and(
+          eq(trades.portfolioId, portfolioId),
+          gte(trades.createdAt, startDate),
+          lte(trades.createdAt, endDate)
+        )
+      )
+      .orderBy(desc(trades.createdAt));
+    return results;
+  }
+
+  async createHourlyPnL(data: any): Promise<any> {
+    const [result] = await db.insert(hourlyPnL)
+      .values(data)
+      .returning();
+    return result;
+  }
+
+  async getHourlyPnL(portfolioId: string, hours: number): Promise<any[]> {
+    const results = await db.select()
+      .from(hourlyPnL)
+      .where(eq(hourlyPnL.portfolioId, portfolioId))
+      .orderBy(desc(hourlyPnL.hour))
+      .limit(hours);
+    return results;
+  }
+
+  async getHourlyPnLSince(portfolioId: string, since: Date): Promise<any[]> {
+    const results = await db.select()
+      .from(hourlyPnL)
+      .where(
+        and(
+          eq(hourlyPnL.portfolioId, portfolioId),
+          gte(hourlyPnL.hour, since)
+        )
+      )
+      .orderBy(desc(hourlyPnL.hour));
+    return results;
   }
 }
 
