@@ -63,12 +63,8 @@ export class TradingAnalyticsService extends EventEmitter {
       const startingCapital = parseFloat(portfolio.startingCapital || '10000');
       const cashBalance = parseFloat(portfolio.cashBalance || '0');
 
-      // Calculate realized P&L from closed trades
-      let totalRealizedPnL = 0;
-      const closedTrades = trades.filter(t => t.closedAt && t.realizedPnL);
-      for (const trade of closedTrades) {
-        totalRealizedPnL += parseFloat(trade.realizedPnL || '0');
-      }
+      // Use portfolio's accumulated realized P&L instead of summing trades
+      const totalRealizedPnL = parseFloat(portfolio.realizedPnL || '0');
 
       // Calculate current position values and unrealized P&L
       let currentPositionsValue = 0;
@@ -392,6 +388,233 @@ export class TradingAnalyticsService extends EventEmitter {
       holdTime,
       strategies,
     };
+  }
+
+  async getAllPortfoliosMetrics(): Promise<{
+    pnl: RealtimePnLMetrics;
+    winLoss: WinLossMetrics;
+    holdTime: HoldTimeMetrics;
+    strategies: StrategyROI[];
+  }> {
+    try {
+      const allPortfolios = await storage.getAllPortfolios();
+      
+      // Aggregate P&L across all portfolios
+      let totalStartingCapital = 0;
+      let totalCurrentValue = 0;
+      let totalRealizedPnL = 0;
+      let totalUnrealizedPnL = 0;
+      let totalDailyPnL = 0;
+
+      for (const portfolio of allPortfolios) {
+        const pnl = await this.getRealtimePnL(portfolio.id);
+        totalStartingCapital += pnl.startingCapital;
+        totalCurrentValue += pnl.currentValue;
+        totalRealizedPnL += pnl.totalRealizedPnL;
+        totalUnrealizedPnL += pnl.totalUnrealizedPnL;
+        totalDailyPnL += pnl.dailyPnL;
+      }
+
+      const totalPnL = totalCurrentValue - totalStartingCapital;
+      const pnlPercentage = totalStartingCapital > 0 ? (totalPnL / totalStartingCapital) * 100 : 0;
+
+      // Aggregate win/loss across all portfolios
+      const allWinLoss = await Promise.all(
+        allPortfolios.map(p => this.getWinLossRatios(p.id))
+      );
+
+      let totalWins = 0;
+      let totalLosses = 0;
+      let totalBreakeven = 0;
+      let totalWinAmount = 0;
+      let totalLossAmount = 0;
+      let largestWin = 0;
+      let largestLoss = 0;
+
+      for (const wl of allWinLoss) {
+        totalWins += wl.totalWins;
+        totalLosses += wl.totalLosses;
+        totalBreakeven += wl.totalBreakeven;
+        totalWinAmount += wl.averageWin * wl.totalWins;
+        totalLossAmount += wl.averageLoss * wl.totalLosses;
+        largestWin = Math.max(largestWin, wl.largestWin);
+        largestLoss = Math.max(largestLoss, wl.largestLoss);
+      }
+
+      const totalTrades = totalWins + totalLosses + totalBreakeven;
+      const winRate = totalTrades > 0 ? (totalWins / totalTrades) * 100 : 0;
+      const averageWin = totalWins > 0 ? totalWinAmount / totalWins : 0;
+      const averageLoss = totalLosses > 0 ? totalLossAmount / totalLosses : 0;
+      const profitFactor = totalLossAmount > 0 ? totalWinAmount / totalLossAmount : totalWinAmount > 0 ? Infinity : 0;
+
+      // Aggregate hold time across all portfolios
+      const allHoldTime = await Promise.all(
+        allPortfolios.map(p => this.getAverageHoldTime(p.id))
+      );
+
+      let totalHoldTimeMs = 0;
+      let totalWinHoldTimeMs = 0;
+      let totalLossHoldTimeMs = 0;
+      let totalClosedTrades = 0;
+
+      for (const ht of allHoldTime) {
+        totalHoldTimeMs += ht.averageHoldTimeMs;
+        totalWinHoldTimeMs += ht.averageWinHoldTimeMs;
+        totalLossHoldTimeMs += ht.averageLossHoldTimeMs;
+        totalClosedTrades += ht.totalClosedTrades;
+      }
+
+      const avgHoldTimeMs = allPortfolios.length > 0 ? totalHoldTimeMs / allPortfolios.length : 0;
+      const avgWinHoldTimeMs = allPortfolios.length > 0 ? totalWinHoldTimeMs / allPortfolios.length : 0;
+      const avgLossHoldTimeMs = allPortfolios.length > 0 ? totalLossHoldTimeMs / allPortfolios.length : 0;
+
+      // Aggregate strategies across all portfolios
+      const allStrategies = await Promise.all(
+        allPortfolios.map(p => this.getROIByStrategy(p.id))
+      );
+
+      const strategyMap = new Map<string, {
+        patternId: string | null;
+        patternType: string;
+        totalTrades: number;
+        winningTrades: number;
+        losingTrades: number;
+        totalProfit: number;
+        totalLoss: number;
+      }>();
+
+      for (const strategies of allStrategies) {
+        for (const strategy of strategies) {
+          const key = strategy.patternId || 'manual';
+          
+          if (!strategyMap.has(key)) {
+            strategyMap.set(key, {
+              patternId: strategy.patternId,
+              patternType: strategy.patternType,
+              totalTrades: 0,
+              winningTrades: 0,
+              losingTrades: 0,
+              totalProfit: 0,
+              totalLoss: 0,
+            });
+          }
+
+          const existing = strategyMap.get(key)!;
+          existing.totalTrades += strategy.totalTrades;
+          existing.winningTrades += strategy.winningTrades;
+          existing.losingTrades += strategy.losingTrades;
+          existing.totalProfit += strategy.totalProfit;
+          existing.totalLoss += strategy.totalLoss;
+        }
+      }
+
+      const aggregatedStrategies: StrategyROI[] = [];
+      for (const [key, data] of Array.from(strategyMap.entries())) {
+        const netProfit = data.totalProfit - data.totalLoss;
+        const roi = data.totalTrades > 0 ? netProfit / data.totalTrades : 0;
+        const winRate = data.totalTrades > 0 ? (data.winningTrades / data.totalTrades) * 100 : 0;
+        const averageReturn = data.totalTrades > 0 ? netProfit / data.totalTrades : 0;
+
+        aggregatedStrategies.push({
+          patternId: data.patternId,
+          patternType: data.patternType,
+          totalTrades: data.totalTrades,
+          winningTrades: data.winningTrades,
+          losingTrades: data.losingTrades,
+          totalProfit: data.totalProfit,
+          totalLoss: data.totalLoss,
+          netProfit,
+          roi,
+          winRate,
+          averageReturn,
+        });
+      }
+
+      aggregatedStrategies.sort((a, b) => b.roi - a.roi);
+
+      return {
+        pnl: {
+          totalRealizedPnL,
+          totalUnrealizedPnL,
+          totalPnL,
+          dailyPnL: totalDailyPnL,
+          pnlPercentage,
+          startingCapital: totalStartingCapital,
+          currentValue: totalCurrentValue,
+        },
+        winLoss: {
+          totalWins,
+          totalLosses,
+          totalBreakeven,
+          winRate,
+          averageWin,
+          averageLoss,
+          profitFactor,
+          largestWin,
+          largestLoss,
+        },
+        holdTime: {
+          averageHoldTime: this.formatHoldTime(avgHoldTimeMs),
+          averageHoldTimeMs: avgHoldTimeMs,
+          averageWinHoldTime: this.formatHoldTime(avgWinHoldTimeMs),
+          averageWinHoldTimeMs: avgWinHoldTimeMs,
+          averageLossHoldTime: this.formatHoldTime(avgLossHoldTimeMs),
+          averageLossHoldTimeMs: avgLossHoldTimeMs,
+          totalClosedTrades,
+        },
+        strategies: aggregatedStrategies,
+      };
+    } catch (error) {
+      console.error('Error calculating all portfolios metrics:', error);
+      return {
+        pnl: {
+          totalRealizedPnL: 0,
+          totalUnrealizedPnL: 0,
+          totalPnL: 0,
+          dailyPnL: 0,
+          pnlPercentage: 0,
+          startingCapital: 10000,
+          currentValue: 10000,
+        },
+        winLoss: {
+          totalWins: 0,
+          totalLosses: 0,
+          totalBreakeven: 0,
+          winRate: 0,
+          averageWin: 0,
+          averageLoss: 0,
+          profitFactor: 0,
+          largestWin: 0,
+          largestLoss: 0,
+        },
+        holdTime: {
+          averageHoldTime: '0 hours',
+          averageHoldTimeMs: 0,
+          averageWinHoldTime: '0 hours',
+          averageWinHoldTimeMs: 0,
+          averageLossHoldTime: '0 hours',
+          averageLossHoldTimeMs: 0,
+          totalClosedTrades: 0,
+        },
+        strategies: [],
+      };
+    }
+  }
+
+  private formatHoldTime(ms: number): string {
+    if (ms === 0) return '0 hours';
+    
+    const hours = ms / (1000 * 60 * 60);
+    const days = hours / 24;
+    
+    if (days >= 1) {
+      return `${days.toFixed(1)} days`;
+    } else if (hours >= 1) {
+      return `${hours.toFixed(1)} hours`;
+    } else {
+      const minutes = ms / (1000 * 60);
+      return `${minutes.toFixed(1)} minutes`;
+    }
   }
 
   emitMetricsUpdate(portfolioId: string, metrics: any) {

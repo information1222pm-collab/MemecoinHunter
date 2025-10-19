@@ -2458,12 +2458,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/analytics/all", async (req: any, res) => {
     try {
-      // Check if user is authenticated
-      const isAuthenticated = !!(req.user?.id || req.session?.userId);
-      const userId = req.user?.id || req.session?.userId;
-      
-      // Use user-specific cache key or demo cache key
-      const cacheKey = isAuthenticated ? `analytics_all_${userId}` : 'analytics_all_demo';
+      // UPDATED: Now aggregates P&L across ALL portfolios (not just demo user's)
+      const cacheKey = 'analytics_all_global';
       
       // Try to get from cache first (even if stale)
       let transformed = cacheService.get(cacheKey);
@@ -2476,17 +2472,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (cacheService.isStale(cacheKey)) {
           (async () => {
             try {
-              let portfolio;
-              if (isAuthenticated) {
-                portfolio = await storage.getPortfolioByUserId(userId);
-              } else {
-                const demoData = await getDemoUserAndPortfolio();
-                portfolio = demoData.portfolio;
-              }
-              
-              if (!portfolio) return;
-              
-              const allMetrics = await tradingAnalyticsService.getAllMetrics(portfolio.id);
+              const allMetrics = await tradingAnalyticsService.getAllPortfoliosMetrics();
               
               const freshData = {
                 pnl: allMetrics.pnl,
@@ -2514,20 +2500,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           })();
         }
       } else {
-        // Cache miss (first time) - compute analytics synchronously
-        let portfolio;
-        if (isAuthenticated) {
-          portfolio = await storage.getPortfolioByUserId(userId);
-        } else {
-          const demoData = await getDemoUserAndPortfolio();
-          portfolio = demoData.portfolio;
-        }
-        
-        if (!portfolio) {
-          return res.status(404).json({ message: "Portfolio not found" });
-        }
-        
-        const allMetrics = await tradingAnalyticsService.getAllMetrics(portfolio.id);
+        // Cache miss (first time) - compute analytics synchronously across ALL portfolios
+        const allMetrics = await tradingAnalyticsService.getAllPortfoliosMetrics();
         
         transformed = {
           pnl: allMetrics.pnl,
