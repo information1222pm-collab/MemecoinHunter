@@ -867,11 +867,18 @@ class AutoTrader extends EventEmitter {
           // Get risk config for take-profit levels
           const riskConfig = await this.getRiskConfig(portfolioId);
           
-          // ENHANCED: Chart-based exit signal
-          if (chartBasedExit && profitLoss > 2) {
-            sellReason = `Chart pattern exit signal at ${profitLoss.toFixed(1)}% gain`;
-            sellTrigger = 'chart_pattern_exit';
-            this.positionStages.delete(position.id);
+          // ENHANCED: Chart-based exit signal - NOW FULLY ACTIVE for all positions
+          // Exit on bearish signals even at breakeven or small losses to prevent bigger losses
+          if (chartBasedExit) {
+            // Strong bearish signals: Exit immediately regardless of P&L
+            if (profitLoss >= -3) {
+              // Only prevent exits if loss is > 3% (catastrophic scenario - hold for recovery)
+              sellReason = `Chart pattern exit signal at ${profitLoss.toFixed(1)}% ${profitLoss >= 0 ? 'gain' : 'loss'}`;
+              sellTrigger = 'chart_pattern_exit';
+              this.positionStages.delete(position.id);
+            } else {
+              console.log(`⚠️ CHART-ANALYZER: Bearish signal detected but loss too large (${profitLoss.toFixed(1)}%) - holding for potential recovery`);
+            }
           }
           // DYNAMIC RISK LEVEL: Multi-stage take-profit strategy based on portfolio risk level
           // Only execute next stage if previous stages are complete
