@@ -63,31 +63,40 @@ export class TradingAnalyticsService extends EventEmitter {
       const startingCapital = parseFloat(portfolio.startingCapital || '10000');
       const cashBalance = parseFloat(portfolio.cashBalance || '0');
 
+      // Calculate realized P&L from closed trades
       let totalRealizedPnL = 0;
       const closedTrades = trades.filter(t => t.closedAt && t.realizedPnL);
       for (const trade of closedTrades) {
         totalRealizedPnL += parseFloat(trade.realizedPnL || '0');
       }
 
-      let totalUnrealizedPnL = 0;
-      for (const position of positions) {
-        if (parseFloat(position.amount) > 0) {
-          totalUnrealizedPnL += parseFloat(position.unrealizedPnL || '0');
-        }
-      }
-
-      const totalPnL = totalRealizedPnL + totalUnrealizedPnL;
-      
+      // Calculate current position values and unrealized P&L
       let currentPositionsValue = 0;
+      let totalUnrealizedPnL = 0;
+      
       for (const position of positions) {
-        if (parseFloat(position.amount) > 0) {
-          currentPositionsValue += parseFloat(position.currentValue || '0');
+        const amount = parseFloat(position.amount);
+        if (amount > 0) {
+          const token = await storage.getToken(position.tokenId);
+          if (token) {
+            const currentPrice = parseFloat(token.currentPrice || '0');
+            const avgBuyPrice = parseFloat(position.avgBuyPrice || '0');
+            
+            const positionValue = amount * currentPrice;
+            const costBasis = amount * avgBuyPrice;
+            const unrealizedPnL = positionValue - costBasis;
+            
+            currentPositionsValue += positionValue;
+            totalUnrealizedPnL += unrealizedPnL;
+          }
         }
       }
+      
+      // CORRECT P&L CALCULATION: Current Value - Starting Capital
       const currentValue = cashBalance + currentPositionsValue;
+      const totalPnL = currentValue - startingCapital;
 
       const dailyPnL = parseFloat(portfolio.dailyPnL || '0');
-
       const pnlPercentage = startingCapital > 0 ? (totalPnL / startingCapital) * 100 : 0;
 
       return {
