@@ -1,4 +1,4 @@
-export type RiskLevel = 'conservative' | 'moderate' | 'balanced' | 'aggressive' | 'very_aggressive';
+export type RiskLevel = 'conservative' | 'moderate' | 'balanced' | 'aggressive' | 'very_aggressive' | 'high_frequency';
 
 export interface RiskLevelConfig {
   level: RiskLevel;
@@ -215,6 +215,40 @@ export const RISK_LEVEL_CONFIGS: Record<RiskLevel, RiskLevelConfig> = {
     volatilityTolerance: 1.5,
     maxConcentration: 40,
     aggressiveSellThreshold: 4.0,
+  },
+  
+  high_frequency: {
+    level: 'high_frequency',
+    displayName: 'High Frequency',
+    description: '$100/hour target with rapid scalping. Ultra-tight profit-taking for maximum hourly returns.',
+    color: 'purple',
+    icon: '⚡💰',
+    
+    // Position Sizing - High capital deployment for frequent trades
+    kellyMultiplier: 1.5,
+    maxPositionSizePercent: 25,
+    minCashPercentage: 15,
+    
+    // Confidence & Quality - Lower thresholds for more opportunities
+    minConfidence: 65,
+    minRiskRewardRatio: 1.2,
+    minPatternWinRate: 0.45,
+    
+    // Risk Management - Tight per-trade limits
+    maxOpenPositions: 25,
+    
+    // Take Profit - ULTRA AGGRESSIVE scalping (0.8%, 1.6%, 3.0%)
+    takeProfitStages: [0.8, 1.6, 3.0],
+    finalTakeProfitPercent: 3.0,
+    
+    // Market Health - Trade frequently in any reasonable conditions
+    minMarketHealthScore: 35,
+    marketHealthMultiplier: 0.6,
+    
+    // Advanced - Optimized for high frequency
+    volatilityTolerance: 1.4,
+    maxConcentration: 35,
+    aggressiveSellThreshold: 0.8,
   },
 };
 

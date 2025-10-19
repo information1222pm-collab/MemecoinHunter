@@ -323,20 +323,24 @@ class AutoTrader extends EventEmitter {
         return;
       }
       
-      // Get current dynamic minimum confidence
-      const currentMinConfidence = await patternPerformanceAnalyzer.getCurrentMinConfidence();
-      
-      if (adjustedConfidence < currentMinConfidence) {
-        console.log(`🔍 Pattern ${pattern.patternType} skipped: ${adjustedConfidence.toFixed(1)}% < ${currentMinConfidence}% threshold`);
-        return;
-      }
-      
       const token = await storage.getToken(pattern.tokenId);
       if (!token) return;
       
-      // Execute on ALL enabled portfolios
+      // Execute on ALL enabled portfolios - check confidence per portfolio
       const portfolioIds = Array.from(this.enabledPortfolios.keys());
       for (const portfolioId of portfolioIds) {
+        // Get portfolio-specific risk config for confidence threshold
+        const riskConfig = await this.getRiskConfig(portfolioId);
+        
+        // Check against both the pattern analyzer's dynamic minimum AND the portfolio's risk level
+        const currentMinConfidence = await patternPerformanceAnalyzer.getCurrentMinConfidence();
+        const effectiveMinConfidence = Math.max(currentMinConfidence, riskConfig.minConfidence);
+        
+        if (adjustedConfidence < effectiveMinConfidence) {
+          console.log(`🔍 Pattern ${pattern.patternType} skipped for portfolio ${portfolioId}: ${adjustedConfidence.toFixed(1)}% < ${effectiveMinConfidence}% (dynamic: ${currentMinConfidence}%, ${riskConfig.displayName}: ${riskConfig.minConfidence}%)`);
+          continue; // Skip this portfolio
+        }
+        
         const signal = await this.evaluatePattern(pattern, token, adjustedConfidence, portfolioId);
         if (signal) {
           signal.patternId = pattern.id; // Link signal to pattern
@@ -352,16 +356,21 @@ class AutoTrader extends EventEmitter {
     if (!this.isActive || this.enabledPortfolios.size === 0) return;
     
     try {
-      if (alert.confidence < this.strategy.minConfidence) return;
-      
       const token = await storage.getToken(alert.tokenId);
       if (!token) return;
       
       // Only trade on significant price movements with volume
       if (alert.alertType === 'volume_surge' || alert.alertType === 'price_spike') {
-        // Execute on ALL enabled portfolios
+        // Execute on ALL enabled portfolios - check confidence per portfolio
         const portfolioIds = Array.from(this.enabledPortfolios.keys());
         for (const portfolioId of portfolioIds) {
+          // Get portfolio-specific risk config for confidence threshold
+          const riskConfig = await this.getRiskConfig(portfolioId);
+          if (alert.confidence < riskConfig.minConfidence) {
+            console.log(`📊 Alert skipped for portfolio ${portfolioId}: ${alert.confidence}% < ${riskConfig.minConfidence}% threshold (${riskConfig.displayName})`);
+            continue; // Skip this portfolio
+          }
+          
           const signal = this.evaluateAlert(alert, token, portfolioId);
           if (signal) {
             await this.executeTradeSignal(signal, undefined, portfolioId);
@@ -558,6 +567,9 @@ class AutoTrader extends EventEmitter {
         return;
       }
       
+      // Get risk config for portfolio-specific limits
+      const riskConfig = await this.getRiskConfig(portfolioId);
+      
       // IMPROVED: Dynamic position sizing from RiskManager
       const positionSizing = await riskManager.calculatePositionSizing(
         portfolioId,
@@ -567,8 +579,10 @@ class AutoTrader extends EventEmitter {
       );
       
       // FIXED: RiskManager returns recommendedSize in TOKENS, convert to DOLLARS
+      // Use risk config's maxPositionSizePercent for portfolio-specific limits
+      const maxPositionValue = totalValue * (riskConfig.maxPositionSizePercent / 100);
       const recommendedDollars = positionSizing.recommendedSize * signal.price;
-      let tradeValue = Math.min(recommendedDollars, this.strategy.maxPositionSize);
+      let tradeValue = Math.min(recommendedDollars, maxPositionValue);
       
       // MARKET HEALTH: Apply position size adjustment (already checked for 0 above)
       if (healthMultiplier < 1.0) {
@@ -692,11 +706,12 @@ class AutoTrader extends EventEmitter {
       const currentCashBalance = safeParseFloat(currentPortfolio.cashBalance, 0);
       
       // Update portfolio cash balance atomically using current balance
-      const newCashBalance = safeDbNumber(currentCashBalance - tradeValue);
+      const newCashBalanceValue = currentCashBalance - tradeValue;
+      const newCashBalance = safeDbNumber(newCashBalanceValue);
       
       // CRITICAL INVARIANT: Ensure cash balance never goes negative
-      if (newCashBalance < -0.01) { // Allow tiny floating point errors
-        console.error(`❌ CRITICAL: Portfolio ${portfolioId} cash would go negative: ${currentCashBalance} - ${tradeValue} = ${newCashBalance}`);
+      if (newCashBalanceValue < -0.01) { // Allow tiny floating point errors
+        console.error(`❌ CRITICAL: Portfolio ${portfolioId} cash would go negative: ${currentCashBalance} - ${tradeValue} = ${newCashBalanceValue}`);
         throw new Error('Portfolio cash balance would go negative - trade aborted');
       }
       
