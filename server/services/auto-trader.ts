@@ -9,6 +9,7 @@ import { MarketHealthAnalyzer } from './market-health';
 import { chartAnalyzer } from './chart-analyzer';
 import { dynamicExitStrategy } from './dynamic-exit-strategy';
 import { getRiskLevelConfig, type RiskLevel, type RiskLevelConfig } from './risk-levels';
+import { aiEntryAnalyzer } from './ai-entry-analyzer';
 import type { Token, Pattern, InsertTrade } from '@shared/schema';
 import type { ExchangeTradingSignal } from './exchange-service';
 import { safeParseFloat, safeDivide, safeDbNumber } from '../utils/safe-number';
@@ -326,6 +327,25 @@ class AutoTrader extends EventEmitter {
       const token = await storage.getToken(pattern.tokenId);
       if (!token) return;
       
+      // OPTIMIZED: Perform AI analysis ONCE per pattern, before looping through portfolios
+      // Get price history for AI analysis (shared across all portfolios)
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const history = await storage.getPriceHistory(token.id, sevenDaysAgo);
+      
+      let chartSignal = null;
+      if (history.length >= 10) {
+        chartSignal = chartAnalyzer.generateEntryExitSignal(history);
+      }
+      
+      // CRITICAL FIX: Call AI analyzer ONCE for this pattern, not once per portfolio
+      const sharedAIAnalysis = await aiEntryAnalyzer.analyzeTradeEntry(
+        token,
+        pattern,
+        chartSignal,
+        history,
+        adjustedConfidence
+      );
+      
       // Execute on ALL enabled portfolios - check confidence per portfolio
       const portfolioIds = Array.from(this.enabledPortfolios.keys());
       for (const portfolioId of portfolioIds) {
@@ -341,7 +361,7 @@ class AutoTrader extends EventEmitter {
           continue; // Skip this portfolio
         }
         
-        const signal = await this.evaluatePattern(pattern, token, adjustedConfidence, portfolioId);
+        const signal = await this.evaluatePattern(pattern, token, adjustedConfidence, portfolioId, sharedAIAnalysis);
         if (signal) {
           signal.patternId = pattern.id; // Link signal to pattern
           await this.executeTradeSignal(signal, pattern.id, portfolioId);
@@ -382,7 +402,7 @@ class AutoTrader extends EventEmitter {
     }
   }
 
-  private async evaluatePattern(pattern: Pattern, token: Token, confidence: number, portfolioId: string): Promise<TradingSignal | null> {
+  private async evaluatePattern(pattern: Pattern, token: Token, confidence: number, portfolioId: string, sharedAIAnalysis?: any): Promise<TradingSignal | null> {
     const currentPrice = parseFloat(token.currentPrice || '0');
     if (currentPrice <= 0) return null;
     
@@ -470,8 +490,34 @@ class AutoTrader extends EventEmitter {
     
     // Regular buy signals for bullish patterns
     if (bullishPatterns.includes(pattern.patternType)) {
+      // AI-POWERED: Use shared AI analysis (already calculated once per pattern)
+      // This prevents duplicate OpenAI API calls across multiple portfolios
+      const aiAnalysis = sharedAIAnalysis || {
+        shouldTrade: true,
+        confidence,
+        reasoning: ['AI analysis not available'],
+        riskFactors: [],
+        opportunities: [],
+        recommendedAction: confidence > 75 ? 'buy' : 'hold',
+      };
+      
+      // Apply AI recommendations
+      if (!aiAnalysis.shouldTrade) {
+        console.log(`🤖 AI-ENTRY-ANALYZER: Trade REJECTED for ${token.symbol} - ${aiAnalysis.reasoning.join('; ')}`);
+        return null;
+      }
+      
+      // Use AI-adjusted confidence (weighted average: 70% AI, 30% ML)
+      const finalConfidence = (aiAnalysis.confidence * 0.7) + (confidence * 0.3);
+      
+      // Require strong AI recommendation for high-frequency trading
+      if (aiAnalysis.recommendedAction === 'avoid') {
+        console.log(`🤖 AI-ENTRY-ANALYZER: Avoiding ${token.symbol} despite pattern - ${aiAnalysis.reasoning.join('; ')}`);
+        return null;
+      }
+      
       // ENHANCED: Add chart analysis reasoning to the signal
-      let enhancedReason = `🤖 [Portfolio ${portfolioId}] ${pattern.patternType} detected (${confidence.toFixed(1)}% confidence)`;
+      let enhancedReason = `🤖 [Portfolio ${portfolioId}] ${pattern.patternType} detected (ML: ${confidence.toFixed(1)}%, AI: ${aiAnalysis.confidence.toFixed(1)}%, Final: ${finalConfidence.toFixed(1)}%)`;
       
       if (chartSignal && tradeQuality) {
         enhancedReason += ` | Chart: ${tradeQuality.recommendation.toUpperCase()}`;
@@ -483,11 +529,17 @@ class AutoTrader extends EventEmitter {
         }
       }
       
+      // Add AI insights
+      enhancedReason += ` | AI: ${aiAnalysis.recommendedAction.replace(/_/g, ' ').toUpperCase()}`;
+      if (aiAnalysis.opportunities.length > 0) {
+        enhancedReason += ` - ${aiAnalysis.opportunities[0]}`;
+      }
+      
       return {
         tokenId: token.id,
         type: 'buy',
-        confidence,
-        source: `ML Pattern: ${pattern.patternType}`,
+        confidence: finalConfidence,
+        source: `AI-Enhanced ML Pattern: ${pattern.patternType}`,
         price: currentPrice,
         reason: enhancedReason,
         patternId: pattern.id
